@@ -149,4 +149,46 @@ with col_esq:
     conteudo_padrao = ""
     
     if arquivo_atual != "+ Novo Estudo":
-        titulo_padrao = arquivo_atual.replace(".txt",
+        titulo_padrao = arquivo_atual.replace(".txt", "")
+        try:
+            with open(os.path.join(PASTA_USER, arquivo_atual), "r") as f:
+                conteudo_padrao = f.read()
+        except:
+            pass
+        
+    novo_titulo = st.text_input("Título da Mensagem", value=titulo_padrao)
+    texto = st.text_area("Esboço", value=conteudo_padrao, height=650)
+    
+    if st.button("💾 Salvar Estudo", type="primary"):
+        if novo_titulo:
+            with open(os.path.join(PASTA_USER, f"{novo_titulo}.txt"), "w") as f:
+                f.write(texto)
+            st.toast("Estudo salvo com sucesso!", icon="✅")
+
+# DIREITA: FERRAMENTAS
+with col_dir:
+    aba1, aba2, aba3 = st.tabs(["📖 Bíblia", "🏛️ Análise", "📰 Notícias"])
+    
+    # ABA BÍBLIA
+    with aba1:
+        st.caption("Comparar Traduções")
+        ref = st.text_input("Versículo (ex: Jo 14:6)")
+        if st.button("Comparar"):
+            if not api_key:
+                st.warning("Precisa da Chave Google.")
+            else:
+                resp = consultar_gemini(f"Traga {ref} na NVI, Almeida e Grego. Explique diferenças.", api_key)
+                st.markdown(resp)
+                
+    # ABA ANÁLISE (IA)
+    with aba2:
+        st.caption("Raio-X Teológico")
+        if st.button("Analisar Esboço"):
+            if not api_key:
+                st.warning("Precisa da Chave Google.")
+            else:
+                with st.status("Consultando teologia...", expanded=True):
+                    if anim_ia:
+                        st_lottie(anim_ia, height=60, key="loading")
+                    analise = consultar_gemini(f"Faça uma análise homilética e teológica deste texto: {texto[:1000]}...", api_key)
+                    st.

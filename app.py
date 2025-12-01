@@ -1,3 +1,73 @@
+# --- INÍCIO DO BLOCO DE DESIGN PROFISSIONAL ---
+st.markdown("""
+    <style>
+    /* 1. Fundo Geral (Cinza Chumbo Profissional) */
+    .stApp {
+        background-color: #0e1117;
+    }
+    
+    /* 2. Barra Lateral (Estilo Couro Escuro com Borda Dourada) */
+    [data-testid="stSidebar"] {
+        background-color: #1a1c24;
+        border-right: 2px solid #C5A059; /* Cor Dourada Clássica */
+    }
+    
+    /* 3. Títulos e Textos */
+    h1, h2, h3 {
+        font-family: 'Helvetica Neue', sans-serif;
+        font-weight: 300;
+        color: #E0E0E0;
+    }
+    
+    /* 4. O Papel de Escrita (A parte mais importante) */
+    .stTextArea textarea {
+        font-family: 'Merriweather', 'Georgia', serif; /* Fonte de Livro Teológico */
+        font-size: 19px !important;
+        line-height: 1.6 !important;
+        background-color: #16171a; /* Fundo bem escuro para não cansar a vista */
+        color: #dcdcdc; /* Texto cinza claro */
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 15px;
+        box-shadow: inset 0 2px 5px rgba(0,0,0,0.5); /* Sombra interna */
+    }
+    
+    /* 5. Botões (Estilo Premium) */
+    .stButton button {
+        background-color: #2b303b;
+        color: white;
+        border-radius: 6px;
+        border: 1px solid #444;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+    .stButton button:hover {
+        border-color: #C5A059; /* Fica dourado ao passar o mouse */
+        color: #C5A059;
+        background-color: #1a1c24;
+    }
+    
+    /* 6. Limpeza Visual (Remove menu padrão do Streamlit) */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* 7. Abas (Tabs) */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1a1c24;
+        border-radius: 4px;
+        color: white;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #C5A059 !important; /* Aba selecionada fica dourada */
+        color: black !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+# --- FIM DO BLOCO DE DESIGN ---
 import streamlit as st
 from duckduckgo_search import DDGS
 import google.generativeai as genai

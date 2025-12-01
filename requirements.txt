@@ -2,3 +2,8 @@ streamlit
 openai
 duckduckgo_search
 requests
+streamlit
+duckduckgo-search
+google-generativeai
+requests
+streamlit-lottie

@@ -1,15 +1,7 @@
-streamlit
-openai
-duckduckgo_search
-requests
-streamlit
+streamlit>=1.35.0
 duckduckgo-search
 google-generativeai
 requests
 streamlit-lottie
-streamlit
-duckduckgo_search
-google-generativeai
-requests
-streamlit-lottie
 PyPDF2
+watchdog

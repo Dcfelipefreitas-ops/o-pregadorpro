@@ -1,5 +1,5 @@
 # --- INÍCIO DO BLOCO DE DESIGN PROFISSIONAL ---
-st.markdown("""
+st.markdown
     <style>
     /* 1. Fundo Geral (Cinza Chumbo Profissional) */
     .stApp {

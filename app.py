@@ -191,4 +191,3 @@ with col_dir:
                     if anim_ia:
                         st_lottie(anim_ia, height=60, key="loading")
                     analise = consultar_gemini(f"Faça uma análise homilética e teológica deste texto: {texto[:1000]}...", api_key)
-                    st.

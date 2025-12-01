@@ -1,6 +1,6 @@
 # --- INÍCIO DO BLOCO DE DESIGN PROFISSIONAL ---
 st.markdown
-    style
+
     /* 1. Fundo Geral (Cinza Chumbo Profissional) */
     .stApp {
         background-color: #0e1117;

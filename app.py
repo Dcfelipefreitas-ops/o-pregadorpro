@@ -15,7 +15,7 @@ except ImportError:
 # --- 1. CONFIGURAÇÃO GERAL ---
 st.set_page_config(page_title="O Pregador", layout="wide", page_icon="✝️")
 
-# --- 2. SISTEMA DE LOGIN (ENTRADA LEGAL) ---
+# --- 2. SISTEMA DE LOGIN ---
 USUARIOS = {
     "admin": "1234",
     "pastor": "pregar",
@@ -23,11 +23,13 @@ USUARIOS = {
 }
 
 def load_lottie_url(url):
-    """Tenta baixar a animação. Se falhar, retorna None mas não trava o app."""
-    if not LOTTIE_OK: return None
+    """Tenta baixar a animação."""
+    if not LOTTIE_OK:
+        return None
     try:
         r = requests.get(url, timeout=1.5)
-        if r.status_code != 200: return None
+        if r.status_code != 200:
+            return None
         return r.json()
     except:
         return None
@@ -37,7 +39,7 @@ anim_entrada = load_lottie_url("https://lottie.host/5a666e37-d2c4-4a47-98d9-2475
 anim_ia = load_lottie_url("https://lottie.host/93310461-1250-482f-87d9-482a46696d5b/6u0v8v5j2a.json")
 
 def verificar_login():
-    """Tela de Login com Design Bonito"""
+    """Tela de Login"""
     if 'logado' not in st.session_state:
         st.session_state['logado'] = False
         st.session_state['usuario_atual'] = ''
@@ -47,7 +49,6 @@ def verificar_login():
         with col2:
             st.write("")
             st.write("")
-            # SE A ANIMAÇÃO CARREGOU, MOSTRA ELA. SE NÃO, MOSTRA TEXTO.
             if anim_entrada:
                 st_lottie(anim_entrada, height=150, key="intro")
             else:
@@ -79,19 +80,73 @@ USUARIO_ATUAL = st.session_state['usuario_atual']
 # --- 3. CONFIGURAÇÃO DE ARQUIVOS ---
 PASTA_RAIZ = "Banco_Sermoes"
 PASTA_USER = os.path.join(PASTA_RAIZ, USUARIO_ATUAL)
-if not os.path.exists(PASTA_USER): os.makedirs(PASTA_USER)
+if not os.path.exists(PASTA_USER):
+    os.makedirs(PASTA_USER)
 
 # --- 4. FUNÇÕES DO SISTEMA ---
 def consultar_gemini(prompt, chave):
-    if not chave: return "⚠️ Cole a chave API no menu."
+    if not chave:
+        return "⚠️ Cole a chave API no menu."
     try:
         genai.configure(api_key=chave)
         model = genai.GenerativeModel('gemini-pro')
         return model.generate_content(prompt).text
-    except Exception as e: return f"Erro Google: {e}"
+    except Exception as e:
+        return f"Erro Google: {e}"
 
 def buscar_noticias(tema):
     try:
         res = DDGS().news(keywords=tema, region="br-pt", max_results=3)
         return res if res else []
     except:
+        return []
+
+# --- 5. VISUAL ESTILO THEWORD ---
+st.markdown("""
+    <style>
+    .block-container {padding-top: 1rem;}
+    [data-testid="stSidebar"] {background-color: #2b2b2b;}
+    .stTextArea textarea {
+        font-family: 'Georgia', serif;
+        font-size: 18px !important;
+        background-color: #1e1e1e;
+        color: #e0e0e0;
+        border: 1px solid #444;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 6. INTERFACE PRINCIPAL ---
+
+# MENU LATERAL
+with st.sidebar:
+    st.markdown("### ✝️ O Pregador")
+    st.caption(f"Logado como: {USUARIO_ATUAL}")
+    
+    if st.button("Sair (Logout)"):
+        st.session_state['logado'] = False
+        st.rerun()
+        
+    st.divider()
+    with st.expander("🔐 Chave Google API"):
+        api_key = st.text_input("Cole aqui", type="password")
+        
+    st.markdown("---")
+    # LISTAGEM SEGURA
+    try:
+        arquivos = [f for f in os.listdir(PASTA_USER) if f.endswith(".txt")]
+    except:
+        arquivos = []
+    
+    arquivo_atual = st.radio("Seus Estudos:", ["+ Novo Estudo"] + arquivos)
+
+# COLUNAS: EDITOR E FERRAMENTAS
+col_esq, col_dir = st.columns([2.5, 1.5])
+
+# ESQUERDA: EDITOR DE TEXTO
+with col_esq:
+    titulo_padrao = ""
+    conteudo_padrao = ""
+    
+    if arquivo_atual != "+ Novo Estudo":
+        titulo_padrao = arquivo_atual.replace(".txt",

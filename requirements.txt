@@ -7,3 +7,9 @@ duckduckgo-search
 google-generativeai
 requests
 streamlit-lottie
+streamlit
+duckduckgo_search
+google-generativeai
+requests
+streamlit-lottie
+PyPDF2

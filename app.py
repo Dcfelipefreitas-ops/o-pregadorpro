@@ -94,18 +94,4 @@ def buscar_noticias(tema):
     try:
         res = DDGS().news(keywords=tema, region="br-pt", max_results=3)
         return res if res else []
-    except: return []
-
-# --- 5. VISUAL ESTILO THEWORD ---
-st.markdown("""
-    <style>
-    .block-container {padding-top: 1rem;}
-    [data-testid="stSidebar"] {background-color: #2b2b2b;}
-    .stTextArea textarea {
-        font-family: 'Georgia', serif;
-        font-size: 18px !important;
-        background-color: #1e1e1e;
-        color: #e0e0e0;
-        border: 1px solid #444;
-    }
-    </style>
+    except:

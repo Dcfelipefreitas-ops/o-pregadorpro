@@ -1,7 +1,6 @@
 import streamlit as st
 from duckduckgo_search import DDGS
 import google.generativeai as genai
-import os
 import requests
 import time
 import PyPDF2  # Biblioteca para ler PDFs

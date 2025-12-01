@@ -1,0 +1,4 @@
+streamlit
+openai
+duckduckgo_search
+requests

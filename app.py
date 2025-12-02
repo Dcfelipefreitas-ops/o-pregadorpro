@@ -1,4 +1,4 @@
-# app.py (VERSÃO CORRIGIDA - cole por cima do seu arquivo)
+# app.py (VERSÃO UNIFICADA, CORRIGIDA E COMPLETA)
 import streamlit as st
 import os
 import requests
@@ -6,6 +6,7 @@ import tempfile
 import qrcode
 from io import BytesIO
 from datetime import datetime
+import json
 import PyPDF2
 from gtts import gTTS
 
@@ -59,7 +60,8 @@ if 'api_input' not in st.session_state:
 # Safe default user for caption (so UI doesn't crash before login)
 USER = st.session_state.get('user', 'Admin')
 
-# --- UTILIDADES ---
+# --- FUNÇÕES AUXILIARES E LÓGICA ---
+
 def update_streak():
     hoje = str(datetime.now().date())
     if st.session_state['last_login'] != hoje:
@@ -94,11 +96,8 @@ def ai_brain(prompt, key, mode="Professor"):
         system_prompt = f"MODO: {roles.get(mode,'Assistente')}\n{lang_instruction}\nCONTEXTO: {prompt}"
         model = genai.GenerativeModel('gemini-1.5-flash')
         out = model.generate_content(system_prompt)
-        # Handle different response shapes
         if hasattr(out, "text"):
             return out.text
-        if isinstance(out, dict):
-            return str(out)
         return str(out)
     except Exception as e:
         return f"Erro na Nuvem IA: {e}"
@@ -124,32 +123,6 @@ def transcrever_audio_file(uploaded_file):
                 return f"Erro no serviço de reconhecimento: {e}"
     except Exception as e:
         return f"Erro ao processar áudio: {e}"
-        def strongs_info(codigo):
-    codigo = codigo.upper().strip()
-    if codigo in LEXICO:
-        return LEXICO[codigo]
-    return "Não encontrado no léxico."
-def referencias_cruzadas(ref):
-    return XREF.get(ref, [])
-with st.expander("📖 Bíblia + Léxico + Strong (TheWord)"):
-    busca = st.text_input("Buscar (texto / strong / operador):")
-
-    if st.button("🔎 Pesquisar"):
-        if busca.upper().startswith("G") or busca.upper().startswith("H"):
-            st.subheader("Léxico Strong")
-            st.write(strongs_info(busca))
-        else:
-            resultados = buscar_palavra(busca)
-            for r in resultados:
-                livro, cap, num, txt = r
-                st.markdown(f"**{livro} {cap}:{num}** — {txt}")
-
-with st.expander("🔗 Referências Cruzadas (XREF)"):
-    ref = st.text_input("Ex: João 3:16")
-    if st.button("🔗 Ver XREF"):
-        cruz = referencias_cruzadas(ref)
-        st.write(cruz if cruz else "Sem referências.")
-
 
 def get_bible(ref):
     """Consulta bible-api com algumas normalizações; retorna dict ou None."""
@@ -158,15 +131,20 @@ def get_bible(ref):
     try:
         r = ref.strip()
         # normalize common separators
-        r = r.replace(",", " ").replace(":", " ").replace(".", " ")
-        parts = r.split()
-        if len(parts) >= 3:
-            book = parts[0]
-            chapter = parts[1]
-            verse = parts[2]
-            query = f"{book}+{chapter}:{verse}"
+        r = r.replace(",", " ").replace(".", " ")
+        # allow formats: "Jo 3 16", "John 3:16", "John 3 16"
+        if ":" in r:
+            # preserve colon form
+            query = r.replace(" ", "+")
         else:
-            query = ref.replace(" ", "+")
+            parts = r.split()
+            if len(parts) >= 3:
+                book = parts[0]
+                chapter = parts[1]
+                verse = parts[2]
+                query = f"{book}+{chapter}:{verse}"
+            else:
+                query = r.replace(" ", "+")
         url = f"https://bible-api.com/{query}?translation=almeida"
         resp = requests.get(url, timeout=6)
         if resp.status_code == 200:
@@ -266,7 +244,115 @@ USER = st.session_state.get('user', 'Admin')
 PASTA = os.path.join("Banco_Sermoes", USER)
 os.makedirs(PASTA, exist_ok=True)
 
-# SIDEBAR
+# --- BÍBLIA + LÉXICO + STRONG + CROSSREFS (TheWord-like) ---
+def carregar_json(caminho):
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+BIBLIA = carregar_json("Banco_Biblia/bibles/acf.json")        # opcional: coloque seu JSON aqui
+LEXICO = carregar_json("Banco_Biblia/lexico/strongs.json")   # opcional
+XREF   = carregar_json("Banco_Biblia/crossrefs/referencias.json") # opcional
+KAI    = carregar_json("Banco_Biblia/chave/kai.json")        # opcional
+
+def buscar_palavra(termo):
+    """
+    Busca simples com suporte a operadores AND, OR, NEAR e wildcard *.
+    Retorna lista de tuplas (livro, cap, verso, texto).
+    """
+    resultados = []
+    if not termo or not isinstance(termo, str):
+        return resultados
+
+    termo_raw = termo.strip()
+    termo = termo_raw.lower()
+
+    # Busca por strong (G#### / H####) -> retornará ocorrências contendo o strong tag no texto se houver
+    if (termo.upper().startswith("G") or termo.upper().startswith("H")) and termo.replace("g","").replace("G","").replace("h","").replace("H","").isdigit():
+        # procurar ocorrência de código strong no texto (caso textos possuam tags)
+        for livro, capitulos in BIBLIA.items():
+            for cap, versos in capitulos.items():
+                for num, texto in versos.items():
+                    if termo_raw.upper() in (texto or ""):
+                        resultados.append((livro, cap, num, texto))
+        return resultados
+
+    # Operadores
+    if " AND " in termo_raw:
+        a, b = termo_raw.split(" AND ", 1)
+        a = a.strip().lower(); b = b.strip().lower()
+        for livro, capitulos in BIBLIA.items():
+            for cap, versos in capitulos.items():
+                for num, texto in versos.items():
+                    t = (texto or "").lower()
+                    if a in t and b in t:
+                        resultados.append((livro, cap, num, texto))
+        return resultados
+
+    if " OR " in termo_raw:
+        a, b = termo_raw.split(" OR ", 1)
+        a = a.strip().lower(); b = b.strip().lower()
+        for livro, capitulos in BIBLIA.items():
+            for cap, versos in capitulos.items():
+                for num, texto in versos.items():
+                    t = (texto or "").lower()
+                    if a in t or b in t:
+                        resultados.append((livro, cap, num, texto))
+        return resultados
+
+    if " NEAR " in termo_raw:
+        a, b = termo_raw.split(" NEAR ", 1)
+        a = a.strip().lower(); b = b.strip().lower()
+        for livro, capitulos in BIBLIA.items():
+            for cap, versos in capitulos.items():
+                for num, texto in versos.items():
+                    t = (texto or "").lower()
+                    if a in t and b in t:
+                        try:
+                            posA = t.index(a)
+                            posB = t.index(b)
+                            if abs(posA - posB) < 200:  # janela maior para segurança
+                                resultados.append((livro, cap, num, texto))
+                        except ValueError:
+                            continue
+        return resultados
+
+    # Wildcard termina com *
+    if termo_raw.endswith("*"):
+        base = termo_raw[:-1].lower()
+        for livro, capitulos in BIBLIA.items():
+            for cap, versos in capitulos.items():
+                for num, texto in versos.items():
+                    t = (texto or "").lower()
+                    if any(word.startswith(base) for word in t.split()):
+                        resultados.append((livro, cap, num, texto))
+        return resultados
+
+    # Busca simples
+    for livro, capitulos in BIBLIA.items():
+        for cap, versos in capitulos.items():
+            for num, texto in versos.items():
+                if termo in (texto or "").lower():
+                    resultados.append((livro, cap, num, texto))
+    return resultados
+
+def strongs_info(codigo):
+    codigo = codigo.upper().strip()
+    if codigo in LEXICO:
+        return LEXICO[codigo]
+    return "❌ Código não encontrado no Léxico Strong."
+
+def referencias_cruzadas(ref):
+    ref = ref.strip()
+    return XREF.get(ref, [])
+
+def chave_kai(term):
+    term = term.lower().strip()
+    return KAI.get(term, [])
+
+# --- SIDEBAR ---
 with st.sidebar:
     st.markdown(f"""
     <div class="brand-box">
@@ -325,7 +411,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-# ÁREA DE TRABALHO
+# --- ÁREA DE TRABALHO ---
 ratio = st.session_state['layout_split'] / 100
 c_editor, c_tools = st.columns([ratio, 1 - ratio])
 
@@ -499,55 +585,3 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# --- BIBLIA + LEXICO + STRONGS + CROSSREFS -------------------------
-
-import json
-
-def carregar_json(caminho):
-    try:
-        with open(caminho, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
-
-BIBLIA = carregar_json("Banco_Biblia/bibles/acf.json")    # Bíblia
-LEXICO = carregar_json("Banco_Biblia/lexico/strongs.json") # Léxico
-XREF   = carregar_json("Banco_Biblia/crossrefs/referencias.json") # Crossrefs
-KAI    = carregar_json("Banco_Biblia/chave/kai.json")       # Chave Bíblica
-def buscar_palavra(termo):
-    resultados = []
-    termo = termo.lower()
-
-    for livro, capitulos in BIBLIA.items():
-        for cap, versos in capitulos.items():
-            for num, texto in versos.items():
-                t = texto.lower()
-
-                if "*" in termo:
-                    # busca com wildcard
-                    base = termo.replace("*", "")
-                    if t.startswith(base):
-                        resultados.append((livro, cap, num, texto))
-
-                elif " AND " in termo:
-                    a, b = termo.split(" AND ")
-                    if a in t and b in t:
-                        resultados.append((livro, cap, num, texto))
-
-                elif " OR " in termo:
-                    a, b = termo.split(" OR ")
-                    if a in t or b in t:
-                        resultados.append((livro, cap, num, texto))
-
-                elif " NEAR " in termo:
-                    a, b = termo.split(" NEAR ")
-                    if a in t and b in t:
-                        posA = t.index(a)
-                        posB = t.index(b)
-                        if abs(posA - posB) < 35:
-                            resultados.append((livro, cap, num, texto))
-
-                elif termo in t:
-                    resultados.append((livro, cap, num, texto))
-
-    return resultados

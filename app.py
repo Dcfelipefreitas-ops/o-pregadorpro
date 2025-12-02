@@ -327,3 +327,123 @@ elif menu == "⚙️ Configurações":
     st.title("Configurações")
     st.write("Aqui você poderá alterar tamanho da fonte, temas e gerenciar backups futuramente.")
     st.info("Versão 2.0 - Build: Stable")
+    # --- TELA 2: EDITOR POWER (CORRIGIDO) ---
+elif menu == "✍️ Editor de Sermões":
+    
+    # Seleção de Arquivo na Sidebar
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("### 📂 Meus Arquivos")
+        arquivos = [f for f in os.listdir(PASTA_USER) if f.endswith('.txt')]
+        arquivo_sel = st.selectbox("Selecione:", ["+ Novo Sermão"] + arquivos)
+
+    # --- LÓGICA DE ESTADO (CORREÇÃO DO ERRO) ---
+    # 1. Cria uma chave única para o arquivo atual para saber quando mudou
+    if 'arquivo_aberto' not in st.session_state:
+        st.session_state['arquivo_aberto'] = ""
+    
+    # 2. Se mudou de arquivo, carrega o novo conteúdo no Session State
+    if st.session_state['arquivo_aberto'] != arquivo_sel:
+        st.session_state['arquivo_aberto'] = arquivo_sel
+        if arquivo_sel != "+ Novo Sermão":
+            titulo_limpo = arquivo_sel.replace(".txt", "")
+            # Carrega título
+            st.session_state['titulo_atual'] = titulo_limpo
+            # Carrega conteúdo
+            try:
+                with open(os.path.join(PASTA_USER, arquivo_sel), 'r', encoding='utf-8') as f:
+                    st.session_state['texto_atual'] = f.read()
+            except:
+                st.session_state['texto_atual'] = ""
+        else:
+            # Reseta para novo
+            st.session_state['titulo_atual'] = ""
+            st.session_state['texto_atual'] = ""
+
+    # Garante que as variáveis existam
+    if 'texto_atual' not in st.session_state: st.session_state['texto_atual'] = ""
+    if 'titulo_atual' not in st.session_state: st.session_state['titulo_atual'] = ""
+
+    # --- CALLBACKS (FUNÇÕES PARA OS BOTÕES) ---
+    # Isso evita o erro 'Node' pois atualiza o estado antes do render
+    def inserir_texto(texto_para_adicionar):
+        if st.session_state['texto_atual']:
+            st.session_state['texto_atual'] += "\n" + texto_para_adicionar
+        else:
+            st.session_state['texto_atual'] = texto_para_adicionar
+
+    # --- LAYOUT DO EDITOR ---
+    c_edit, c_tools = st.columns([3, 1.5])
+    
+    with c_edit:
+        # Cabeçalho
+        col_tit, col_btn = st.columns([3, 1])
+        with col_tit:
+            # Vincula o input ao session_state
+            st.text_input("Título da Mensagem", key="titulo_atual", placeholder="Ex: O Poder da Oração")
+        with col_btn:
+            st.write("") 
+            if st.button("💾 Salvar", type="primary", use_container_width=True):
+                if st.session_state['titulo_atual']:
+                    path = os.path.join(PASTA_USER, f"{st.session_state['titulo_atual']}.txt")
+                    with open(path, 'w', encoding='utf-8') as f:
+                        f.write(st.session_state['texto_atual'])
+                    st.toast("Salvo!", icon="✅")
+        
+        # Toolbar (Botões com Callbacks)
+        st.markdown("**Estrutura Rápida:**")
+        b1, b2, b3, b4 = st.columns(4)
+        
+        # Note o uso de on_click e args
+        b1.button("📌 Intro", on_click=inserir_texto, args=("\n# INTRODUÇÃO\n\n",))
+        b2.button("I. Tópico", on_click=inserir_texto, args=("\n## I. TÍTULO DO TÓPICO\nTexto...\n",))
+        b3.button("⚔️ Aplicação", on_click=inserir_texto, args=("\n> APLICAÇÃO PRÁTICA:\n",))
+        b4.button("🏁 Conclusão", on_click=inserir_texto, args=("\n# CONCLUSÃO\n\n",))
+
+        # O Editor Principal
+        # O segredo é usar SOMENTE o 'key'. Não use 'value' se usar 'key'.
+        st.text_area(
+            "Escreva sua mensagem aqui...", 
+            height=650, 
+            key="texto_atual" 
+        )
+
+    # Ferramentas Laterais (Mantive igual, só ajustando para ler do session_state)
+    with c_tools:
+        st.markdown("### 🧰 Caixa de Ferramentas")
+        tab1, tab2, tab3, tab4 = st.tabs(["💡 Ilustrar", "🔍 Exegese", "📰 Atualidades", "📤 Exportar"])
+        
+        # ABA 1: ILUSTRAÇÕES
+        with tab1:
+            st.caption("Gerador de Ilustrações")
+            tema_ilus = st.text_input("Tema:")
+            tipo_ilus = st.selectbox("Tipo:", ["História Real", "Metáfora", "Biografia"])
+            if st.button("Gerar Ilustração"):
+                prompt = f"Crie uma ilustração curta tipo '{tipo_ilus}' sobre: '{tema_ilus}'."
+                res = consultar_gemini(prompt, api_key)
+                st.info(res)
+
+        # ABA 2: EXEGESE
+        with tab2:
+            st.caption("Análise de Texto")
+            ref_exe = st.text_input("Versículo:")
+            if st.button("Analisar"):
+                res = consultar_gemini(f"Exegese de {ref_exe}", api_key)
+                st.markdown(res)
+
+        # ABA 3: ATUALIDADES
+        with tab3:
+            st.caption("Notícias")
+            busca = st.text_input("Assunto:")
+            if st.button("Buscar"):
+                try:
+                    res = DDGS().news(keywords=busca, region="br-pt", max_results=2)
+                    for r in res: st.markdown(f"- [{r['title']}]({r['url']})")
+                except: st.error("Erro busca.")
+
+        # ABA 4: EXPORTAR
+        with tab4:
+            if st.button("📄 Gerar PDF"):
+                if st.session_state['titulo_atual']:
+                    pdf_bytes = gerar_pdf(st.session_state['titulo_atual'], st.session_state['texto_atual'])
+                    st.download_button("⬇️ Baixar", pdf_bytes, f"{st.session_state['titulo_atual']}.pdf", "application/pdf")

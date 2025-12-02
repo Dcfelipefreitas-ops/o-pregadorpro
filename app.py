@@ -1,12 +1,26 @@
 import streamlit as st
-from duckduckgo_search import DDGS
-import google.generativeai as genai
 import os
+import sys
+import subprocess
+
+# --- INSTALAÇÃO FORÇADA DE PACOTES ---
+# Isso obriga o servidor a instalar o Google AI se não encontrar
+try:
+    import google.generativeai as genai
+except ImportError:
+    st.warning("Instalando biblioteca do Google... Aguarde um momento.")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "google-generativeai"])
+    import google.generativeai as genai
+    st.rerun() # Recarrega a página após instalar
+
+# --- IMPORTAÇÃO DOS DEMAIS ---
+from duckduckgo_search import DDGS
 import requests
 from streamlit_lottie import st_lottie
+import time
 from datetime import datetime
 from fpdf import FPDF
-import io
+# -----------------------------------
 
 # --- 1. CONFIGURAÇÃO E CONSTANTES ---
 st.set_page_config(page_title="O Pregador Pro", layout="wide", page_icon="✝️")

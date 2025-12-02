@@ -8,7 +8,7 @@ import requests
 from datetime import datetime
 from io import BytesIO
 
-# --- 0. AUTO-INSTALAÇÃO DE DEPENDÊNCIAS (BLINDADA) ---
+# --- 0. AUTO-INSTALAÇÃO DE DEPENDÊNCIAS ---
 def install_packages():
     required = ["google-generativeai", "duckduckgo-search", "streamlit-lottie", "fpdf", "Pillow"]
     for package in required:
@@ -26,7 +26,7 @@ from streamlit_lottie import st_lottie
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
-# --- 1. CONFIGURAÇÃO DO SISTEMA ---
+# --- 1. CONFIGURAÇÃO DO SISTEMA (APP) ---
 st.set_page_config(
     page_title="O PREGADOR", 
     layout="wide", 
@@ -34,349 +34,416 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. GERENCIAMENTO DE ESTADO E PREFERÊNCIAS ---
+# --- 2. CSS "APPLE DARK" & LOGOS HEADER ---
+# Este CSS define o cabeçalho fixo, a fonte moderna e o visual "limpo".
+st.markdown("""
+    <style>
+    /* IMPORTANDO FONTES MODERNAS */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Merriweather:ital,wght@0,300;0,700;1,400&display=swap');
+
+    :root {
+        --bg-color: #0d0d0d;
+        --panel-color: #1c1c1e;
+        --border-color: #2c2c2e;
+        --accent-color: #0A84FF;
+        --text-color: #f5f5f7;
+    }
+
+    /* GLOBAL */
+    .stApp {
+        background-color: var(--bg-color);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* REMOVE HEADER PADRÃO */
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    /* CABEÇALHO FIXO "LOGOS STYLE" */
+    .logos-header {
+        position: fixed;
+        top: 0; left: 0; width: 100%;
+        height: 60px;
+        background: rgba(28, 28, 30, 0.85); /* Vidro Escuro */
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border-color);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 25px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    
+    .logo-area { font-weight: 700; font-size: 18px; color: #FFF; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+    .gold-cross { color: #d4af37; font-size: 22px; }
+
+    /* Espaçamento para o conteúdo não ficar embaixo do header fixo */
+    .block-container {
+        padding-top: 80px !important;
+    }
+
+    /* BOTÕES TIPO APPLE */
+    div.stButton > button {
+        background-color: #2c2c2e;
+        color: white;
+        border: 1px solid #3a3a3c;
+        border-radius: 8px;
+        padding: 6px 15px;
+        font-size: 14px;
+        transition: all 0.2s ease;
+    }
+    div.stButton > button:hover {
+        background-color: var(--accent-color);
+        border-color: var(--accent-color);
+        transform: scale(1.02);
+    }
+
+    /* ÁREA DE TEXTO ESTILO "THE WORD" */
+    .stTextArea textarea {
+        background-color: #151516 !important;
+        border: 1px solid #333 !important;
+        color: #ddd !important;
+        font-family: 'Merriweather', serif; /* Fonte para leitura confortável */
+        line-height: 1.8;
+        font-size: 18px !important;
+        border-radius: 8px;
+    }
+    
+    /* MODAIS/CARDS */
+    div[data-testid="stExpander"] {
+        background-color: var(--panel-color);
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+    }
+    </style>
+    
+    <!-- ELEMENTO HTML DO CABEÇALHO -->
+    <div class="logos-header">
+        <div class="logo-area">
+            <span class="gold-cross">✝</span> O PREGADOR
+            <span style="font-size:10px; color:#666; margin-top:5px; margin-left:5px">SYSTEM 4.0</span>
+        </div>
+        <div style="font-size: 13px; color: #888;">
+            Central de Pregação Integrada
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+# --- 3. GESTÃO DE DADOS ---
 PASTA_USER = "Banco_Sermoes"
 os.makedirs(PASTA_USER, exist_ok=True)
 
-# Cores e Temas Personalizáveis
-TEMAS = {
-    "Genesis Dark": {"bg": "#000000", "fg": "#e0e0e0", "acc": "#d4af37", "menu": "#1a1a1a"},
-    "Apocalipse Red": {"bg": "#1a0505", "fg": "#ffcccc", "acc": "#ff4444", "menu": "#2e0b0b"},
-    "Salmos Light": {"bg": "#f8f9fa", "fg": "#333333", "acc": "#2980b9", "menu": "#e9ecef"},
-    "Cyber Gospel": {"bg": "#0b0c15", "fg": "#a0e9ff", "acc": "#00d2ff", "menu": "#151621"}
-}
+if 'slides' not in st.session_state: st.session_state['slides'] = []
+if 'texto_ativo' not in st.session_state: st.session_state['texto_ativo'] = ""
+if 'titulo_ativo' not in st.session_state: st.session_state['titulo_ativo'] = ""
+if 'api_key' not in st.session_state: st.session_state['api_key'] = ""
+if 'aba_atual' not in st.session_state: st.session_state['aba_atual'] = "Central"
+if 'humor' not in st.session_state: st.session_state['humor'] = "Normal"
 
-def load_user_prefs():
-    if 'prefs' not in st.session_state:
-        st.session_state['prefs'] = {"tema": "Genesis Dark", "user": "Pastor", "igreja": "Igreja Local", "biblia": "NVI", "avatar_url": ""}
-    return st.session_state['prefs']
-
-prefs = load_user_prefs()
-cores = TEMAS[prefs['tema']]
-
-# --- 3. ESTILIZAÇÃO AVANÇADA (UI DE DESKTOP) ---
-st.markdown(f"""
-    <style>
-    /* Reset Geral */
-    .stApp {{ background-color: {cores['bg']}; color: {cores['fg']}; }}
-    
-    /* MENU BAR ESTILO WINDOWS/LOGOS */
-    .menubar {{
-        display: flex; gap: 15px; padding: 10px 20px;
-        background: {cores['menu']}; border-bottom: 2px solid {cores['acc']};
-        font-family: 'Segoe UI', sans-serif; font-size: 14px;
-        position: sticky; top: 0; z-index: 999;
-    }}
-    .menu-item {{ cursor: pointer; color: {cores['fg']}; font-weight: 500; padding: 5px 10px; border-radius: 4px; }}
-    .menu-item:hover {{ background: {cores['acc']}; color: {cores['bg']}; }}
-
-    /* JANELAS FLUTUANTES (EFEITO) */
-    .workspace {{
-        background: {cores['menu']}; border: 1px solid #333;
-        border-radius: 8px; padding: 20px; margin-top: 10px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }}
-    
-    /* TEXT AREAS CUSTOMIZADOS */
-    textarea {{
-        background: {cores['bg']} !important; color: {cores['fg']} !important;
-        border: 1px solid #444 !important; font-family: 'Merriweather', serif;
-    }}
-    
-    /* BOTÕES */
-    button {{ border: 1px solid {cores['acc']} !important; }}
-    
-    /* SEPARAÇÃO DE TELAS */
-    .split-screen {{ display: flex; gap: 10px; }}
-    </style>
-""", unsafe_allow_html=True)
-
-# --- 4. FUNÇÕES DE IA & LÓGICA ---
-def assistente_ia(prompt, key, personality="Teólogo"):
-    if not key: return "⚠️ IA Offline: Insira a chave API nas Configurações."
+# --- 4. CÉREBRO (IA) COM EMPATIA ---
+def assistente_ia(prompt, key, contexto="teologico"):
+    if not key: return "⚠️ Conecte sua Chave nas Configurações."
     try:
         genai.configure(api_key=key)
-        sys_msg = f"Você é o assistente do sistema 'O Pregador'. Personalidade: {personality}."
-        model = genai.GenerativeModel("gemini-pro")
-        return model.generate_content(f"{sys_msg}\n{prompt}").text
-    except Exception as e: return f"Erro na Matriz: {e}"
+        
+        # 🧠 INTEGRAÇÃO EMOCIONAL
+        humor_atual = st.session_state['humor']
+        
+        personalidade = "Você é um assistente teológico acadêmico."
+        
+        if contexto == "ajuda_emocional":
+            if humor_atual in ["Esgotado (Burnout)", "Tristeza Profunda", "Ansioso"]:
+                personalidade = """
+                ATENÇÃO MÁXIMA: O usuário (pastor) está relatando sofrimento emocional (Burnout/Tristeza).
+                Aja como um 'Pastor de Pastores', terapeuta cristão sábio e acolhedor.
+                1. NÃO dê ordens. Valide a dor dele. (Ex: "Eu sinto muito, pastor. O peso é grande mesmo.")
+                2. Use o exemplo de Elias (1 Reis 19) ou Jesus no Getsêmani: até gigantes cansam.
+                3. Sugira descanso físico e busca por ajuda profissional (psicólogo/médico) com delicadeza.
+                4. Termine com uma oração curta escrita em itálico.
+                """
+            else:
+                personalidade = "Você é um mentor puritano encorajador. Dê conselhos bíblicos de ânimo."
+        
+        elif contexto == "chat":
+             personalidade = f"Você é o assistente do software O Pregador. O usuário está se sentindo: {humor_atual}. Ajuste seu tom para ser empático a esse sentimento."
 
-def gerar_imagem_social(texto, imagem_fundo=None, cor_texto="white"):
-    # Cria uma base preta ou usa imagem enviada
+        model = genai.GenerativeModel("gemini-pro")
+        return model.generate_content(f"{personalidade}\n\nPERGUNTA/TEXTO: {prompt}").text
+    except Exception as e: return f"Erro de Conexão: {e}"
+
+def gerar_imagem_social(texto, img_upload=None, cor_hex="#FFFFFF"):
     W, H = 1080, 1080
-    if imagem_fundo:
-        try:
-            img = Image.open(imagem_fundo).resize((W, H))
-            img = img.filter(ImageFilter.GaussianBlur(3)) # Desfoque leve para ler texto
-        except:
-            img = Image.new('RGB', (W, H), color=(20, 20, 20))
-    else:
-        img = Image.new('RGB', (W, H), color=(20, 20, 20))
+    bg_color = (20, 20, 20)
     
+    if img_upload:
+        try:
+            img = Image.open(img_upload).convert("RGB").resize((W, H))
+            img = img.filter(ImageFilter.GaussianBlur(4)) # Blur estiloso estilo Apple
+        except: img = Image.new('RGB', (W, H), color=bg_color)
+    else:
+        img = Image.new('RGB', (W, H), color=bg_color)
+        
     draw = ImageDraw.Draw(img)
-    # Tenta usar fonte padrão ou fallback
     try: font = ImageFont.truetype("arial.ttf", 60)
     except: font = ImageFont.load_default()
     
-    # Centraliza texto (Lógica simplificada)
-    lines = texto.split('\n')
-    y_text = H // 2 - (len(lines)*35)
-    for line in lines:
-        # Posição aproximada central (Pillow nativo requer cálculos complexos de bbox, simplificando)
-        draw.text((100, y_text), line, font=font, fill=cor_texto)
-        y_text += 70
+    # Texto Centralizado
+    linhas = texto.split('\n')
+    total_h = len(linhas) * 70
+    y_text = (H - total_h) / 2
+    
+    for linha in linhas:
+        draw.text((100, y_text), linha, font=font, fill=cor_hex)
+        y_text += 80
         
-    # Adiciona Logo
-    draw.text((W-300, H-80), "O PREGADOR APP", fill=cores['acc'])
+    draw.text((W-350, H-100), "O PREGADOR", fill="#d4af37", font=font)
     
     buf = BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
 
-# --- 5. COMPONENTES DO SISTEMA ---
+# --- 5. INTERFACE (FRONT-END) ---
 
-# BARRA DE MENU SUPERIOR (HEADER)
-def render_menu_bar():
-    c1, c2, c3, c4, c5, c6 = st.columns([1,1,1,1,1,5])
-    with c1: st.markdown(f"<div class='menu-item'>📂 Arquivo</div>", unsafe_allow_html=True)
-    with c2: st.markdown(f"<div class='menu-item'>🛠️ Editar</div>", unsafe_allow_html=True)
-    with c3: st.markdown(f"<div class='menu-item'>👁️ Exibir</div>", unsafe_allow_html=True)
-    with c4: st.markdown(f"<div class='menu-item'>⚙️ Config</div>", unsafe_allow_html=True)
-    with c5: st.markdown(f"<div class='menu-item'>🆘 Ajuda</div>", unsafe_allow_html=True)
-    with c6: st.caption(f"Logado como: {prefs['user']} | {datetime.now().strftime('%H:%M')}")
-
-# ESTADOS GLOBAIS
-if 'slides' not in st.session_state: st.session_state['slides'] = []
-if 'texto_ativo' not in st.session_state: st.session_state['texto_ativo'] = ""
-if 'titulo_ativo' not in st.session_state: st.session_state['titulo_ativo'] = ""
-if 'api_key' not in st.session_state: st.session_state['api_key'] = ""
-if 'aba_atual' not in st.session_state: st.session_state['aba_atual'] = "Studio"
-
-# --- SIDEBAR (ASSISTENTE E PERFIL) ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2965/2965300.png", width=50) # Logo genérico cruz
-    st.markdown("## O PREGADOR")
-    st.markdown("*Sistema Homilético v4.0*")
+# MENU DE NAVEGAÇÃO "ATALHOS NO TOPO" (Simulado abaixo do header fixo)
+def navegacao_topo():
+    c1, c2, c3, c4, c5 = st.columns(5)
+    modulo = None
+    if c1.button("🏠 CENTRAL", use_container_width=True): modulo = "Central"
+    if c2.button("✍️ STUDIO", use_container_width=True): modulo = "Studio"
+    if c3.button("🎨 SOCIAL", use_container_width=True): modulo = "Social"
+    if c4.button("🖥️ SLIDES", use_container_width=True): modulo = "Slides"
+    if c5.button("⚙️ CONFIG", use_container_width=True): modulo = "Config"
     
-    st.markdown("---")
-    menu_sel = st.radio("MÓDULOS", ["🏠 Central", "✍️ Studio (Split View)", "🎨 Social Studio", "🖥️ Apresentação", "🆘 Suporte"], 
-                       index=["Central", "Studio", "Social", "Apres", "Suporte"].index(st.session_state['aba_atual'].split(" ")[0]) if st.session_state['aba_atual'].split(" ")[0] in ["Central", "Studio", "Social", "Apres", "Suporte"] else 0)
-    
-    # Assistente de Bolso (Sempre visível)
-    st.divider()
-    with st.expander("🤖 O Pregador Chat", expanded=True):
-        st.session_state['api_key'] = st.text_input("Chave Google", type="password", value=st.session_state['api_key'])
-        msg = st.text_input("Fale comigo, pastor:", placeholder="Ex: Ideia para introdução...")
-        if msg and st.session_state['api_key']:
-            st.info(assistente_ia(msg, st.session_state['api_key']))
-    
-    # Customização Rápida
-    st.divider()
-    tema_opt = st.selectbox("Tema Visual", list(TEMAS.keys()), index=list(TEMAS.keys()).index(prefs['tema']))
-    if tema_opt != prefs['tema']:
-        prefs['tema'] = tema_opt
+    if modulo: 
+        st.session_state['aba_atual'] = modulo
         st.rerun()
 
-# --- PÁGINA 1: CENTRAL (DASHBOARD) ---
-if menu_sel == "🏠 Central":
-    render_menu_bar()
-    st.title(f"Bem-vindo, {prefs['user']}")
+# --- SIDEBAR (PERFIL & CHAT INTEGRADO) ---
+with st.sidebar:
+    st.caption("CONTA")
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=60)
+    st.write("Pr. Usuário")
     
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.markdown(f"### 🕯️ Palavra Viva de Hoje")
-        # IA gera devocional com base no humor (Mood Tracker)
-        humor = st.selectbox("Como você se sente hoje?", ["Abençoado 🙏", "Cansado 😓", "Ansioso 🌪️", "Motivado 🔥"])
-        if st.button("Receber Direção Espiritual") and st.session_state['api_key']:
-            prompt = f"O pastor está se sentindo {humor}. Dê um conselho puritano breve e um versículo ({prefs['biblia']})."
-            st.success(assistente_ia(prompt, st.session_state['api_key'], "Puritano"))
+    st.divider()
     
-    with col2:
-        st.markdown(f"""
-        <div class="workspace" style="text-align:center">
-            <h4>Seu Púlpito</h4>
-            <h1>{len(os.listdir(PASTA_USER))}</h1>
-            <p>Sermões Arquivados</p>
+    # --- NOVO: SELETOR DE HUMOR ---
+    st.caption("❤️ TERMÔMETRO EMOCIONAL")
+    humor_ops = ["Bem / Normal", "Abençoado 🙏", "Cansado 😓", "Ansioso 😰", "Esgotado (Burnout) 🔴", "Tristeza Profunda 🌑"]
+    st.session_state['humor'] = st.selectbox("Como você está?", humor_ops)
+    
+    if st.session_state['humor'] in ["Esgotado (Burnout) 🔴", "Tristeza Profunda 🌑", "Ansioso 😰"]:
+        st.warning("⚠️ O Modo 'Cuidado Pastoral' foi ativado no Chat. Estamos aqui por você.")
+    
+    st.divider()
+    
+    # --- CHATBOT INTEGRADO ---
+    with st.expander("💬 Chat Assistente", expanded=True):
+        api_key = st.text_input("API Key (Google)", type="password", value=st.session_state['api_key'])
+        st.session_state['api_key'] = api_key
+        
+        p_chat = st.text_input("Converse comigo:", placeholder="Preciso de ajuda...")
+        if p_chat and api_key:
+            # Envia contexto emocional para a IA
+            res_chat = assistente_ia(p_chat, api_key, contexto="chat")
+            st.markdown(f"**Assistente:** {res_chat}")
+
+
+# --- ROTEAMENTO DE PÁGINAS ---
+
+# 1. PÁGINA CENTRAL (DASHBOARD)
+if st.session_state['aba_atual'] == "Central":
+    navegacao_topo()
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    col_dash1, col_dash2 = st.columns([2, 1])
+    
+    with col_dash1:
+        st.subheader("💡 Direção para Hoje")
+        # IA PROATIVA BASEADA NO HUMOR
+        if api_key:
+            if st.button("Receber Palavra do Dia (Personalizada)"):
+                with st.spinner("O Espírito sopra onde quer..."):
+                    msg = assistente_ia("Dê-me uma palavra para hoje.", api_key, contexto="ajuda_emocional")
+                    st.success(msg)
+        else:
+            st.info("Insira sua chave no menu lateral para ativar a inteligência pastoral.")
+            
+        st.markdown("---")
+        st.markdown("### 📂 Acesso Rápido")
+        files = os.listdir(PASTA_USER)
+        if files:
+            for f in files[:5]:
+                if f.endswith(".txt"):
+                    st.markdown(f"📄 {f.replace('.txt','')}")
+        else:
+            st.caption("Nenhum sermão encontrado.")
+
+    with col_dash2:
+        st.markdown("""
+        <div style="background:#1c1c1e; padding:20px; border-radius:15px; border:1px solid #333; text-align:center;">
+            <h1 style="color:#0A84FF; font-size:40px;">Studio</h1>
+            <p>O Pregador</p>
         </div>
         """, unsafe_allow_html=True)
 
-# --- PÁGINA 2: STUDIO (SPLIT SCREEN - CORE) ---
-elif menu_sel == "✍️ Studio (Split View)":
-    render_menu_bar()
+# 2. STUDIO (EDITOR + SLIDES LATERAL)
+elif st.session_state['aba_atual'] == "Studio":
+    navegacao_topo()
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Toolbar de Arquivo
+    c_file, c_name, c_act = st.columns([2, 3, 2])
+    with c_file:
+        arquivo_aberto = st.selectbox("Abrir:", ["+ Novo"] + os.listdir(PASTA_USER))
+        
+        # Carregamento automático ao mudar seleção
+        if 'last_load' not in st.session_state: st.session_state['last_load'] = ""
+        if arquivo_aberto != st.session_state['last_load']:
+            st.session_state['last_load'] = arquivo_aberto
+            if arquivo_aberto != "+ Novo":
+                try:
+                    with open(os.path.join(PASTA_USER, arquivo_aberto), 'r', encoding='utf-8') as f:
+                        st.session_state['texto_ativo'] = f.read()
+                    # Tenta carregar slides
+                    slide_path = os.path.join(PASTA_USER, arquivo_aberto.replace('.txt', '_slides.json'))
+                    if os.path.exists(slide_path):
+                        with open(slide_path, 'r', encoding='utf-8') as f: st.session_state['slides'] = json.load(f)
+                    st.session_state['titulo_ativo'] = arquivo_aberto.replace(".txt", "")
+                except: pass
+            else:
+                st.session_state['titulo_ativo'] = ""
+                st.session_state['texto_ativo'] = ""
+
+    with c_name:
+        titulo = st.text_input("Título", value=st.session_state['titulo_ativo'], label_visibility="collapsed", placeholder="Título da Mensagem...")
     
-    # Ferramentas de Topo (Word Style)
-    t_col1, t_col2, t_col3 = st.columns([2, 3, 2])
-    with t_col1:
-        arquivo_sel = st.selectbox("Arquivo", ["+ Novo"] + os.listdir(PASTA_USER))
-    with t_col2:
-        titulo = st.text_input("Título da Mensagem", value=st.session_state['titulo_ativo'], label_visibility="collapsed", placeholder="Título do Sermão...")
-    with t_col3:
-        if st.button("💾 Salvar Tudo", type="primary", use_container_width=True):
+    with c_act:
+        if st.button("💾 SALVAR TUDO", type="primary", use_container_width=True):
             if titulo:
-                # Salva texto
+                # Salvar TXT
                 with open(os.path.join(PASTA_USER, f"{titulo}.txt"), 'w', encoding='utf-8') as f:
                     f.write(st.session_state['texto_ativo'])
-                # Salva slides (JSON)
+                # Salvar Slides JSON
                 with open(os.path.join(PASTA_USER, f"{titulo}_slides.json"), 'w', encoding='utf-8') as f:
                     json.dump(st.session_state['slides'], f)
-                st.toast("Texto e Slides salvos no servidor!", icon="💾")
+                st.toast("Projeto salvo com sucesso!", icon="✅")
 
-    # ÁREA DIVIDIDA: ESQUERDA (TEXTO) | DIREITA (SLIDES)
-    col_text, col_slide = st.columns([1.2, 1])
+    # ÁREA DE TRABALHO DIVIDIDA
+    c_txt, c_ppt = st.columns([1.5, 1])
     
-    # --- COLUNA ESQUERDA: EDITOR WORD ---
-    with col_text:
-        st.markdown("#### 📜 Manuscrito")
+    # COLUNA ESQUERDA: EDITOR DE TEXTO
+    with c_txt:
+        st.caption("MANUSCRITO")
         
-        # Barra de ferramentas texto
-        b1, b2, b3 = st.columns(3)
-        def add_text(t): st.session_state['texto_ativo'] += t
-        b1.button("Negrito", on_click=add_text, args=(" **text** ",))
-        b2.button("Versículo", help="Insira referência") 
-        b3.button("Intro/Fim", on_click=add_text, args=("\n# INTRODUÇÃO\n\n",))
+        # Barra de Edição Rápida
+        btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4)
+        def ins(t): st.session_state['texto_ativo'] += t
         
-        texto_input = st.text_area("Escreva aqui...", value=st.session_state['texto_ativo'], height=600, key="editor_main")
-        # Sync manual para garantir estado
-        st.session_state['texto_ativo'] = texto_input
+        btn_c1.button("**B**", help="Negrito", on_click=ins, args=(" **texto** ",))
+        btn_c2.button("*I*", help="Itálico", on_click=ins, args=(" *texto* ",))
+        btn_c3.button("H1", help="Título", on_click=ins, args=("\n# ",))
+        btn_c4.button("Vers.", help="Inserir Versículo (Exemplo)", on_click=ins, args=("\n> Jo 3:16\n",))
         
-        # Botão mágico de transferência
-        st.markdown("---")
-        add_selecao = st.text_area("Copie um trecho acima e cole aqui para transformar em slide:", height=100)
-        if st.button("➡️ Criar Slide Deste Trecho"):
-            if add_selecao:
-                st.session_state['slides'].append({"conteudo": add_selecao, "imagem": None})
-                st.toast("Slide criado!", icon="🎞️")
+        txt_in = st.text_area("", value=st.session_state['texto_ativo'], height=600, key="main_editor", label_visibility="collapsed")
+        st.session_state['texto_ativo'] = txt_in # Sync
+        
+        st.caption(f"Caracteres: {len(txt_in)}")
 
-    # --- COLUNA DIREITA: PROJETOR SLIDE BUILDER ---
-    with col_slide:
-        st.markdown("#### 🎞️ Deck de Apresentação (Slides)")
+    # COLUNA DIREITA: GERENCIADOR DE SLIDES (ARRASTAR IDEAL)
+    with c_ppt:
+        st.caption("GERENCIADOR DE SLIDES")
+        st.info("💡 Copie texto do lado esquerdo e cole aqui para criar slide.")
         
-        if not st.session_state['slides']:
-            st.info("Nenhum slide ainda. Escreva à esquerda e envie para cá.")
+        # Adicionar novo slide
+        novo_conteudo = st.text_area("Texto para o Slide:", height=100)
+        col_btn_add, col_btn_clear = st.columns([3, 1])
+        if col_btn_add.button("⬇️ Adicionar como Slide"):
+            if novo_conteudo:
+                st.session_state['slides'].append({"texto": novo_conteudo, "img": None})
+                st.toast("Slide Adicionado!")
         
-        # Iterador de Slides
-        for i, slide in enumerate(st.session_state['slides']):
-            with st.expander(f"Slide {i+1}", expanded=False):
-                nov_conteudo = st.text_area(f"Texto Slide {i+1}", slide['conteudo'])
-                st.session_state['slides'][i]['conteudo'] = nov_conteudo
-                
-                # Upload imagem de fundo individual
-                bg = st.file_uploader(f"Fundo Slide {i+1}", type=["png","jpg"], key=f"file_{i}")
-                if bg: st.session_state['slides'][i]['imagem'] = bg # Nota: Em prod, salvaria o path
-                
-                if st.button(f"🗑️ Excluir Slide {i+1}"):
-                    st.session_state['slides'].pop(i)
-                    st.rerun()
-
-        # Adicionar Manualmente
-        if st.button("➕ Slide em Branco"):
-            st.session_state['slides'].append({"conteudo": "Novo Texto", "imagem": None})
-            st.rerun()
-            
-        # Preview Rápido
+        st.divider()
+        
+        # Lista de Slides
         if st.session_state['slides']:
-            last = st.session_state['slides'][-1]
-            st.markdown(f"""
-            <div style="background: black; color: white; padding: 20px; text-align: center; border: 4px solid {cores['acc']}; border-radius: 10px;">
-                <small>PREVIEW ÚLTIMO SLIDE</small><br><br>
-                <h3>{last['conteudo']}</h3>
-            </div>
-            """, unsafe_allow_html=True)
+            for i, slide in enumerate(st.session_state['slides']):
+                with st.expander(f"Slide {i+1}: {slide['texto'][:20]}..."):
+                    st.write(slide['texto'])
+                    if st.button(f"Remover {i+1}", key=f"del_{i}"):
+                        st.session_state['slides'].pop(i)
+                        st.rerun()
+        else:
+            st.caption("Nenhum slide criado.")
 
-
-# --- PÁGINA 3: SOCIAL STUDIO (NOVIDADE) ---
-elif menu_sel == "🎨 Social Studio":
-    st.title("Estúdio Criativo")
-    st.markdown("Crie cards para Instagram/WhatsApp baseados em versículos.")
+# 3. SOCIAL STUDIO
+elif st.session_state['aba_atual'] == "Social":
+    navegacao_topo()
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.title("Criador de Posts")
     
-    col_img, col_prev = st.columns([1, 1.5])
+    col_social_1, col_social_2 = st.columns([1, 1.5])
     
-    with col_img:
-        txt_card = st.text_area("Texto da Imagem", "O Senhor é o meu pastor;\nnada me faltará.\nSalmos 23:1")
-        bg_card = st.file_uploader("Imagem de Fundo (Opcional)", type=['jpg', 'png'])
-        cor_txt = st.color_picker("Cor do Texto", "#FFFFFF")
+    with col_social_1:
+        s_txt = st.text_area("Frase do Card:", "Tudo posso naquele que me fortalece.\nFilipenses 4:13")
+        s_file = st.file_uploader("Fundo (Opcional):", type=['png','jpg'])
+        s_cor = st.color_picker("Cor da Fonte:", "#ffffff")
         
-        if st.button("✨ Gerar Arte"):
-            img_bytes = gerar_imagem_social(txt_card, bg_card, cor_txt)
-            st.session_state['last_img'] = img_bytes
-    
-    with col_prev:
-        if 'last_img' in st.session_state:
-            st.image(st.session_state['last_img'], caption="Pré-visualização", use_column_width=True)
-            st.download_button("⬇️ Baixar Imagem PNG", st.session_state['last_img'], file_name="versiculo_social.png", mime="image/png")
+        if st.button("Gerar Imagem"):
+            st.session_state['img_gerada'] = gerar_imagem_social(s_txt, s_file, s_cor)
+            
+    with col_social_2:
+        if 'img_gerada' in st.session_state:
+            st.image(st.session_state['img_gerada'], use_column_width=True)
+            st.download_button("Baixar PNG", st.session_state['img_gerada'], "card_pregador.png", "image/png")
 
-# --- PÁGINA 4: APRESENTAÇÃO (SEGUNDA TELA) ---
-elif menu_sel == "🖥️ Apresentação":
-    st.markdown("## Modo Projeção")
+# 4. SLIDES / APRESENTAÇÃO
+elif st.session_state['aba_atual'] == "Slides":
+    navegacao_topo()
+    st.markdown("<br>", unsafe_allow_html=True)
     
     if not st.session_state['slides']:
         st.warning("Crie slides no Studio primeiro.")
     else:
-        # Se usuário tiver 2 telas, ele abre o navegador nesta aba e joga pra lá
-        col_list, col_screen = st.columns([1, 4])
+        # VISÃO DE OPERADOR
+        if 'idx_slide' not in st.session_state: st.session_state['idx_slide'] = 0
         
-        # Controle (Operador)
-        with col_list:
-            st.caption("Navegação")
-            if 'slide_idx' not in st.session_state: st.session_state['slide_idx'] = 0
-            
-            for j, s in enumerate(st.session_state['slides']):
-                if st.button(f"Slide {j+1}: {s['conteudo'][:10]}...", use_container_width=True):
-                    st.session_state['slide_idx'] = j
+        current = st.session_state['slides'][st.session_state['idx_slide']]
         
-        # Tela (Projeção)
-        with col_screen:
-            curr = st.session_state['slides'][st.session_state['slide_idx']]
-            
-            # CSS Para simular Fullscreen na div
+        col_prev, col_main, col_next = st.columns([1, 6, 1])
+        
+        with col_prev:
+            if st.button("◀", use_container_width=True):
+                st.session_state['idx_slide'] = max(0, st.session_state['idx_slide']-1)
+                st.rerun()
+        
+        with col_main:
+            # RENDERIZA O SLIDE ESTILO PROJETOR
+            html_content = current['texto'].replace('\n', '<br>')
             st.markdown(f"""
             <div style="
-                width: 100%; height: 70vh; 
-                background-color: black; 
-                color: white; 
-                display: flex; justify-content: center; align-items: center; 
-                text-align: center;
-                font-family: Arial, sans-serif;
-                font-size: 50px;
-                font-weight: bold;
-                border: 2px solid white;
-                text-shadow: 2px 2px 4px #000000;">
-                {curr['conteudo'].replace('\n', '<br>')}
+                width:100%; height: 60vh; background: black; color: white;
+                display:flex; justify-content:center; align-items:center;
+                text-align:center; font-size:40px; font-weight:bold;
+                border: 4px solid #333; border-radius:10px;
+                text-shadow: 2px 2px 4px #000;
+            ">
+                {html_content}
             </div>
             """, unsafe_allow_html=True)
-            
-            c_back, c_fwd = st.columns(2)
-            if c_back.button("⬅️ Anterior"): 
-                st.session_state['slide_idx'] = max(0, st.session_state['slide_idx'] - 1)
-                st.rerun()
-            if c_fwd.button("Próximo ➡️"):
-                st.session_state['slide_idx'] = min(len(st.session_state['slides']) - 1, st.session_state['slide_idx'] + 1)
+            st.caption(f"Slide {st.session_state['idx_slide']+1} / {len(st.session_state['slides'])}")
+
+        with col_next:
+            if st.button("▶", use_container_width=True):
+                st.session_state['idx_slide'] = min(len(st.session_state['slides'])-1, st.session_state['idx_slide']+1)
                 st.rerun()
 
-# --- PÁGINA 5: SUPORTE ---
-elif menu_sel == "🆘 Suporte":
-    st.title("Central de Ajuda")
-    
-    st.info("Para destacar janelas em duas telas: Abra o site em duas abas do navegador. Em uma, fique no 'Studio' (Notebook). Na outra, vá em 'Apresentação', clique em F11 (Tela Cheia) e arraste para o Projetor/Datashow.")
-    
-    with st.form("ticket"):
-        st.write("Fale com o desenvolvedor:")
-        nome = st.text_input("Seu Nome")
-        msg = st.text_area("Descreva o problema ou sugestão")
-        if st.form_submit_button("Enviar"):
-            st.success("Mensagem enviada! O anjo da TI responderá em breve.")
-
-# --- LOADERS INICIAIS (Setup de arquivos) ---
-if arquivo_sel != "+ Novo":
-    try:
-        path_txt = os.path.join(PASTA_USER, arquivo_sel)
-        if os.path.exists(path_txt):
-            with open(path_txt, 'r', encoding='utf-8') as f:
-                 if st.session_state['texto_ativo'] == "": st.session_state['texto_ativo'] = f.read()
-        # Tenta carregar slides associados
-        path_json = os.path.join(PASTA_USER, f"{arquivo_sel.replace('.txt', '')}_slides.json")
-        if os.path.exists(path_json) and not st.session_state['slides']:
-            with open(path_json, 'r', encoding='utf-8') as f:
-                st.session_state['slides'] = json.load(f)
-            st.session_state['titulo_ativo'] = arquivo_sel.replace(".txt", "")
-    except: pass
+# 5. CONFIG
+elif st.session_state['aba_atual'] == "Config":
+    navegacao_topo()
+    st.title("Preferências")
+    st.info("Configurações do Sistema 4.0")
+    st.text_input("Seu Nome")
+    st.text_input("Nome da Igreja")
+    if st.button("Salvar"): st.toast("Salvo")

@@ -34,7 +34,155 @@ st.set_page_config(
     layout="wide", 
     page_icon="🧷", 
     initial_sidebar_state="expanded"
+    
 )
+st.caption(f"Pastor(a): {USER.capitalize()}")
+
+# ORGANIZAÇÃO POR ABAS (A Pedido: Configuração separada)
+menu_tabs = st.tabs(["📂 PROJETOS", "⚙️ CONFIG", "📱 SOCIAL"])
+
+with menu_tabs[0]: # Projetos
+    try:
+        files = [f.replace(".txt","") for f in os.listdir(PASTA) if f.endswith(".txt")]
+    except Exception:
+        files = []
+    sel = st.radio("Selecione o Estudo:", ["+ Novo Projeto"] + files, label_visibility="collapsed")
+    st.write("")
+    if st.button("🚪 Sair do Sistema"):
+        st.session_state['logado'] = False
+        st.rerun()
+
+with menu_tabs[1]: # Configuração e Ajustes
+    st.write("**Personalização**")
+    st.session_state['idioma'] = st.selectbox("Idioma da IA:", ["Português", "English", "Español"])
+    
+    tamanho = st.slider("Área do Editor", 30, 80, st.session_state['layout_split'])
+    st.session_state['layout_split'] = tamanho
+    
+    novo_bg = st.text_input("Wallpaper URL:", st.session_state['bg_url'])
+    if st.button("Aplicar Fundo"): 
+        st.session_state['bg_url'] = novo_bg
+        st.rerun()
+        
+    st.divider()
+    st.write("**Credenciais**")
+    api_key = st.secrets.get("GOOGLE_API_KEY", "")
+    if not api_key: api_key = st.text_input("Chave Google API:", type="password")
+        # CAMPO DE TEXTO DO USUÁRIO
+main_text = st.text_area("PAPEL", value=st.session_state['texto_esboco'], height=700, label_visibility="collapsed")
+st.session_state['texto_esboco'] = main_text
+
+# --- BARRA DE AUTOMAÇÃO E CORRETOR (Abaixo do texto) ---
+st.caption("🛠️ Ações Rápidas de IA")
+
+# NOVA FEATURE: Microfone Nativo (Grava -> Texto no Editor)
+try:
+    audio_val = st.audio_input("🎤 Ditar para o Editor (Clique para gravar)")
+    if audio_val and api_key:
+        texto_voz = transcrever_audio_arquivo(audio_val) # Transcreve
+        if texto_voz:
+            st.session_state['texto_esboco'] += f"\n\n[Voz]: {texto_voz}"
+            st.success("Texto transcrito adicionado ao final!")
+            st.rerun()
+except: pass
+
+b1, b2, b3 = st.columns(3)
+with b1:
+    if st.button("✨ REVISAR ORTOGRAFIA"):
+        if api_key:
+            with st.spinner("Professor revisando..."):
+                res = ai_brain(f"Corrija apenas a gramática mantendo o sentido e estilo pastoral: \n{main_text}", api_key, "Professor")
+                # Automatização de Copia: Mostra em bloco de código
+                st.code(res, language="text")
+                st.success("Copie o texto acima 👆")
+                # Organize ferramentas em Abas Claras
+tab_ia, tab_biblia, tab_pdf, tab_dev = st.tabs(["🤖 IA", "📖 BÍBLIA", "📚 LIVRO", "👨‍💻 DEV"])
+
+# 1. MODOS INTELIGENTES (RAZÃO x EMOÇÃO)
+with tab_ia:
+    st.write("Conselheiro Virtual")
+    ask = st.text_area("Pergunta:", height=100, placeholder="Digite sua dúvida teológica...")
+    c_r, c_e = st.columns(2)
+    if c_r.button("🧠 Razão"):
+        if api_key: st.markdown(ai_brain(ask, api_key, "Razão"))
+    if c_e.button("❤️ Emoção"):
+        if api_key: st.markdown(ai_brain(ask, api_key, "Sentimento"))
+
+# 2. BÍBLIA COM ÁUDIO FIX
+with tab_biblia:
+    st.write("Consulta Rápida")
+    ref = st.text_input("Verso (Ex: Jo 3:16)")
+    if ref:
+        bd = get_bible(ref)
+        if bd:
+            t_b = bd['text']
+            st.success(f"{bd['reference']}")
+            st.write(t_b)
+            
+            ck1, ck2 = st.columns(2)
+            if ck1.button("⬇ Inserir"):
+                st.session_state['texto_esboco'] += f"\n\n**{bd['reference']}**\n{t_b}"
+                st.rerun()
+            
+            if ck2.button("🔊 Ouvir"):
+                # Fix do bug de audio: usar hash unico no nome ou bytes diretos
+                try:
+                    tts = gTTS(t_b, lang='pt')
+                    # Salva num buffer de memoria ao inves de arquivo para não dar conflito
+                    mp3_fp = BytesIO()
+                    tts.write_to_fp(mp3_fp)
+                    st.audio(mp3_fp, format='audio/mp3')
+                except Exception as e: st.error(f"Erro Audio: {e}")
+        else: st.warning("Versículo não encontrado. Verifique a grafia.")
+
+# 3. LEITOR PDF (Extração)
+with tab_pdf:
+    st.write("Resumir Livro")
+    pdf = st.file_uploader("Upload PDF", type="pdf")
+    if pdf and st.button("Analisar PDF"):
+        if api_key:
+            raw = read_pdf_text(pdf)
+            st.success("Lido! Gerando resumo...")
+            summary = ai_brain(f"Resuma este texto teológico: {raw[:4000]}", api_key, "Professor")
+            st.markdown(summary)
+
+# 4. MODO DEV (Gerar Código Livre)
+with tab_dev:
+    st.caption("Fábrica de Código")
+    prompt_dev = st.text_input("O que criar?")
+    if st.button("Codar"):
+        if api_key: st.code(ai_brain(prompt_dev, api_key, "Coder"))
+with b2:
+    if st.button("🗣 TRADUZIR TUDO"):
+        if api_key:
+            res = ai_brain(main_text, api_key, "Tradutor")
+            st.session_state['texto_esboco'] = res
+            st.rerun()
+with b3:
+    if st.button("🎓 AVALIAR HOMILÉTICA"):
+        if api_key:
+            st.info(ai_brain(main_text, api_key, "Professor"))
+
+# Auto Save (Silent)
+if new_tit and main_text != txt_curr:
+    with open(os.path.join(PASTA, f"{new_tit}.txt"), "w") as f: f.write(main_text)
+
+with menu_tabs[2]: # Social / Monetização
+    st.write("**Contato do Dev**")
+    try:
+        buf = BytesIO()
+        img = gerar_qr("https://instagram.com/felipefreitashope")
+        img.save(buf)
+        st.image(buf, caption="Scan para Instagram")
+    except: pass
+    
+    st.divider()
+    st.markdown(f"""
+    <div class="ad-card">
+        📖 Sugestão:<br>{st.session_state['anuncio_atual']}<br>
+        <a href="https://amazon.com.br" style="color:#000; text-decoration:underline;">ADQUIRIR AGORA</a>
+    </div>
+    """, unsafe_allow_html=True)
 
 # --- 2. GESTÃO DE ESTADO & MEMÓRIA ---
 if 'logado' not in st.session_state: st.session_state.update({'logado': False, 'user': ''})
@@ -123,6 +271,18 @@ def read_pdf_text(file_like):
         pages = [p.extract_text() for p in reader.pages[:40] if p.extract_text()]
         return "\n".join(pages)
     except: return "Erro ao ler PDF."
+        with st.form("login_seguro"):
+        u = st.text_input("Identificação")
+        p = st.text_input("Credencial", type="password")
+        if st.form_submit_button("ENTRAR NO SISTEMA", type="primary"):
+            if u in ["admin", "pastor", "felipe"] and p in ["1234", "pregar", "hope"]:
+                st.session_state['logado'] = True
+                st.session_state['user'] = u
+                update_streak()
+                st.rerun()
+            else:
+                st.error("Acesso Não Autorizado")
+st.stop()
 
 # --- 3. ESTILOS VISUAIS (DESIGN SYSTEM V13) ---
 st.markdown(f"""
@@ -417,3 +577,25 @@ st.markdown("""
     | V13 PLATINUM
 </div>
 """, unsafe_allow_html=True)
+try:
+    genai.configure(api_key=key)
+    
+    # Seleção de Idioma para a IA
+    lang_instruction = f"Responda sempre em {st.session_state['idioma']}."
+    
+    roles = {
+        "Razão": "Teólogo apologético e histórico. Use lógica e exegese.",
+      bz
+        "Professor": "Professor de homilética. Corrija o texto, aponte erros gramaticais e teológicos.",
+        "Coder": "Programador Senior Python/Streamlit.",
+        "Tradutor": "Tradutor especialista em Teologia Cristã.",
+        "Marketing": "Gere um título de livro cristão fictício."
+    }
+    
+    system_prompt = f"MODO: {roles.get(mode, 'Assistente')}\n{lang_instruction}\nCONTEXTO: {prompt}"
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    return model.generate_content(system_prompt).text
+except Exception as e: return f"Erro na Nuvem IA: {e}"
+r = requests.get(f"https://bible-api.com/{ref_safe}?translation=almeida", timeout=4)
+    return r.json() if r.status_code == 200 else None
+except: return None

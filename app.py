@@ -231,7 +231,7 @@ def load_crossrefs():
             return json.load(f)
     except:
         return {}
-xref = crossrefs.get("João 3:16", [])
+xref = crossrefs.get("João 3:16",
 def load_lexico():
     try:
         with open("Banco_Biblia/lexico/strongs.json", "r", encoding="utf-8") as f:
@@ -251,4 +251,42 @@ def load_kai():
             return json.load(f)
     except:
         return {}
+
+kai_refs = kai["fé"]
+def ia_gratis(prompt):
+    try:
+        url = "https://api-free-llm.gptfree.cc/v1/chat/completions"
+        payload = {
+            "model": "llama-3.1-8b-instruct",
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        r = requests.post(url, json=payload)
+        return r.json()["choices"][0]["message"]["content"]
+    except:
+        return "Erro na IA gratuita"
+texto = ia_gratis("Faça uma introdução sobre João 3:16")
+with t2:
+    ref = st.text_input("Versículo (ex: Jo 3:16)")
+    ver = st.selectbox("Versão:", ["acf", "nvi"])
+
+    if st.button("BUSCAR TEXTO"):
+        biblia = load_bible(ver)
+        try:
+            livro, cap_vers = ref.split(" ")
+            cap, vers = cap_vers.split(":")
+            texto = biblia[livro][cap][vers]
+            st.success(texto)
+        except:
+            st.error("Referência inválida")
+    
+    if st.button("REFERÊNCIAS CRUZADAS"):
+        cross = load_crossrefs()
+        refs = cross.get(ref, [])
+        st.write(refs)
+
+    if st.button("LÉXICO STRONGS"):
+        lexico = load_lexico()
+        termo = st.text_input("ID Strong (ex: G25)")
+        if termo:
+            st.write(lexico.get(termo, "Não encontrado"))
 

@@ -279,3 +279,10 @@ with st.sidebar:
     with tab_set:
         val = st.slider("Tamanho", 30, 80, st.session_state['layout_split'])
         st.session
+# --- 8. RODAPÉ FIXO ---
+st.markdown("""
+<div class="footer-insta">
+    DESENVOLVEDOR: <a href="https://instagram.com/felipefreitashope" target="_blank">@FELIPEFREITASHOPE</a> 
+    | V12 PRO BUSINESS
+</div>
+""", unsafe_allow_html=True)

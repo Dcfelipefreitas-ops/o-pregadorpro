@@ -412,4 +412,4 @@ def read_pdf_text(file_like):
         return "\n".join(text)
     except Exception as e:
         return "Erro lendo PDF: " + str(e)
-python Banco_Biblia/build_full_bibles.py --kjv_url "https://www.gutenberg.org/cache/epub/10/pg10.txt" --out_dir "./Banco_Biblia/bibles"
+

@@ -113,4 +113,3 @@ USER = st.session_state['user']
 PASTA = os.path.join("Banco_Sermoes", USER)
 if not os.path.exists(PASTA): os.makedirs(PASTA)
 
-def gemini

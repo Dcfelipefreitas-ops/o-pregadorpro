@@ -1,25 +1,48 @@
+# app.py (corrigido - cole por cima do arquivo atual)
 import streamlit as st
 import os
 import requests
 import tempfile
 import qrcode
 from io import BytesIO
-from datetime import datetime, timedelta
+from datetime import datetime
 import PyPDF2
 from gtts import gTTS
-import speech_recognition as sr
+
+# speech_recognition é opcional — se não estiver disponível, app mostra instrução
+try:
+    import speech_recognition as sr
+    SR_OK = True
+except Exception:
+    SR_OK = False
+
+# generative AI (opcional)
+try:
+    import google.generativeai as genai
+    GENAI_INSTALLED = True
+except Exception:
+    GENAI_INSTALLED = False
 
 # --- 1. CONFIGURAÇÃO GERAL ---
 st.set_page_config(page_title="O Pregador", layout="wide", page_icon="🧷", initial_sidebar_state="expanded")
 
 # --- 2. GESTÃO DE ESTADO & MEMÓRIA ---
-if 'logado' not in st.session_state: st.session_state.update({'logado': False, 'user': ''})
-if 'bg_url' not in st.session_state: st.session_state['bg_url'] = "https://images.unsplash.com/photo-1497294815431-9365093b7331?q=80&w=2070&auto=format&fit=crop"
-if 'layout_split' not in st.session_state: st.session_state['layout_split'] = 60
-if 'texto_esboco' not in st.session_state: st.session_state['texto_esboco'] = ""
-if 'login_streak' not in st.session_state: st.session_state['login_streak'] = 1
-if 'last_login' not in st.session_state: st.session_state['last_login'] = str(datetime.now().date())
-if 'anuncio_atual' not in st.session_state: st.session_state['anuncio_atual'] = "📚 Bíblia de Estudo Premium"
+if 'logado' not in st.session_state:
+    st.session_state.update({'logado': False, 'user': ''})
+if 'bg_url' not in st.session_state:
+    st.session_state['bg_url'] = "https://images.unsplash.com/photo-1497294815431-9365093b7331?q=80&w=2070&auto=format&fit=crop"
+if 'layout_split' not in st.session_state:
+    st.session_state['layout_split'] = 60
+if 'texto_esboco' not in st.session_state:
+    st.session_state['texto_esboco'] = ""
+if 'login_streak' not in st.session_state:
+    st.session_state['login_streak'] = 1
+if 'last_login' not in st.session_state:
+    st.session_state['last_login'] = str(datetime.now().date())
+if 'anuncio_atual' not in st.session_state:
+    st.session_state['anuncio_atual'] = "📚 Bíblia de Estudo Premium"
+if 'api_input' not in st.session_state:
+    st.session_state['api_input'] = ""
 
 # Gamificação
 def update_streak():
@@ -29,22 +52,25 @@ def update_streak():
         st.session_state['last_login'] = hoje
 
 # --- 3. INTEGRAÇÃO E SEGURANÇA IA ---
-try:
-    from duckduckgo_search import DDGS
-    import google.generativeai as genai
-except: pass
-
 def safety_filter(prompt):
     blacklist = ["porn", "sex", "erotic", "xxx", "fraude", "hack", "roubar", "cassino"]
-    if any(p in prompt.lower() for p in blacklist): return False
+    if any(p in prompt.lower() for p in blacklist):
+        return False
     return True
 
 def ai_brain(prompt, key, mode="Professor"):
-    if not key: return "⚠️ Configure a Chave Google no Menu."
-    if not safety_filter(prompt): return "🚫 Conteúdo Bloqueado por Ética."
+    """
+    Usa google.generativeai se instalado e chave fornecida.
+    Caso contrário, devolve mensagem instructiva.
+    """
+    if not key:
+        return "⚠️ Configure a Chave Google no Menu (st.secrets['GOOGLE_API_KEY'] ou no campo de configurações)."
+    if not safety_filter(prompt):
+        return "🚫 Conteúdo Bloqueado por Ética."
+    if not GENAI_INSTALLED:
+        return "⚠️ Biblioteca google.generativeai não está instalada no ambiente."
     try:
         genai.configure(api_key=key)
-        # Personalidades Avançadas
         roles = {
             "Razão": "Teólogo apologético, use lógica, grego/hebraico e história.",
             "Sentimento": "Pastor pentecostal, use emoção, fervor e consolo.",
@@ -53,34 +79,94 @@ def ai_brain(prompt, key, mode="Professor"):
             "Tradutor": "Traduza para Português Culto Teológico.",
             "Marketing": "Gere um título de livro cristão fictício baseado no tema para venda."
         }
-        sys = f"MODO: {roles.get(mode, 'Assistente')}\nCONTEXTO: {prompt}"
-        return genai.GenerativeModel('gemini-1.5-flash').generate_content(sys).text
-    except Exception as e: return f"Erro IA: {e}"
-
-def transcrever_audio(audio_file, key):
-    """Transforma voz em texto usando o Google Gemini (Mais preciso)"""
-    if not key: return "Sem chave API."
-    try:
-        genai.configure(api_key=key)
+        system_prompt = f"MODO: {roles.get(mode,'Assistente')}\nCONTEXTO: {prompt}"
         model = genai.GenerativeModel('gemini-1.5-flash')
-        # Gambiarra técnica: Gemini aceita áudio via File API, mas aqui faremos via prompt simples se for curto
-        # Para produção, usaríamos speech_recognition, mas requer ffmpeg no servidor linux
-        return "⚠️ Transcrição de áudio requer configuração avançada de servidor. Use a digitação de voz do seu teclado (Win+H) para resultado imediato." 
-    except: return "Erro Audio."
+        out = model.generate_content(system_prompt)
+        # some SDKs return object with .text, others nested; handle both
+        if hasattr(out, "text"):
+            return out.text
+        if isinstance(out, dict):
+            return str(out)
+        return str(out)
+    except Exception as e:
+        return f"Erro IA: {e}"
 
-def get_bible(ref):
+# Transcrição de áudio simples via speech_recognition (WAV aceito)
+def transcrever_arquivo_audio(uploaded_file):
+    if not SR_OK:
+        return ("Transcrição local não disponível. Instale 'speechrecognition' e 'pydub' + 'ffmpeg' no servidor "
+                "para suportar formatos além de WAV.")
+    # speech_recognition suporta WAV nativamente
     try:
-        r = requests.get(f"https://bible-api.com/{ref.replace(' ', '+')}?translation=almeida", timeout=2)
-        return r.json() if r.status_code == 200 else None
-    except: return None
+        recognizer = sr.Recognizer()
+        # precisamos salvar temporariamente
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            tmp.write(uploaded_file.read())
+            tmp.flush()
+            tmp_path = tmp.name
+        with sr.AudioFile(tmp_path) as source:
+            audio_data = recognizer.record(source)
+            try:
+                text = recognizer.recognize_google(audio_data, language="pt-BR")
+                return text
+            except sr.UnknownValueError:
+                return "Não foi possível reconhecer o áudio."
+            except sr.RequestError as e:
+                return f"Erro no serviço de reconhecimento: {e}"
+    except Exception as e:
+        return f"Erro ao processar áudio: {e}"
+
+# --- 4. FUNÇÕES AUXILIARES ---
+def get_bible(ref):
+    """
+    Aceita formatos como:
+    - 'Jo 3 16'
+    - 'John 3:16'
+    Faz tentativas seguras de chamada ao bible-api.
+    """
+    if not ref:
+        return None
+    # normalizar
+    cleaned = ref.strip().replace(":", " ").replace(",", " ")
+    parts = cleaned.split()
+    if len(parts) < 3:
+        # se o usuário passou 'Jo 3' ou similar - aborta
+        try_url = ref.replace(" ", "+")
+    else:
+        book = parts[0]
+        chapter = parts[1]
+        verse = parts[2]
+        try_url = f"{book}+{chapter}:{verse}"
+    url = f"https://bible-api.com/{try_url}?translation=almeida"
+    try:
+        r = requests.get(url, timeout=6)
+        if r.status_code == 200:
+            j = r.json()
+            # esperado: {'reference': 'John 3:16', 'text': '...'}
+            return j
+        return None
+    except Exception:
+        return None
 
 def gerar_qr(link):
     qr = qrcode.QRCode(box_size=10, border=1)
     qr.add_data(link)
     qr.make(fit=True)
-    return qr.make_image(fill_color="black", back_color="white")
+    img = qr.make_image(fill_color="black", back_color="white")
+    return img
 
-# --- 4. CSS VISUAL (APPLE GLASS + WOOD) ---
+def read_pdf_text(file_like, max_pages=20):
+    try:
+        reader = PyPDF2.PdfReader(file_like)
+        pages = []
+        for i, p in enumerate(reader.pages):
+            if i >= max_pages: break
+            pages.append(p.extract_text() or "")
+        return "\n\n".join(pages)
+    except Exception as e:
+        return f"Erro lendo PDF: {e}"
+
+# --- 5. CSS VISUAL (mantive seu visual) ---
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -135,12 +221,11 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 5. TELA DE LOGIN ---
+# --- 6. TELA DE LOGIN (mantive seu fluxo) ---
 if not st.session_state['logado']:
-    c1,c2,c3 = st.columns([1,2,1])
+    c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        # IMAGEM DO PREGADOR DE ROUPA REAL (PNG)
         st.markdown("""
         <div style="text-align:center; background: rgba(0,0,0,0.7); padding: 30px; border-radius: 20px;">
             <img src="https://cdn-icons-png.flaticon.com/512/9430/9430594.png" width="80">
@@ -148,7 +233,6 @@ if not st.session_state['logado']:
             <p style="color:#aaa">Ferramenta Pastoral & Business</p>
         </div>
         """, unsafe_allow_html=True)
-        
         with st.form("login"):
             u = st.text_input("Usuário")
             p = st.text_input("Senha", type="password")
@@ -157,18 +241,18 @@ if not st.session_state['logado']:
                     st.session_state['logado'] = True
                     st.session_state['user'] = u
                     update_streak()
-                    st.rerun()
-                else: st.error("Acesso Negado")
+                    st.experimental_rerun()
+                else:
+                    st.error("Acesso Negado")
     st.stop()
 
-# --- 6. APP PRINCIPAL ---
+# --- 7. APP PRINCIPAL ---
 USER = st.session_state['user']
 PASTA = os.path.join("Banco_Sermoes", USER)
-if not os.path.exists(PASTA): os.makedirs(PASTA)
+os.makedirs(PASTA, exist_ok=True)
 
 # SIDEBAR (CONFIGURAÇÕES E ADS)
 with st.sidebar:
-    # 1. MARCA E FOTO DE MADEIRA
     st.markdown(f"""
     <div class="brand-box">
         <img src="https://cdn-icons-png.flaticon.com/512/9430/9430594.png" width="50">
@@ -176,162 +260,22 @@ with st.sidebar:
         <div style="color:#4CAF50; font-size:12px; margin-top:5px">🔥 {st.session_state['login_streak']} DIAS ON</div>
     </div>
     """, unsafe_allow_html=True)
-    
+
     st.caption(f"Olá, {USER.capitalize()}")
-    
+
     tab_proj, tab_set, tab_qr = st.tabs(["📂", "⚙️", "📱"])
-    
+
     with tab_proj:
-        try: files = [f.replace(".txt","") for f in os.listdir(PASTA) if f.endswith(".txt")]
-        except: files = []
+        try:
+            files = [f.replace(".txt","") for f in os.listdir(PASTA) if f.endswith(".txt")]
+        except Exception:
+            files = []
         sel = st.radio("Biblioteca:", ["+ Novo"] + files, label_visibility="collapsed")
-        
-        if st.button("Sair"): st.session_state['logado']=False; st.rerun()
+
+        if st.button("Sair"):
+            st.session_state['logado'] = False
+            st.experimental_rerun()
 
     with tab_set:
         val = st.slider("Tamanho", 30, 80, st.session_state['layout_split'])
-        st.session_state['layout_split'] = val
-        
-        novo_bg = st.text_input("Fundo URL:", st.session_state['bg_url'])
-        if st.button("Mudar Fundo"): 
-            st.session_state['bg_url'] = novo_bg
-            st.rerun()
-            
-        st.divider()
-        api_key = st.secrets.get("GOOGLE_API_KEY", "")
-        if not api_key: api_key = st.text_input("API Key Google:", type="password")
-
-    with tab_qr:
-        st.caption("Acesse @felipefreitashope")
-        try:
-            buf = BytesIO()
-            img = gerar_qr("https://instagram.com/felipefreitashope")
-            img.save(buf)
-            st.image(buf)
-        except: pass
-
-    # MONETIZAÇÃO (ADS GOSPEL)
-    st.markdown("---")
-    st.markdown("##### ⭐ Ofertas Para Você")
-    # Card de Anúncio Inteligente
-    st.markdown(f"""
-    <div class="ad-box">
-        SUGESTÃO: {st.session_state['anuncio_atual']}<br>
-        <a href="https://amazon.com.br" target="_blank" style="font-size:12px; text-decoration:underline;">COMPRAR AGORA</a>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ÁREA DE TRABALHO
-ratio = st.session_state['layout_split'] / 100
-c_edit, c_tools = st.columns([ratio, 1 - ratio])
-
-# Lógica Texto
-txt_curr = ""
-tit_curr = ""
-if sel != "+ Novo":
-    tit_curr = sel
-    try: 
-        with open(os.path.join(PASTA, f"{sel}.txt"), "r") as f: txt_curr = f.read()
-    except: pass
-
-# --- EDITOR (CENTRO) ---
-with c_edit:
-    # 1. CABEÇALHO E TÍTULO
-    cc1, cc2 = st.columns([3,1])
-    with cc1:
-        new_tit = st.text_input("TEMA", value=tit_curr, placeholder="Título da Mensagem...", label_visibility="collapsed")
-    with cc2:
-        if st.button("💾 GRAVAR", type="primary", use_container_width=True):
-            if new_tit:
-                with open(os.path.join(PASTA, f"{new_tit}.txt"), "w") as f: f.write(st.session_state['texto_esboco'])
-                # GERA ANÚNCIO NOVO BASEADO NO TEMA
-                if api_key:
-                    novo_anuncio = ai_brain(f"Sugira um livro cristão existente sobre: {new_tit}", api_key, "Marketing")
-                    st.session_state['anuncio_atual'] = novo_anuncio
-                st.toast("Salvo! Veja a oferta na barra lateral.")
-                st.rerun()
-
-    # 2. PAPEL DE TRABALHO
-    if not st.session_state['texto_esboco'] and txt_curr:
-        st.session_state['texto_esboco'] = txt_curr
-    
-    main_text = st.text_area("EDITOR", value=st.session_state['texto_esboco'], height=700, label_visibility="collapsed")
-    st.session_state['texto_esboco'] = main_text
-
-    # 3. BARRA DE COMANDO (CORRETOR/VOZ)
-    st.caption("Ferramentas do Editor")
-    
-    # Gravador de Áudio (Experimental)
-    audio_val = st.audio_input("🎤 Digitar por Voz (Grave e a IA escreve)")
-    if audio_val and api_key:
-        st.info("Áudio recebido! Para transcrição real, use Win+H. A transcrição de arquivo requer servidor dedicado.")
-    
-    b1, b2, b3 = st.columns(3)
-    with b1:
-        if st.button("🗣 TRADUZIR TUDO"):
-            if api_key:
-                res = ai_brain(main_text, api_key, "Tradutor")
-                st.session_state['texto_esboco'] = res
-                st.rerun()
-    with b2:
-        if st.button("✨ CORRIGIR AGORA"):
-            if api_key:
-                # O comando Professor aqui corrige e substitui o texto direto
-                res = ai_brain(f"Corrija apenas a gramática deste texto mantendo o sentido: {main_text}", api_key, "Coder") 
-                st.session_state['texto_esboco'] = res
-                st.rerun()
-    with b3:
-        if st.button("🎓 AVALIAR"):
-            if api_key: st.info(ai_brain(main_text, api_key, "Professor"))
-
-    # Autosave
-    if new_tit and main_text != txt_curr:
-        with open(os.path.join(PASTA, f"{new_tit}.txt"), "w") as f: f.write(main_text)
-
-# --- SATÉLITE (DIREITA) ---
-with c_tools:
-    st.markdown("#### 🧠 CÉREBRO")
-    tabs = st.tabs(["IA MODOS", "BÍBLIA", "DEV"])
-    
-    with tabs[0]:
-        ask = st.text_area("Pergunta:")
-        br, bs = st.columns(2)
-        if br.button("🧠 RAZÃO"):
-            st.write(ai_brain(ask, api_key, "Razão"))
-        if bs.button("❤️ EMOÇÃO"):
-            st.write(ai_brain(ask, api_key, "Sentimento"))
-
-    with tabs[1]:
-        ref = st.text_input("Verso (Jo 3 16)")
-        if ref:
-            bd = get_bible(ref.replace(' ', '+'))
-            if bd:
-                txt_b = bd['text']
-                st.markdown(f"**{bd['reference']}**\n{txt_b}")
-                
-                ck1, ck2 = st.columns(2)
-                if ck1.button("⬇ Inserir"):
-                    st.session_state['texto_esboco'] += f"\n\n**{bd['reference']}**\n{txt_b}"
-                    st.rerun()
-                if ck2.button("🔊 Ouvir"):
-                    try:
-                        tts = gTTS(txt_b, lang='pt')
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
-                            tts.save(f.name)
-                            st.audio(f.name)
-                    except: st.error("Erro Audio")
-            else: st.warning("Nada achado.")
-
-    with tabs[2]:
-        st.info("Crie novas funções:")
-        ped = st.text_input("O que criar? (Ex: Botão dízimo)")
-        if st.button("GERAR CÓDIGO"):
-            st.code(ai_brain(ped, api_key, "Coder"))
-
-# --- 8. RODAPÉ FIXO ---
-st.markdown("""
-<div class="footer-insta">
-    DESENVOLVEDOR: <a href="https://instagram.com/felipefreitashope" target="_blank">@FELIPEFREITASHOPE</a> 
-    | V12 PRO BUSINESS
-</div>
-""", unsafe_allow_html=True)
+        st.session

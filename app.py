@@ -223,3 +223,32 @@ with c_tools:
                 raw = read_pdf(pdf_file)
                 st.success("Lido!")
                 st.markdown(ai_gemini(f"Resuma este conteúdo teológico: {raw[:3000]}", api_key))
+                biblia = load_bible("acf")
+texto = biblia["João"]["3"]["16"]
+def load_crossrefs():
+    try:
+        with open("Banco_Biblia/crossrefs/referencias.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+xref = crossrefs.get("João 3:16", [])
+def load_lexico():
+    try:
+        with open("Banco_Biblia/lexico/strongs.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+lex = lexico.get("G25")  # exemplo: ágape
+def load_kai():
+    try:
+        with open("Banco_Biblia/chave/kai.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+def load_kai():
+    try:
+        with open("Banco_Biblia/chave/kai.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+

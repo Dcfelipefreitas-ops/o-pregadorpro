@@ -1,4 +1,10 @@
 import streamlit as st
+from utils.bible_loader import load_bible_from_folder, get_verse
+from utils.lexicon_loader import load_lexicon, search_strongs
+from utils.reference_search import find_references
+from utils.chave_kai import load_kai, get_cross_references
+
+import streamlit as st
 import json
 import os
 import requests
@@ -239,3 +245,171 @@ with c_tools:
                 st.success("Livro Indexado!")
                 st.markdown(ia_google(f"Resuma este conteúdo teológico para sermão: {txt_livro[:3000]}", api_key))
             except: st.error("Erro na leitura.")
+import json
+import os
+
+def load_bible_from_folder(folder_path="bible"):
+    bible = {}
+
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".json"):
+            book_name = filename.replace(".json", "")
+            with open(os.path.join(folder_path, filename), "r", encoding="utf-8") as f:
+                bible[book_name.capitalize()] = json.load(f)
+
+    return bible
+
+
+def get_verse(bible, book, chapter, verse):
+    try:
+        return bible[book][str(chapter)][str(verse)]
+    except KeyError:
+        return "Verso não encontrado."
+import json
+import os
+
+def load_lexicon(folder_path="lexicon"):
+    lexicons = {}
+
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".json"):
+            name = filename.replace(".json", "")
+            with open(os.path.join(folder_path, filename), "r", encoding="utf-8") as f:
+                lexicons[name] = json.load(f)
+
+    return lexicons
+
+
+def search_strongs(lexicons, strongs_number):
+    strongs_number = strongs_number.upper()
+
+    for lex in lexicons.values():
+        if strongs_number in lex:
+            return lex[strongs_number]
+
+    return "Número Strong não encontrado."
+def find_references(bible, keyword):
+    result = []
+
+    for book, chapters in bible.items():
+        for chapter, verses in chapters.items():
+            for number, text in verses.items():
+                if keyword.lower() in text.lower():
+                    result.append({
+                        "book": book,
+                        "chapter": chapter,
+                        "verse": number,
+                        "text": text
+                    })
+
+    return result
+import json
+
+def load_kai(file_path="lexicon/chave_kai.json"):
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def get_cross_references(kai, verse_key):
+    return kai.get(verse_key, [])
+@st.cache_resource
+def load_data():
+    bible = load_bible_from_folder("bible")
+    lexicons = load_lexicon("lexicon")
+    kai = load_kai("lexicon/chave_kai.json")
+    return bible, lexicons, kai
+
+bible, lexicons, kai = load_data()
+book = st.selectbox("Livro", list(bible.keys()))
+chapter = st.number_input("Capítulo", 1)
+verse = st.number_input("Verso", 1)
+
+if st.button("Buscar verso"):
+    st.write(get_verse(bible, book, chapter, verse))
+strong = st.text_input("Número Strong")
+
+if st.button("Buscar Strong"):
+    st.write(search_strongs(lexicons, strong))
+keyword = st.text_input("Buscar palavra na Bíblia")
+
+if st.button("Buscar"):
+    results = find_references(bible, keyword)
+    for r in results:
+        st.write(f"{r['book']} {r['chapter']}:{r['verse']} — {r['text']}")
+verse_key = f"{book} {chapter}:{verse}"
+
+refs = get_cross_references(kai, verse_key)
+st.write(refs)
+# utils/reference_search.py
+def find_references(bible, keyword):
+    if not keyword: return []
+    results = []
+    for book, chapters in bible.items():
+        for ch, verses in chapters.items():
+            for v, text in verses.items():
+                try:
+                    if keyword.lower() in (text or "").lower():
+                        results.append({"book": book, "chapter": ch, "verse": v, "text": text})
+                except:
+                    continue
+    return results
+# utils/kai.py
+import json
+from pathlib import Path
+
+def load_kai(path="Banco_Biblia/chave/kai.json"):
+    p = Path(path)
+    if not p.exists():
+        return {}
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def get_kai_refs(kai_data, term):
+    if not term: return []
+    key = term.lower()
+    if key in kai_data:
+        return kai_data[key]
+    # try partial matches
+    matches = []
+    for k, v in kai_data.items():
+        if key in k.lower():
+            matches.extend(v)
+    return matches
+# helpers.py
+import requests
+import io
+import PyPDF2
+
+def ia_gratis(prompt: str):
+    """
+    Implementação simples para serviços LLM grátis.
+    OBS: endpoints públicos mudam — essa função tenta usar um endpoint gratuito se disponível.
+    Se falhar, retorna fallback com instrução.
+    """
+    try:
+        url = "https://api-free-llm.gptfree.cc/v1/chat/completions"  # exemplo - pode nao estar disponível
+        payload = {
+            "model": "llama-3.1-8b-instruct",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 600
+        }
+        r = requests.post(url, json=payload, timeout=20)
+        r.raise_for_status()
+        j = r.json()
+        if "choices" in j and len(j["choices"])>0:
+            return j["choices"][0]["message"]["content"]
+    except Exception as e:
+        # fallback local lightweight
+        return ("[IA gratuita indisponível ou erro de rede].\n\nSugestão automática:\n" +
+               prompt[:800] + "\n\n(Use build_full_bibles.py para integrar uma LLM local ou configure sua chave em st.secrets).")
+
+def read_pdf_text(file_like):
+    try:
+        reader = PyPDF2.PdfReader(file_like)
+        text = []
+        for i,p in enumerate(reader.pages):
+            if i>60: break
+            text.append(p.extract_text() or "")
+        return "\n".join(text)
+    except Exception as e:
+        return "Erro lendo PDF: " + str(e)
+python Banco_Biblia/build_full_bibles.py --kjv_url "https://www.gutenberg.org/cache/epub/10/pg10.txt" --out_dir "./Banco_Biblia/bibles"

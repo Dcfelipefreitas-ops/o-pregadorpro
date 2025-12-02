@@ -3,3 +3,5 @@ openai
 duckduckgo_search
 requests
 fpdf
+google-generativeai
+streamlit-lottie

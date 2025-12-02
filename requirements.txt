@@ -4,3 +4,4 @@ google-generativeai
 requests
 streamlit-lottie
 PyPDF2
+watchdog

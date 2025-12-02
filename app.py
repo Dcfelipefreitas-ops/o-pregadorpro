@@ -1,12 +1,13 @@
-# app.py (VERSÃO UNIFICADA, CORRIGIDA E COMPLETA)
+# app.py (VERSÃO UNIFICADA, CORRIGIDA, COM INTERLINEAR, NOTES (SQLite) E CONVERTERS)
 import streamlit as st
 import os
 import requests
 import tempfile
 import qrcode
-from io import BytesIO
+from io import BytesIO, StringIO
 from datetime import datetime
 import json
+import sqlite3
 import PyPDF2
 from gtts import gTTS
 
@@ -57,10 +58,17 @@ if 'idioma' not in st.session_state:
 if 'api_input' not in st.session_state:
     st.session_state['api_input'] = ""
 
-# Safe default user for caption (so UI doesn't crash before login)
 USER = st.session_state.get('user', 'Admin')
 
-# --- FUNÇÕES AUXILIARES E LÓGICA ---
+# --- PASTAS & DB ---
+os.makedirs("Banco_Biblia/bibles", exist_ok=True)
+os.makedirs("Banco_Biblia/lexico", exist_ok=True)
+os.makedirs("Banco_Biblia/crossrefs", exist_ok=True)
+os.makedirs("Banco_Biblia/chave", exist_ok=True)
+os.makedirs("Banco_Sermoes", exist_ok=True)
+DB_NOTES = os.path.join("Banco_Sermoes", "notes.db")
+
+# --- UTILIDADES & FUNÇÕES CENTRAIS ---
 
 def update_streak():
     hoje = str(datetime.now().date())
@@ -75,7 +83,6 @@ def safety_filter(prompt):
     return True
 
 def ai_brain(prompt, key, mode="Professor"):
-    """Wrapper for google.generativeai with fallbacks and safety check."""
     if not key:
         return "⚠️ Configure a Chave Google no Menu (st.secrets['GOOGLE_API_KEY'] ou campo de configurações)."
     if not safety_filter(prompt):
@@ -103,12 +110,10 @@ def ai_brain(prompt, key, mode="Professor"):
         return f"Erro na Nuvem IA: {e}"
 
 def transcrever_audio_file(uploaded_file):
-    """Transcreve arquivos WAV localmente via speech_recognition quando disponível."""
     if not SR_OK:
         return "Transcrição local não disponível. Instale 'speechrecognition' e dependências."
     try:
         recognizer = sr.Recognizer()
-        # speech_recognition expects a filename or file-like. We'll save to temp file.
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             tmp.write(uploaded_file.read())
             tmp_path = tmp.name
@@ -125,23 +130,17 @@ def transcrever_audio_file(uploaded_file):
         return f"Erro ao processar áudio: {e}"
 
 def get_bible(ref):
-    """Consulta bible-api com algumas normalizações; retorna dict ou None."""
     if not ref:
         return None
     try:
         r = ref.strip()
-        # normalize common separators
         r = r.replace(",", " ").replace(".", " ")
-        # allow formats: "Jo 3 16", "John 3:16", "John 3 16"
         if ":" in r:
-            # preserve colon form
             query = r.replace(" ", "+")
         else:
             parts = r.split()
             if len(parts) >= 3:
-                book = parts[0]
-                chapter = parts[1]
-                verse = parts[2]
+                book = parts[0]; chapter = parts[1]; verse = parts[2]
                 query = f"{book}+{chapter}:{verse}"
             else:
                 query = r.replace(" ", "+")
@@ -171,17 +170,15 @@ def read_pdf_text(file_like):
     except Exception as e:
         return f"Erro ao ler PDF: {e}"
 
-# --- CSS (manteve visual) ---
+# --- CSS (mantive visual e cores) ---
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] {{font-family: 'Inter', sans-serif;}}
-
     [data-testid="stAppViewContainer"] {{
         background-image: url("{st.session_state['bg_url']}");
         background-size: cover; background-position: center; background-attachment: fixed;
     }}
-    
     [data-testid="stSidebar"], .stTextArea textarea, .stTextInput input, div[data-testid="stExpander"], .stSelectbox {{
         background-color: rgba(20, 22, 28, 0.90) !important;
         backdrop-filter: blur(15px);
@@ -189,32 +186,20 @@ st.markdown(f"""
         border-radius: 12px !important;
         color: #e0e0e0 !important;
     }}
-
     header, footer {{visibility: hidden;}}
     .block-container {{padding-top: 1rem; max-width: 96%;}}
-
     .brand-box {{ text-align: center; padding-bottom: 20px; border-bottom: 1px solid #333; margin-bottom: 15px; }}
     .brand-title {{ font-size: 26px; font-weight: 800; color: #D4AF37; letter-spacing: 2px; margin-top: 5px; }}
-
-    .ad-card {{
-        background: linear-gradient(135deg, #FFD700, #DAA520);
-        color: black; padding: 12px; border-radius: 8px; margin-top: 10px; 
-        text-align: center; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }}
-
+    .ad-card {{ background: linear-gradient(135deg, #FFD700, #DAA520); color: black; padding: 12px; border-radius: 8px; margin-top: 10px; text-align: center; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }}
     .stButton button {{ background-color: #2b2b2b; color: #eee; border: 1px solid #444; border-radius: 6px; font-weight: 600; }}
     .stButton button:hover {{ border-color: #D4AF37; color: #D4AF37; background-color: #1a1a1a; }}
-
-    .footer-insta {{
-        position: fixed; bottom: 0; left: 0; width: 100%;
-        background: #000; color: #666; text-align: center;
-        padding: 6px; font-size: 11px; z-index: 9999; border-top: 1px solid #222;
-    }}
+    .footer-insta {{ position: fixed; bottom: 0; left: 0; width: 100%; background: #000; color: #666; text-align: center; padding: 6px; font-size: 11px; z-index: 9999; border-top: 1px solid #222; }}
     .footer-insta a {{ color: #E1306C; font-weight: bold; text-decoration: none; }}
+    .interlinear-col {{ padding: 6px; border-left: 1px solid rgba(255,255,255,0.03); }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIN (único ponto, limpo) ---
+# --- LOGIN ---
 if not st.session_state['logado']:
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -239,12 +224,12 @@ if not st.session_state['logado']:
                     st.error("Acesso Não Autorizado")
     st.stop()
 
-# --- APLICAÇÃO PRINCIPAL (após login) ---
+# --- APLICAÇÃO PRINCIPAL ---
 USER = st.session_state.get('user', 'Admin')
 PASTA = os.path.join("Banco_Sermoes", USER)
 os.makedirs(PASTA, exist_ok=True)
 
-# --- BÍBLIA + LÉXICO + STRONG + CROSSREFS (TheWord-like) ---
+# --- BÍBLIA + LÉXICO + STRONG + CROSSREFS + INTERLINEAR ---
 def carregar_json(caminho):
     try:
         with open(caminho, "r", encoding="utf-8") as f:
@@ -252,16 +237,13 @@ def carregar_json(caminho):
     except Exception:
         return {}
 
-BIBLIA = carregar_json("Banco_Biblia/bibles/acf.json")        # opcional: coloque seu JSON aqui
-LEXICO = carregar_json("Banco_Biblia/lexico/strongs.json")   # opcional
-XREF   = carregar_json("Banco_Biblia/crossrefs/referencias.json") # opcional
-KAI    = carregar_json("Banco_Biblia/chave/kai.json")        # opcional
+BIBLIA = carregar_json("Banco_Biblia/bibles/acf.json")
+LEXICO = carregar_json("Banco_Biblia/lexico/strongs.json")
+XREF   = carregar_json("Banco_Biblia/crossrefs/referencias.json")
+KAI    = carregar_json("Banco_Biblia/chave/kai.json")
+INTERLINEAR = carregar_json("Banco_Biblia/interlinear.json")  # formato: {"Book": {"3": {"16": {"pt":"...", "gr":"...", "strongs":["G25"]}}}}
 
 def buscar_palavra(termo):
-    """
-    Busca simples com suporte a operadores AND, OR, NEAR e wildcard *.
-    Retorna lista de tuplas (livro, cap, verso, texto).
-    """
     resultados = []
     if not termo or not isinstance(termo, str):
         return resultados
@@ -269,9 +251,8 @@ def buscar_palavra(termo):
     termo_raw = termo.strip()
     termo = termo_raw.lower()
 
-    # Busca por strong (G#### / H####) -> retornará ocorrências contendo o strong tag no texto se houver
-    if (termo.upper().startswith("G") or termo.upper().startswith("H")) and termo.replace("g","").replace("G","").replace("h","").replace("H","").isdigit():
-        # procurar ocorrência de código strong no texto (caso textos possuam tags)
+    # Strong search pattern detection (G#### / H####)
+    if (termo_raw.upper().startswith("G") or termo_raw.upper().startswith("H")) and termo_raw[1:].isdigit():
         for livro, capitulos in BIBLIA.items():
             for cap, versos in capitulos.items():
                 for num, texto in versos.items():
@@ -279,10 +260,10 @@ def buscar_palavra(termo):
                         resultados.append((livro, cap, num, texto))
         return resultados
 
-    # Operadores
-    if " AND " in termo_raw:
-        a, b = termo_raw.split(" AND ", 1)
-        a = a.strip().lower(); b = b.strip().lower()
+    # Operators AND, OR, NEAR
+    if " AND " in termo_raw.upper():
+        a, b = termo_raw.upper().split(" AND ", 1)
+        a = a.lower(); b = b.lower()
         for livro, capitulos in BIBLIA.items():
             for cap, versos in capitulos.items():
                 for num, texto in versos.items():
@@ -291,9 +272,9 @@ def buscar_palavra(termo):
                         resultados.append((livro, cap, num, texto))
         return resultados
 
-    if " OR " in termo_raw:
-        a, b = termo_raw.split(" OR ", 1)
-        a = a.strip().lower(); b = b.strip().lower()
+    if " OR " in termo_raw.upper():
+        a, b = termo_raw.upper().split(" OR ", 1)
+        a = a.lower(); b = b.lower()
         for livro, capitulos in BIBLIA.items():
             for cap, versos in capitulos.items():
                 for num, texto in versos.items():
@@ -302,9 +283,9 @@ def buscar_palavra(termo):
                         resultados.append((livro, cap, num, texto))
         return resultados
 
-    if " NEAR " in termo_raw:
-        a, b = termo_raw.split(" NEAR ", 1)
-        a = a.strip().lower(); b = b.strip().lower()
+    if " NEAR " in termo_raw.upper():
+        a, b = termo_raw.upper().split(" NEAR ", 1)
+        a = a.lower(); b = b.lower()
         for livro, capitulos in BIBLIA.items():
             for cap, versos in capitulos.items():
                 for num, texto in versos.items():
@@ -313,24 +294,24 @@ def buscar_palavra(termo):
                         try:
                             posA = t.index(a)
                             posB = t.index(b)
-                            if abs(posA - posB) < 200:  # janela maior para segurança
+                            if abs(posA - posB) < 200:
                                 resultados.append((livro, cap, num, texto))
                         except ValueError:
                             continue
         return resultados
 
-    # Wildcard termina com *
+    # Wildcard *
     if termo_raw.endswith("*"):
         base = termo_raw[:-1].lower()
         for livro, capitulos in BIBLIA.items():
             for cap, versos in capitulos.items():
                 for num, texto in versos.items():
                     t = (texto or "").lower()
-                    if any(word.startswith(base) for word in t.split()):
+                    if any(w.startswith(base) for w in t.split()):
                         resultados.append((livro, cap, num, texto))
         return resultados
 
-    # Busca simples
+    # Simple contains
     for livro, capitulos in BIBLIA.items():
         for cap, versos in capitulos.items():
             for num, texto in versos.items():
@@ -352,6 +333,102 @@ def chave_kai(term):
     term = term.lower().strip()
     return KAI.get(term, [])
 
+def interlinear_entry(book, chapter, verse):
+    try:
+        return INTERLINEAR.get(book, {}).get(str(chapter), {}).get(str(verse), {})
+    except Exception:
+        return {}
+
+# --- NOTES (SQLite) ---
+def get_db_connection():
+    conn = sqlite3.connect(DB_NOTES, check_same_thread=False)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user TEXT,
+            book TEXT,
+            chapter TEXT,
+            verse TEXT,
+            title TEXT,
+            content TEXT,
+            created_at TEXT
+        )
+    """)
+    conn.commit()
+    return conn
+
+def add_note(user, book, chapter, verse, title, content):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO notes (user, book, chapter, verse, title, content, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (user, book, str(chapter), str(verse), title, content, str(datetime.now())))
+    conn.commit()
+    conn.close()
+
+def get_notes_for_verse(user, book, chapter, verse):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, title, content, created_at FROM notes
+        WHERE user=? AND book=? AND chapter=? AND verse=?
+        ORDER BY created_at DESC
+    """, (user, book, str(chapter), str(verse)))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+def delete_note(note_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM notes WHERE id=?", (note_id,))
+    conn.commit()
+    conn.close()
+
+# --- CONVERTERS (CSV / TSK -> JSON) ---
+def convert_strongs_csv_to_json(csv_bytes):
+    """
+    Expects CSV with columns: code, lemma, transliteration, strong_type, definition
+    Returns dict { "G1": {...}, "H2": {...} }
+    """
+    text = csv_bytes.decode('utf-8', errors='ignore')
+    lines = [l for l in text.splitlines() if l.strip()]
+    result = {}
+    for i, line in enumerate(lines):
+        # naive CSV parse (comma separated). For robust solution use csv module.
+        parts = [p.strip() for p in line.split(',')]
+        if len(parts) < 2:
+            continue
+        code = parts[0].upper()
+        entry = {
+            "lemma": parts[1] if len(parts) > 1 else "",
+            "translit": parts[2] if len(parts) > 2 else "",
+            "type": parts[3] if len(parts) > 3 else "",
+            "def": parts[4] if len(parts) > 4 else ""
+        }
+        result[code] = entry
+    return result
+
+def convert_tsk_to_json(tsk_text):
+    """
+    Very simple converter for TSK-like files (Thematic Study Key). This is placeholder:
+    Splits by lines, looks for verses like 'John 3:16 — text' and indexes them.
+    """
+    lines = [l.strip() for l in tsk_text.splitlines() if l.strip()]
+    out = {}
+    for line in lines:
+        # try to find pattern "Book Chapter:Verse - text"
+        parts = line.split('—', 1)
+        if len(parts) == 2:
+            ref = parts[0].strip()
+            text = parts[1].strip()
+            out[ref] = text
+        else:
+            # fallback append to last
+            pass
+    return out
+
 # --- SIDEBAR ---
 with st.sidebar:
     st.markdown(f"""
@@ -364,7 +441,6 @@ with st.sidebar:
 
     st.caption(f"Pastor(a): {USER.capitalize()}")
 
-    # menu em tabs
     menu_tabs = st.tabs(["📂 PROJETOS", "⚙️ CONFIG", "📱 SOCIAL"])
     api_input_local = st.session_state.get('api_input', '')
 
@@ -444,7 +520,6 @@ with c_editor:
                 try:
                     with open(save_path, "w", encoding="utf-8") as f:
                         f.write(st.session_state.get('texto_esboco', ''))
-                    # sugestão de anúncio via IA (se configurada)
                     api_key = st.session_state.get('api_input', '') or st.secrets.get("GOOGLE_API_KEY", "")
                     if api_key and GENAI_INSTALLED:
                         sugestao = ai_brain(f"Indique 1 livro cristão clássico sobre: '{new_tit}'. Apenas título.", api_key, "Marketing")
@@ -454,13 +529,11 @@ with c_editor:
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
 
-    # campo de texto
     main_text = st.text_area("PAPEL", value=st.session_state.get('texto_esboco', ''), height=700, label_visibility="collapsed")
     st.session_state['texto_esboco'] = main_text
 
     st.caption("🛠️ Ações Rápidas de IA")
 
-    # Upload de áudio (mais confiável que audio_input em muitos ambientes)
     st.markdown("**Ditar para o Editor (upload WAV recomendado)**")
     audio_file = st.file_uploader("Envie WAV (recomendado) ou MP3/M4A", type=['wav', 'mp3', 'm4a'], accept_multiple_files=False)
     if audio_file is not None:
@@ -474,7 +547,6 @@ with c_editor:
         else:
             st.warning("Formato diferente de WAV. Para MP3/M4A você precisa de 'pydub' + 'ffmpeg' no servidor para transcrição automática. Use download + ditado local se necessário.")
 
-    # Ações rápidas
     b1, b2, b3 = st.columns(3)
     api_key = st.session_state.get('api_input', '') or st.secrets.get("GOOGLE_API_KEY", "")
     with b1:
@@ -501,7 +573,6 @@ with c_editor:
             else:
                 st.info("Configure Google API + google.generativeai para avaliação.")
 
-    # Auto save (escreve somente quando houver título para evitar muita I/O)
     if new_tit and main_text != txt_curr:
         try:
             with open(os.path.join(PASTA, f"{new_tit}.txt"), "w", encoding="utf-8") as f:
@@ -509,11 +580,12 @@ with c_editor:
         except Exception:
             pass
 
-# SATÉLITE: ferramentas
+# SATÉLITE: ferramentas (IA, Bíblia, PDF, DEV)
 with c_tools:
     st.markdown("#### 🧠 CENTRAL")
     tab_ia, tab_biblia, tab_pdf, tab_dev = st.tabs(["🤖 IA", "📖 BÍBLIA", "📚 LIVRO", "👨‍💻 DEV"])
 
+    # IA
     with tab_ia:
         st.write("Conselheiro Virtual")
         ask = st.text_area("Pergunta:", height=100, placeholder="Digite sua dúvida teológica...")
@@ -529,6 +601,7 @@ with c_tools:
             else:
                 st.warning("Configure Google API.")
 
+    # BÍBLIA
     with tab_biblia:
         st.write("Consulta Rápida")
         ref = st.text_input("Verso (Ex: Jo 3 16 ou John 3:16)")
@@ -539,7 +612,26 @@ with c_tools:
                 ref_label = bd.get('reference', ref)
                 st.success(f"{ref_label}")
                 st.write(txt_b)
-                ck1, ck2 = st.columns(2)
+
+                # Interlinear display (if available)
+                try:
+                    # attempt to parse common book name formatting
+                    parts = ref.replace(":", " ").split()
+                    book = parts[0] if parts else ""
+                    chapter = parts[1] if len(parts) > 1 else ""
+                    verse_num = parts[2] if len(parts) > 2 else ""
+                    inter = interlinear_entry(book, chapter, verse_num)
+                except Exception:
+                    inter = {}
+
+                if inter:
+                    st.markdown("**Interlinear (se disponível localmente)**")
+                    cols = st.columns([1,1,0.8])
+                    cols[0].markdown(f"**PT:**\n{inter.get('pt','—')}")
+                    cols[1].markdown(f"**Original:**\n{inter.get('orig','—')}")
+                    cols[2].markdown(f"**Strongs:**\n{', '.join(inter.get('strongs',[])) if inter.get('strongs') else '—'}")
+
+                ck1, ck2, ck3 = st.columns(3)
                 if ck1.button("⬇ Inserir"):
                     st.session_state['texto_esboco'] += f"\n\n**{ref_label}**\n{txt_b}"
                     st.rerun()
@@ -552,9 +644,36 @@ with c_tools:
                         st.audio(mp3_fp, format='audio/mp3')
                     except Exception as e:
                         st.error(f"Erro Audio: {e}")
+                if ck3.button("📝 Notas deste Verso"):
+                    # show notes UI
+                    try:
+                        parts = ref.replace(":", " ").split()
+                        book = parts[0]; chapter = parts[1]; verse_num = parts[2]
+                    except Exception:
+                        st.warning("Formato do verso inválido para notas (use 'Jo 3 16').")
+                        book = chapter = verse_num = ""
+                    if book:
+                        rows = get_notes_for_verse(USER, book, chapter, verse_num)
+                        st.markdown("### Notas salvas")
+                        for row in rows:
+                            nid, title, content, created_at = row
+                            st.markdown(f"**{title}** — {created_at}")
+                            st.write(content)
+                            if st.button(f"Deletar {nid}"):
+                                delete_note(nid)
+                                st.success("Nota deletada")
+                                st.rerun()
+                        st.markdown("### Adicionar nova nota")
+                        n_title = st.text_input("Título da nota")
+                        n_content = st.text_area("Conteúdo da nota")
+                        if st.button("Salvar nota"):
+                            add_note(USER, book, chapter, verse_num, n_title or "Nota", n_content or "")
+                            st.success("Nota salva")
+                            st.rerun()
             else:
                 st.warning("Versículo não encontrado (API offline ou formato inválido). Use 'Jo 3 16' ou 'John 3:16'.")
 
+    # PDF
     with tab_pdf:
         st.write("Resumir Livro")
         pdf = st.file_uploader("Upload PDF", type="pdf")
@@ -568,14 +687,62 @@ with c_tools:
                 st.write(raw[:2000])
                 st.info("Para resumo automático configure Google API e instale google.generativeai.")
 
+    # DEV: converters + misc
     with tab_dev:
-        st.caption("Fábrica de Código")
-        prompt_dev = st.text_input("O que criar?")
-        if st.button("Codar"):
-            if api_key and GENAI_INSTALLED:
-                st.code(ai_brain(prompt_dev, api_key, "Coder"))
+        st.caption("Fábrica de Código e Ferramentas de Importação")
+        st.markdown("**1) Convert Strongs CSV → JSON**")
+        csv_file = st.file_uploader("Suba CSV de Strongs (code,lemma,translit,type,definition)", type=['csv'], key="csv_strongs")
+        if csv_file and st.button("Converter CSV para JSON"):
+            try:
+                js = convert_strongs_csv_to_json(csv_file.read())
+                out_path = "Banco_Biblia/lexico/strongs_converted.json"
+                with open(out_path, "w", encoding="utf-8") as f:
+                    json.dump(js, f, ensure_ascii=False, indent=2)
+                st.success(f"Salvo em {out_path}")
+            except Exception as e:
+                st.error(f"Erro conversão: {e}")
+
+        st.markdown("**2) Convert TSK-like → JSON**")
+        tsk_file = st.file_uploader("Suba arquivo TSK (texto)", type=['txt'], key="tsk_file")
+        if tsk_file and st.button("Converter TSK para JSON"):
+            try:
+                txt = tsk_file.read().decode('utf-8', errors='ignore')
+                out = convert_tsk_to_json(txt)
+                out_path = "Banco_Biblia/converted_tsk.json"
+                with open(out_path, "w", encoding="utf-8") as f:
+                    json.dump(out, f, ensure_ascii=False, indent=2)
+                st.success(f"Salvo em {out_path}")
+            except Exception as e:
+                st.error(f"Erro conversão TSK: {e}")
+
+        st.markdown("**3) Import Interlinear JSON**")
+        inter_file = st.file_uploader("Suba JSON Interlinear (opcional)", type=['json'], key="inter_json")
+        if inter_file and st.button("Instalar Interlinear"):
+            try:
+                content = json.load(inter_file)
+                out_path = "Banco_Biblia/interlinear.json"
+                with open(out_path, "w", encoding="utf-8") as f:
+                    json.dump(content, f, ensure_ascii=False, indent=2)
+                st.success(f"Interlinear salvo em {out_path}")
+            except Exception as e:
+                st.error(f"Erro salvar interlinear: {e}")
+
+        st.markdown("**4) Quick utilities**")
+        if st.button("Verificar paths e permissões"):
+            ok = True
+            msgs = []
+            for p in ["Banco_Biblia/bibles", "Banco_Biblia/lexico", "Banco_Biblia/chave", "Banco_Sermoes"]:
+                try:
+                    os.makedirs(p, exist_ok=True)
+                    msgs.append(f"{p}: OK")
+                except Exception as e:
+                    ok = False
+                    msgs.append(f"{p}: ERRO {e}")
+            st.write("\n".join(msgs))
+            if ok:
+                st.success("Ambiente OK")
             else:
-                st.code("# Para gerar código automaticamente, configure a Google API e instale google.generativeai")
+                st.error("Problemas detectados. Veja mensagens acima.")
 
 # RODAPÉ
 st.markdown("""
@@ -584,4 +751,3 @@ st.markdown("""
     | V13 PLATINUM
 </div>
 """, unsafe_allow_html=True)
-

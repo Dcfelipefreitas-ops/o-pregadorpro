@@ -1,3 +1,13 @@
+import json
+
+def load_bible(version="acf"):
+    try:
+        path = f"Banco_Biblia/bibles/{version}.json"
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        return {"erro": str(e)}
+
 import streamlit as st
 
 # --- 1. CONFIGURAÇÃO INICIAL ---

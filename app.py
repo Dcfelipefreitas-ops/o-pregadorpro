@@ -241,7 +241,7 @@ if not st.session_state['logado']:
                     st.session_state['logado'] = True
                     st.session_state['user'] = u
                     update_streak()
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("Acesso Negado")
     st.stop()

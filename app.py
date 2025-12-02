@@ -1,347 +1,184 @@
-import streamlit as st
-from utils.bible_loader import load_bible_from_folder, get_verse
-from utils.lexicon_loader import load_lexicon, search_strongs
-from utils.reference_search import find_references
-from utils.chave_kai import load_kai, get_cross_references
-
-import streamlit as st
+# helpers.py
 import json
 import os
 import requests
+import io
 import PyPDF2
+from pathlib import Path
 
-# --- 1. CONFIGURAÇÃO DIVINA (Tela Cheia e Ícone) ---
-st.set_page_config(page_title="O Pregador Supremo", layout="wide", page_icon="✝️", initial_sidebar_state="expanded")
-
-# --- 2. PROTEÇÃO DE IMPORTAÇÃO ---
-try:
-    from duckduckgo_search import DDGS
-    import google.generativeai as genai
-    from streamlit_lottie import st_lottie
-    LOTTIE_OK = True
-except ImportError:
-    LOTTIE_OK = False
-    st.warning("⚠️ Instale: streamlit-lottie duckduckgo-search google-generativeai")
-
-# --- 3. CSS "LOGOS GOLD" (Visual Definitivo) ---
-st.markdown("""
-<style>
-    header, footer {visibility: hidden;}
-    .block-container {padding-top: 0rem; max-width: 98%;}
-    .stApp {background-color: #0b0d10;}
-    
-    /* Efeito Dourado Logos */
-    .gold {color: #C5A059; font-weight: bold;}
-    
-    [data-testid="stSidebar"] {background-color: #111318; border-right: 1px solid #333;}
-    
-    .stTextArea textarea {
-        font-family: 'Merriweather', serif; font-size: 19px !important;
-        background-color: #16191f; color: #d1d5db; border: 1px solid #2d313a; padding: 25px;
-    }
-    .stTextArea textarea:focus {border-color: #C5A059;}
-    
-    .stTabs [aria-selected="true"] {
-        background-color: #16191f !important; border-top: 2px solid #C5A059 !important; color: #C5A059 !important;
-    }
-    
-    /* Card de Notícia/Ref */
-    .card {
-        background-color: #1c2027; border-left: 3px solid #C5A059; padding: 10px; margin-bottom: 8px; border-radius: 4px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --- 4. BACKEND: BANCO DE BÍBLIA HÍBRIDO ---
-# O sistema tenta ler seu JSON local. Se não achar, usa API pública para não travar.
-
-def carregar_biblia(livro, cap, vers, versao="almeida"):
-    # 1. Tenta Modo Local (Seus Arquivos)
+# -------------------------
+# I/O: carregar JSONs genéricos
+# -------------------------
+def read_json(path):
+    p = Path(path)
+    if not p.exists():
+        return {}
     try:
-        path = f"Banco_Biblia/bibles/{versao}.json"
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data[livro][str(cap)][str(vers)]
-    except: pass
-    
-    # 2. Tenta Modo API Online (Salva vidas se não tiver arquivo)
-    try:
-        # Normaliza nomes (ex: João -> john) - Simplificado para demo
-        url = f"https://bible-api.com/{livro}+{cap}:{vers}?translation={versao}"
-        r = requests.get(url, timeout=2)
-        if r.status_code == 200:
-            return r.json()['text']
-    except: pass
-    
-    return "Texto não encontrado ou offline."
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        return {}
 
-def consultar_lexico_strong(termo):
-    try:
-        with open("Banco_Biblia/lexico/strongs.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get(termo, "Termo não encontrado no banco local.")
-    except:
-        return "⚠️ Arquivo 'Banco_Biblia/lexico/strongs.json' não encontrado. Suba o arquivo para usar."
-
-def referencias_cruzadas(ref):
-    # Simula inteligência se não tiver arquivo
-    try:
-        with open("Banco_Biblia/crossrefs/referencias.json", "r") as f:
-            data = json.load(f)
-            return data.get(ref, [])
-    except:
-        return ["Isaias 53:4", "Romanos 5:8", "1 Pedro 2:24"] # Fallback genérico para demo
-
-# --- 5. IAs (O DUETO) ---
-def ia_google(prompt, key):
-    if not key: return "Configure a chave do Google."
-    try:
-        genai.configure(api_key=key)
-        return genai.GenerativeModel('gemini-1.5-flash').generate_content(prompt).text
-    except Exception as e: return str(e)
-
-def ia_gratis(prompt):
+# -------------------------
+# IA GRATUITA (fallback)
+# -------------------------
+def ia_gratis(prompt: str, timeout: int = 15):
+    """
+    Tenta usar um endpoint público gratuito. Se falhar, retorna fallback.
+    NOTE: endpoints públicos variam; para produção configure st.secrets com uma LLM privada.
+    """
     try:
         url = "https://api-free-llm.gptfree.cc/v1/chat/completions"
         payload = {
             "model": "llama-3.1-8b-instruct",
-            "messages": [{"role": "user", "content": prompt}]
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 700
         }
-        r = requests.post(url, json=payload, timeout=10)
-        return r.json()["choices"][0]["message"]["content"]
-    except:
-        return "Erro na IA Gratuita (Servidor Ocupado). Tente Google."
+        r = requests.post(url, json=payload, timeout=timeout)
+        r.raise_for_status()
+        j = r.json()
+        if isinstance(j, dict) and "choices" in j and len(j["choices"])>0:
+            # compatibilidades diversas: try nested keys
+            choice = j["choices"][0]
+            if "message" in choice and "content" in choice["message"]:
+                return choice["message"]["content"]
+            if "text" in choice:
+                return choice["text"]
+        # fallback to raw text if structure differs
+        return str(j)
+    except Exception as e:
+        # fallback: curta resposta sintetizada localmente
+        return ("[IA gratuita indisponível].\n\nResumo automático (fallback):\n" +
+                prompt[:1000] + "\n\n-- Configure st.secrets['GOOGLE_API_KEY'] para usar Gemini ou defina uma LLM local.")
 
-# --- 6. SISTEMA DE LOGIN ---
-USUARIOS = {"admin": "1234", "pastor": "pregar"}
+# -------------------------
+# Ler texto de PDF (primeiras páginas)
+# -------------------------
+def read_pdf_text(file_like, max_pages=60):
+    try:
+        reader = PyPDF2.PdfReader(file_like)
+        pages = []
+        for i, p in enumerate(reader.pages):
+            if i >= max_pages: break
+            t = p.extract_text()
+            if t:
+                pages.append(t)
+        return "\n\n".join(pages)
+    except Exception as e:
+        return f"Erro lendo PDF: {e}"
 
-if 'logado' not in st.session_state: st.session_state.update({'logado': False, 'user': ''})
+# -------------------------
+# Utilitário para salvar arquivo (texto)
+# -------------------------
+def save_text(path, text):
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        f.write(text)
+    return str(p)
 
-if not st.session_state['logado']:
-    c1,c2,c3 = st.columns([1,2,1])
-    with c2:
-        st.markdown("<br><h1 style='text-align:center; color:#C5A059'>O PREGADOR</h1>", unsafe_allow_html=True)
-        with st.form("login"):
-            u = st.text_input("ID")
-            p = st.text_input("SENHA", type="password")
-            if st.form_submit_button("ACESSAR BIBLIOTECA", type="primary"):
-                if u in USUARIOS and USUARIOS[u] == p:
-                    st.session_state.update({'logado': True, 'user': u})
-                    st.rerun()
-                else: st.error("Negado.")
-    st.stop()
+# -------------------------
+# Script helper: construir JSONs a partir de BOM TXT público
+# -------------------------
+def naive_parse_bible_txt(raw_text):
+    """
+    Heurística simples para quebrar textos em livros->cap->verse.
+    Isso é apenas um ponto de partida: resultados podem precisar de revisão.
+    """
+    import re
+    books = {}
+    # tenta achar padrões "BOOK NAME" e linhas com "1:1"
+    verses = re.findall(r'([A-Za-zÀ-ú ]+?)\s+(\d+):(\d+)\s+([^\n]+)', raw_text)
+    if verses:
+        for b, c, v, txt in verses:
+            b = b.strip()
+            books.setdefault(b, {}).setdefault(c, {})[v] = txt.strip()
+    else:
+        # fallback: guarda tudo no 'raw'
+        books["raw"] = {"1": {"1": raw_text[:1000]}}
+    return books
 
-# --- 7. APP PRINCIPAL ---
-USER = st.session_state['user']
-PASTA = os.path.join("Banco_Sermoes", USER)
-if not os.path.exists(PASTA): os.makedirs(PASTA)
-
-with st.sidebar:
-    st.markdown("### ✝️ BIBLIOTECA")
-    st.caption(f"Usuário: {USER}")
-    
-    # Menu Principal
-    api_key = st.secrets.get("GOOGLE_API_KEY", st.text_input("🔑 Chave Google", type="password"))
-    ia_escolhida = st.selectbox("MOTOR IA:", ["Google Gemini (Rápido)", "Llama 3.1 (Grátis)"])
-    
-    st.markdown("---")
-    
-    # Seletor de Sermão
-    try: docs = [f.replace(".txt","") for f in os.listdir(PASTA) if f.endswith(".txt")]
-    except: docs = []
-    sel = st.radio("PROJETOS:", ["+ NOVO"] + docs)
-    
-    st.divider()
-    if st.button("SAIR"): st.session_state['logado']=False; st.rerun()
-
-# Layout Logos
-c_edit, c_tools = st.columns([1.8, 1])
-
-with c_edit:
-    # EDITOR CENTRAL
-    txt_val, tit_val = "", ""
-    if sel != "+ NOVO":
-        tit_val = sel
-        try:
-            with open(os.path.join(PASTA, f"{sel}.txt"), "r") as f: txt_val = f.read()
-        except: pass
-        
-    c1, c2 = st.columns([3,1])
-    with c1: novo_titulo = st.text_input("TEMA", value=tit_val, label_visibility="collapsed", placeholder="Título do Sermão...")
-    with c2:
-        if st.button("💾 GRAVAR", type="primary", use_container_width=True):
-            if novo_titulo:
-                with open(os.path.join(PASTA, f"{novo_titulo}.txt"), "w") as f: f.write(txt_val) 
-                st.toast("Salvo na Nuvem!")
-    
-    texto = st.text_area("Papel", value=txt_val, height=720, label_visibility="collapsed")
-    if novo_titulo and texto != txt_val: # Auto-save state
-         with open(os.path.join(PASTA, f"{novo_titulo}.txt"), "w") as f: f.write(texto)
-
-with c_tools:
-    # FERRAMENTAS AVANÇADAS
-    t1, t2, t3, t4 = st.tabs(["BÍBLIA", "LÉXICO", "NOTÍCIAS", "LIVROS"])
-    
-    with t1: # Aba Bíblia Híbrida
-        st.markdown("<span class='gold'>CONSULTA RÁPIDA</span>", unsafe_allow_html=True)
-        ref_b = st.text_input("Referência:", placeholder="Joao 3 16") # Espaço ao invés de :
-        versao_b = st.selectbox("Versão:", ["almeida", "bbe"])
-        
-        if st.button("📖 LER TEXTO"):
-            if ref_b:
-                try:
-                    livro, rest = ref_b.split(" ", 1)
-                    cap, vers = rest.split(" ")
-                    res_txt = carregar_biblia(livro, cap, vers, versao_b)
-                    st.success(f"Running text: {res_txt}")
-                    st.info("💡 Dica: Para textos completos, configure os arquivos JSON.")
-                except: st.error("Formato: 'Joao 3 16'")
-    
-    with t2: # Léxico e Chave
-        st.markdown("<span class='gold'>FERRAMENTAS ORIGINAIS</span>", unsafe_allow_html=True)
-        cod_strong = st.text_input("Código Strong (ex: G25):")
-        if st.button("PESQUISAR NO GREGO/HEBRAICO"):
-            definicao = consultar_lexico_strong(cod_strong)
-            st.markdown(f"<div class='card'>{definicao}</div>", unsafe_allow_html=True)
-            
-        st.divider()
-        st.caption("Inteligência Artificial Exegética")
-        ref_analise = st.text_input("Versículo para Exegese:")
-        if st.button("ANALISAR PROFUNDAMENTE"):
-            p = f"Faça uma análise exegética profunda de {ref_analise}. Inclua Strongs, morfologia e contexto histórico."
-            
-            with st.status("Consultando Teólogos Digitais...", expanded=True):
-                if ia_escolhida == "Google Gemini (Rápido)":
-                    resp = ia_google(p, api_key)
-                else:
-                    resp = ia_gratis(p)
-                st.markdown(resp)
-
-    with t3: # Notícias & Web
-        termo_n = st.text_input("Tema Atual:")
-        if st.button("BUSCAR ILUSTRAÇÃO"):
-            try:
-                res = DDGS().news(keywords=termo_n, region="br-pt", max_results=3)
-                if res:
-                    links = ""
-                    for n in res:
-                        st.markdown(f"<div class='card'><a href='{n['url']}'>{n['title']}</a></div>", unsafe_allow_html=True)
-                        links += f"{n['title']} "
-                    
-                    st.write("---")
-                    st.caption("Sugestão de Ponte Homilética:")
-                    prompt_il = f"Crie uma introdução de sermão ligando o tema {termo_n} e essas notícias: {links} à Bíblia."
-                    st.write(ia_google(prompt_il, api_key))
-            except: st.warning("Nada encontrado.")
-            
-    with t4: # PDF
-        pdf_f = st.file_uploader("Subir Livro (PDF)", type="pdf")
-        if pdf_f and st.button("ESTUDAR LIVRO"):
-            try:
-                leitor = PyPDF2.PdfReader(pdf_f)
-                txt_livro = ""
-                for p in leitor.pages[:20]: txt_livro += p.extract_text()
-                st.success("Livro Indexado!")
-                st.markdown(ia_google(f"Resuma este conteúdo teológico para sermão: {txt_livro[:3000]}", api_key))
-            except: st.error("Erro na leitura.")
+def build_json_from_txt_file(txt_path, out_json_path):
+    """
+    Lê arquivo TXT local e cria JSON estruturado (heurístico).
+    """
+    p = Path(txt_path)
+    if not p.exists():
+        raise FileNotFoundError(txt_path)
+    raw = p.read_text(encoding="utf-8", errors="ignore")
+    structured = naive_parse_bible_txt(raw)
+    outp = Path(out_json_path)
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    outp.write_text(json.dumps(structured, ensure_ascii=False, indent=2), encoding="utf-8")
+    return str(outp)
+# utils/bible_loader.py
 import json
 import os
+from pathlib import Path
 
-def load_bible_from_folder(folder_path="bible"):
+def load_bible_from_folder(folder_path="Banco_Biblia/bibles"):
+    """
+    Carrega todos os JSONs na pasta e os mescla num dicionário:
+    { "Gênesis": {"1": {"1": "...", ...}}, "João": {...} }
+    """
+    folder = Path(folder_path)
     bible = {}
-
-    for filename in os.listdir(folder_path):
-        if filename.endswith(".json"):
-            book_name = filename.replace(".json", "")
-            with open(os.path.join(folder_path, filename), "r", encoding="utf-8") as f:
-                bible[book_name.capitalize()] = json.load(f)
-
+    if not folder.exists():
+        return bible
+    for f in sorted(folder.iterdir()):
+        if f.suffix.lower() == ".json":
+            try:
+                with open(f, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                # se o JSON contém estrutura por livros (ex.: {"Genesis": {...}}) -> merge
+                for k, v in data.items():
+                    bible[k] = v
+            except Exception as e:
+                print("Erro ao carregar", f, e)
     return bible
-
 
 def get_verse(bible, book, chapter, verse):
     try:
-        return bible[book][str(chapter)][str(verse)]
-    except KeyError:
+        # tolerância: chapter/verse podem ser ints
+        chapter = str(int(chapter))
+        verse = str(int(verse))
+        return bible[book][chapter][verse]
+    except Exception:
         return "Verso não encontrado."
+# utils/lexicon_loader.py
 import json
-import os
+from pathlib import Path
 
-def load_lexicon(folder_path="lexicon"):
+def load_lexicon(folder_path="Banco_Biblia/lexico"):
+    folder = Path(folder_path)
     lexicons = {}
-
-    for filename in os.listdir(folder_path):
-        if filename.endswith(".json"):
-            name = filename.replace(".json", "")
-            with open(os.path.join(folder_path, filename), "r", encoding="utf-8") as f:
-                lexicons[name] = json.load(f)
-
+    if not folder.exists():
+        return lexicons
+    for f in sorted(folder.iterdir()):
+        if f.suffix.lower() == ".json":
+            try:
+                with open(f, "r", encoding="utf-8") as fh:
+                    lexicons[f.stem] = json.load(fh)
+            except Exception as e:
+                print("Erro carregando lexicon", f, e)
     return lexicons
 
-
-def search_strongs(lexicons, strongs_number):
-    strongs_number = strongs_number.upper()
-
-    for lex in lexicons.values():
-        if strongs_number in lex:
-            return lex[strongs_number]
-
+def search_strongs(lexicons, strong_id):
+    if not strong_id:
+        return "Informe um ID Strong (ex: G25 ou H430)"
+    sid = strong_id.strip().upper()
+    for name, lex in lexicons.items():
+        # lex pode ser dict com keys 'G25' etc.
+        if sid in lex:
+            return lex[sid]
     return "Número Strong não encontrado."
-def find_references(bible, keyword):
-    result = []
-
-    for book, chapters in bible.items():
-        for chapter, verses in chapters.items():
-            for number, text in verses.items():
-                if keyword.lower() in text.lower():
-                    result.append({
-                        "book": book,
-                        "chapter": chapter,
-                        "verse": number,
-                        "text": text
-                    })
-
-    return result
-import json
-
-def load_kai(file_path="lexicon/chave_kai.json"):
-    with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def get_cross_references(kai, verse_key):
-    return kai.get(verse_key, [])
-@st.cache_resource
-def load_data():
-    bible = load_bible_from_folder("bible")
-    lexicons = load_lexicon("lexicon")
-    kai = load_kai("lexicon/chave_kai.json")
-    return bible, lexicons, kai
-
-bible, lexicons, kai = load_data()
-book = st.selectbox("Livro", list(bible.keys()))
-chapter = st.number_input("Capítulo", 1)
-verse = st.number_input("Verso", 1)
-
-if st.button("Buscar verso"):
-    st.write(get_verse(bible, book, chapter, verse))
-strong = st.text_input("Número Strong")
-
-if st.button("Buscar Strong"):
-    st.write(search_strongs(lexicons, strong))
-keyword = st.text_input("Buscar palavra na Bíblia")
-
-if st.button("Buscar"):
-    results = find_references(bible, keyword)
-    for r in results:
-        st.write(f"{r['book']} {r['chapter']}:{r['verse']} — {r['text']}")
-verse_key = f"{book} {chapter}:{verse}"
-
-refs = get_cross_references(kai, verse_key)
-st.write(refs)
 # utils/reference_search.py
 def find_references(bible, keyword):
-    if not keyword: return []
+    """
+    Busca palavra-chave em todos os versos e devolve lista de matches.
+    """
+    if not keyword:
+        return []
     results = []
     for book, chapters in bible.items():
         for ch, verses in chapters.items():
@@ -349,10 +186,10 @@ def find_references(bible, keyword):
                 try:
                     if keyword.lower() in (text or "").lower():
                         results.append({"book": book, "chapter": ch, "verse": v, "text": text})
-                except:
+                except Exception:
                     continue
     return results
-# utils/kai.py
+# utils/chave_kai.py
 import json
 from pathlib import Path
 
@@ -360,56 +197,22 @@ def load_kai(path="Banco_Biblia/chave/kai.json"):
     p = Path(path)
     if not p.exists():
         return {}
-    with open(p, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def get_kai_refs(kai_data, term):
-    if not term: return []
-    key = term.lower()
-    if key in kai_data:
-        return kai_data[key]
-    # try partial matches
-    matches = []
-    for k, v in kai_data.items():
-        if key in k.lower():
-            matches.extend(v)
-    return matches
-# helpers.py
-import requests
-import io
-import PyPDF2
-
-def ia_gratis(prompt: str):
-    """
-    Implementação simples para serviços LLM grátis.
-    OBS: endpoints públicos mudam — essa função tenta usar um endpoint gratuito se disponível.
-    Se falhar, retorna fallback com instrução.
-    """
     try:
-        url = "https://api-free-llm.gptfree.cc/v1/chat/completions"  # exemplo - pode nao estar disponível
-        payload = {
-            "model": "llama-3.1-8b-instruct",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 600
-        }
-        r = requests.post(url, json=payload, timeout=20)
-        r.raise_for_status()
-        j = r.json()
-        if "choices" in j and len(j["choices"])>0:
-            return j["choices"][0]["message"]["content"]
-    except Exception as e:
-        # fallback local lightweight
-        return ("[IA gratuita indisponível ou erro de rede].\n\nSugestão automática:\n" +
-               prompt[:800] + "\n\n(Use build_full_bibles.py para integrar uma LLM local ou configure sua chave em st.secrets).")
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
-def read_pdf_text(file_like):
-    try:
-        reader = PyPDF2.PdfReader(file_like)
-        text = []
-        for i,p in enumerate(reader.pages):
-            if i>60: break
-            text.append(p.extract_text() or "")
-        return "\n".join(text)
-    except Exception as e:
-        return "Erro lendo PDF: " + str(e)
-
+def get_cross_references(kai_data, key_or_term):
+    if not kai_data:
+        return []
+    # key_or_term pode ser "João 3:16" ou um tema "fé"
+    k = key_or_term.strip().lower()
+    if k in kai_data:
+        return kai_data[k]
+    # partial match on keys (tema)
+    results = []
+    for tk, refs in kai_data.items():
+        if k in tk.lower():
+            results.extend(refs)
+    return results

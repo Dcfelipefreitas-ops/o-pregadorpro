@@ -6,4 +6,3 @@ streamlit-lottie
 PyPDF2
 gTTS
 SpeechRecognition
-pydub

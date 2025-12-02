@@ -2,3 +2,4 @@ streamlit
 openai
 duckduckgo_search
 requests
+pip install fpdf streamlit-lottie duckduckgo-search google-generativeai requests

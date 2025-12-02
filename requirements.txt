@@ -1,8 +1,8 @@
-streamlit>=1.39.0
+streamlit>=1.40.0
 duckduckgo-search
 google-generativeai
 requests
 streamlit-lottie
 PyPDF2
 gTTS
-SpeechRecognition
+watchdog

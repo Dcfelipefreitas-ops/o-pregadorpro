@@ -371,7 +371,8 @@ if not st.session_state['logado']:
 # --- 5. APLICAÇÃO PRINCIPAL ---
 USER = st.session_state['user']
 PASTA = os.path.join("Banco_Sermoes", USER)
-if not os.path.exists(PASTA): os.makedirs(PASTA)
+if not os.path.exists(PASTA): 
+os.makedirs(PASTA)
 
 # >>>> BARRA LATERAL (NAVEGAÇÃO) <<<<
 with st.sidebar:

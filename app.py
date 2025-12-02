@@ -124,6 +124,32 @@ def transcrever_audio_file(uploaded_file):
                 return f"Erro no serviço de reconhecimento: {e}"
     except Exception as e:
         return f"Erro ao processar áudio: {e}"
+        def strongs_info(codigo):
+    codigo = codigo.upper().strip()
+    if codigo in LEXICO:
+        return LEXICO[codigo]
+    return "Não encontrado no léxico."
+def referencias_cruzadas(ref):
+    return XREF.get(ref, [])
+with st.expander("📖 Bíblia + Léxico + Strong (TheWord)"):
+    busca = st.text_input("Buscar (texto / strong / operador):")
+
+    if st.button("🔎 Pesquisar"):
+        if busca.upper().startswith("G") or busca.upper().startswith("H"):
+            st.subheader("Léxico Strong")
+            st.write(strongs_info(busca))
+        else:
+            resultados = buscar_palavra(busca)
+            for r in resultados:
+                livro, cap, num, txt = r
+                st.markdown(f"**{livro} {cap}:{num}** — {txt}")
+
+with st.expander("🔗 Referências Cruzadas (XREF)"):
+    ref = st.text_input("Ex: João 3:16")
+    if st.button("🔗 Ver XREF"):
+        cruz = referencias_cruzadas(ref)
+        st.write(cruz if cruz else "Sem referências.")
+
 
 def get_bible(ref):
     """Consulta bible-api com algumas normalizações; retorna dict ou None."""
@@ -472,3 +498,56 @@ st.markdown("""
     | V13 PLATINUM
 </div>
 """, unsafe_allow_html=True)
+
+# --- BIBLIA + LEXICO + STRONGS + CROSSREFS -------------------------
+
+import json
+
+def carregar_json(caminho):
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+BIBLIA = carregar_json("Banco_Biblia/bibles/acf.json")    # Bíblia
+LEXICO = carregar_json("Banco_Biblia/lexico/strongs.json") # Léxico
+XREF   = carregar_json("Banco_Biblia/crossrefs/referencias.json") # Crossrefs
+KAI    = carregar_json("Banco_Biblia/chave/kai.json")       # Chave Bíblica
+def buscar_palavra(termo):
+    resultados = []
+    termo = termo.lower()
+
+    for livro, capitulos in BIBLIA.items():
+        for cap, versos in capitulos.items():
+            for num, texto in versos.items():
+                t = texto.lower()
+
+                if "*" in termo:
+                    # busca com wildcard
+                    base = termo.replace("*", "")
+                    if t.startswith(base):
+                        resultados.append((livro, cap, num, texto))
+
+                elif " AND " in termo:
+                    a, b = termo.split(" AND ")
+                    if a in t and b in t:
+                        resultados.append((livro, cap, num, texto))
+
+                elif " OR " in termo:
+                    a, b = termo.split(" OR ")
+                    if a in t or b in t:
+                        resultados.append((livro, cap, num, texto))
+
+                elif " NEAR " in termo:
+                    a, b = termo.split(" NEAR ")
+                    if a in t and b in t:
+                        posA = t.index(a)
+                        posB = t.index(b)
+                        if abs(posA - posB) < 35:
+                            resultados.append((livro, cap, num, texto))
+
+                elif termo in t:
+                    resultados.append((livro, cap, num, texto))
+
+    return resultados

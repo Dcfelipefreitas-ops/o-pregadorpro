@@ -5,3 +5,5 @@ requests
 streamlit-lottie
 PyPDF2
 watchdog
+streamlit
+duckduckgo-search

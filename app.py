@@ -325,3 +325,78 @@ elif menu == "🕶️ Modo Púlpito":
             {html_text}
         </div>
         """, unsafe_allow_html=True)
+        # --- 2. CONFIGURAÇÃO VISUAL ---
+st.set_page_config(
+    page_title="O Pregador",  # Renomeado
+    layout="wide", 
+    page_icon="✝️",
+    initial_sidebar_state="expanded"
+)
+
+# ... (código anterior)
+
+# === SIDEBAR ===
+with st.sidebar:
+    anim_sidebar = load_lottie_safe(LOTTIE_URLS["book"])
+    if anim_sidebar:
+        st_lottie(anim_sidebar, height=60, key="side_logo")
+    else:
+        st.subheader("✝️ O Pregador")  # Renomeado
+
+    st.markdown(f"Olá, **{USER.capitalize()}**")
+    
+    menu = st.radio("Menu", ["🏠 Início", "🕶️ Modo Púlpito"])  # Removido "Studio"
+
+    st.markdown("---")
+    st.caption("FERRAMENTAS")
+    
+    # (Código das ferramentas como Cronômetro)
+
+# VARIAVEIS GLOBAIS
+if 'texto_ativo' not in st.session_state: st.session_state['texto_ativo'] = ""
+if 'titulo_ativo' not in st.session_state: st.session_state['titulo_ativo'] = ""
+
+# === PÁGINAS ===
+
+# > INÍCIO
+if menu == "🏠 Início":
+    st.title("Central Pastoral")
+    st.markdown(f"*{datetime.now().strftime('%d de %B, %Y')}*")
+    # (Seu código existente do Início aqui)
+
+# > MODO PÚLPITO
+elif menu == "🕶️ Modo Púlpito":
+    if not st.session_state['texto_ativo']:
+        st.warning("Abra um sermão no Studio primeiro.")
+    else:
+        f_size = st.slider("Tamanho da Fonte", 20, 60, 28)
+        html_text = st.session_state['texto_ativo'].replace("\n", "<br>")
+        st.markdown(f"""
+        <div style="
+            background-color: black; color: white; padding: 40px; border-radius: 10px;
+            font-size: {f_size}px; line-height: 1.6; font-family: Arial, sans-serif;">
+            <h1 style='color: #d4af37; border-bottom: 2px solid #333'>{st.session_state['titulo_ativo']}</h1>
+            {html_text}
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Botão para entrar em modo apresentação
+        if st.button("Entrar em Modo Apresentação"):
+            st.session_state['modo_apresentacao'] = True
+            st.experimental_rerun()
+
+        if st.session_state.get('modo_apresentacao'):
+            st.markdown(f"""
+            <div style="
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background-color: black; color: white; display: flex;
+                align-items: center; justify-content: center; flex-direction: column;
+                font-size: {f_size}px; line-height: 1.6; font-family: Arial, sans-serif;">
+                <h1 style='color: #d4af37; margin: 0;'>{st.session_state['titulo_ativo']}</h1>
+                <div style='margin-top: 20px; white-space: pre-wrap;'>{html_text}</div>
+                <button onclick="window.close()">Fechar Apresentação</button>
+            </div>
+            """, unsafe_allow_html=True)
+
+# ... (código posterior)
+

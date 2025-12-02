@@ -128,13 +128,17 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 # --- 4. SISTEMA DE LOGIN ---
-if 'logado' not in st.session_state:
-    st.session_state['logado'] = False
-
 if not st.session_state['logado']:
     c1, c2, c3 = st.columns([1,1,1])
     with c2:
-        st_lottie(load_lottieurl(LOTTIE_URLS["book"]), height=150)
+        # Tenta carregar a animação
+        anim_login = load_lottieurl(LOTTIE_URLS["book"])
+        if anim_login:
+            st_lottie(anim_login, height=150)
+        else:
+            # Se falhar, mostra apenas um ícone ou nada
+            st.markdown("# ✝️")
+            
         st.title("Acesso ao Púlpito")
         u = st.text_input("Usuário")
         s = st.text_input("Senha", type="password")
@@ -156,6 +160,12 @@ os.makedirs(PASTA_USER, exist_ok=True)
 
 # Menu Lateral
 with st.sidebar:
+    
+    anim_menu = load_lottieurl(LOTTIE_URLS["book"])
+    if anim_menu:
+        st_lottie(anim_menu, height=60, key="menu_anim")
+    else:
+        st.header("✝️ O Pregador") # Fallback visual
     st_lottie(load_lottieurl(LOTTIE_URLS["book"]), height=60, key="menu_anim")
     st.markdown(f"### Olá, Pastor {USER.capitalize()}")
     

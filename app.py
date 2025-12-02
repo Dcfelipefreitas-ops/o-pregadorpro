@@ -268,7 +268,7 @@ if page == "Dashboard":
     # Acesso Rápido
     st.subheader("Central de Acesso")
     c1, c2, c3 = st.columns(3)
-    if c1.button("📝 Novo Manuscrito", use_container_width=True): 
+    if c1.button("📝 Esboco", use_container_width=True): 
         st.session_state['texto_ativo'] = ""
         st.session_state['titulo_ativo'] = ""
         st.session_state['page_stack'].append("Sermons")

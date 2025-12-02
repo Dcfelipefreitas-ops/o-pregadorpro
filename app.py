@@ -7,6 +7,30 @@ import json
 import requests
 from datetime import datetime
 from io import BytesIO
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        // 1. Envolva sua visualização em um NavigationStack
+        NavigationStack {
+            List(0..<10) { item in
+                NavigationLink("Item \(item)", destination: DetailView())
+            }
+            // 2. Adicione o título do cabeçalho com navigationTitle
+            .navigationTitle("Meu App")
+            
+            // 3. (Opcional) Para um título grande padrão do iOS
+            .navigationBarTitleDisplayMode(.automatic) 
+        }
+    }
+}
+
+struct DetailView: View {
+    var body: some View {
+        Text("Detalhe do Item")
+            .navigationTitle("Detalhe")
+    }
+}
 
 # --- 0. AUTO-INSTALAÇÃO DE DEPENDÊNCIAS ---
 def install_packages():

@@ -7,7 +7,7 @@ import PyPDF2
 from pathlib import Path
 
 # --- 1. CONFIGURAÇÃO DIVINA ---
-st.set_page_config(page_title="O Pregador Supremo", layout="wide", page_icon="✝️", initial_sidebar_state="expanded")
+st.set_page_config(page_title="O Pregador", layout="wide", page_icon="✝️", initial_sidebar_state="expanded")
 
 # --- 2. CLASSE DE UTILIDADES (Helpers Embutidos) ---
 # Aqui está a mágica dos arquivos separados, unificada para facilitar sua vida.

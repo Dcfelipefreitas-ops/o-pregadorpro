@@ -1,157 +1,197 @@
 import streamlit as st
+import time
+
+# 1. CONFIGURAÇÃO (PRIMEIRA COISA DO ARQUIVO)
+st.set_page_config(page_title="O Pregador", layout="wide", page_icon="✝️")
+
+# 2. IMPORTAÇÕES DEPOIS DO CONFIG
 from duckduckgo_search import DDGS
 import google.generativeai as genai
 import os
 import requests
-import time
 import PyPDF2
 
-st.set_page_config(page_title="O Pregador Supremo", layout="wide", page_icon="✝️")
-
-try:
-    from streamlit_lottie import st_lottie
-    LOTTIE_OK = True
-except ImportError:
-    LOTTIE_OK = False
-
-def load_lottie_safe(url):
-    if not LOTTIE_OK: return None
+# 3. FUNÇÕES SEGURAS (Sem risco de erro)
+def try_lottie():
     try:
-        r = requests.get(url, timeout=1.0)
+        from streamlit_lottie import st_lottie
+        return st_lottie
+    except: return None
+
+_st_lottie = try_lottie()
+
+def get_animation(url):
+    try:
+        r = requests.get(url, timeout=1)
         return r.json() if r.status_code == 200 else None
     except: return None
 
-anim_livro = load_lottie_safe("https://lottie.host/5a666e37-d2c4-4a47-98d9-247544062a4d/lB6y7y6a1W.json")
-anim_ia = load_lottie_safe("https://lottie.host/93310461-1250-482f-87d9-482a46696d5b/6u0v8v5j2a.json")
-
+# 4. CSS INJETADO DE FORMA SEGURA
 st.markdown("""
 <style>
-header, footer {visibility: hidden;}
-.block-container {padding-top: 1rem;}
-.stApp {background-color: #0e1117;}
-[data-testid="stSidebar"] {background-color: #1a1c24; border-right: 2px solid #C5A059;}
-.stTextArea textarea {font-family: 'Georgia', serif; font-size: 19px !important; background-color: #1a1b21; color: #e0e0e0; border: 1px solid #333; border-radius: 5px; padding: 15px;}
-.stTabs [aria-selected="true"] {background-color: #C5A059 !important; color: black !important;}
-.stButton button {border-radius: 5px; font-weight: bold;}
+    /* Reset Geral */
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    .block-container {padding-top: 2rem;}
+    
+    /* Cores e Fundo */
+    .stApp {background-color: #0e1117;}
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #1a1c24;
+        border-right: 2px solid #C5A059;
+    }
+    
+    /* Editor de Texto */
+    .stTextArea textarea {
+        font-family: 'Georgia', serif;
+        font-size: 19px !important;
+        background-color: #1a1b21;
+        color: #e0e0e0;
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 15px;
+    }
+    
+    /* Botões */
+    .stButton button {
+        border-radius: 4px;
+        font-weight: 600;
+        transition: 0.2s;
+    }
+    .stButton button:hover {
+        border-color: #C5A059;
+        color: #C5A059;
+    }
 </style>
 """, unsafe_allow_html=True)
 
+# 5. ESTADO E LOGIN
+if 'logado' not in st.session_state:
+    st.session_state.update({'logado': False, 'user': ''})
+
 USUARIOS = {"admin": "1234", "pastor": "pregar"}
+anim_livro = get_animation("https://lottie.host/5a666e37-d2c4-4a47-98d9-247544062a4d/lB6y7y6a1W.json")
 
-def check_login():
-    if 'logado' not in st.session_state:
-        st.session_state.update({'logado': False, 'user': ''})
-    if not st.session_state['logado']:
-        c1, c2, c3 = st.columns([1,2,1])
-        with c2:
-            st.write("")
-            if anim_livro: st_lottie(anim_livro, height=120, key="intro")
-            st.markdown("<h2 style='text-align:center'>Acesso Restrito</h2>", unsafe_allow_html=True)
-            with st.form("login"):
-                u = st.text_input("Usuário")
-                s = st.text_input("Senha", type="password")
-                if st.form_submit_button("Entrar", type="primary"):
-                    if u in USUARIOS and USUARIOS[u] == s:
-                        st.session_state['logado'] = True
-                        st.session_state['user'] = u
-                        st.rerun()
-                    else:
-                        st.error("Dados inválidos.")
-        return False
-    return True
+def tela_login():
+    c1, c2, c3 = st.columns([1,2,1])
+    with c2:
+        st.write("")
+        st.write("")
+        if _st_lottie and anim_livro:
+            _st_lottie(anim_livro, height=100, key="intro")
+        else:
+            st.title("✝️")
+            
+        st.markdown("<h3 style='text-align:center; color:#ccc'>Acesso Restrito</h3>", unsafe_allow_html=True)
+        
+        with st.form("frm_login"):
+            u = st.text_input("Usuário")
+            s = st.text_input("Senha", type="password")
+            if st.form_submit_button("Entrar", type="primary"):
+                if u in USUARIOS and USUARIOS[u] == s:
+                    st.session_state['logado'] = True
+                    st.session_state['user'] = u
+                    st.rerun()
+                else:
+                    st.error("Erro no login.")
 
-if not check_login(): st.stop()
+if not st.session_state['logado']:
+    tela_login()
+    st.stop()
 
+# 6. APP PRINCIPAL (SÓ CARREGA SE LOGADO)
 USER = st.session_state['user']
 PASTA = os.path.join("Banco_Sermoes", USER)
 if not os.path.exists(PASTA): os.makedirs(PASTA)
 
-def gemini(prompt, api_key):
-    if not api_key: return "⚠️ Cole sua API Key no menu."
+def gemini(prompt, api):
+    if not api: return "⚠️ Falta API Key."
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
-        return model.generate_content(prompt).text
-    except Exception as e: return f"Erro IA: {e}"
+        genai.configure(api_key=api)
+        return genai.GenerativeModel('gemini-pro').generate_content(prompt).text
+    except Exception as e: return f"Erro: {e}"
 
-def buscar_news(tema):
-    try: return DDGS().news(keywords=tema, region="br-pt", max_results=3)
+def news_search(term):
+    try: return DDGS().news(keywords=term, region="br-pt", max_results=3)
     except: return []
 
-def ler_pdf(arquivo):
+def pdf_read(file):
     try:
-        reader = PyPDF2.PdfReader(arquivo)
-        texto = ""
+        reader = PyPDF2.PdfReader(file)
+        text = ""
         for i, page in enumerate(reader.pages):
-            if i > 15: break 
-            texto += page.extract_text()
-        return texto
-    except: return "Erro leitura PDF."
+            if i > 15: break
+            text += page.extract_text()
+        return text
+    except: return "Erro PDF"
 
+# MENU LATERAL
 with st.sidebar:
-    st.markdown("### ✝️ O Pregador")
-    st.caption(f"Logado: {USER.upper()}")
+    st.subheader("✝️ O Pregador")
+    st.caption(f"Usuário: {USER}")
     if st.button("Sair"):
         st.session_state['logado'] = False
         st.rerun()
+        
     with st.expander("🔑 Chave Google API"):
         api_key = st.text_input("Cole aqui", type="password")
+        
     st.markdown("---")
-    try: arquivos = [f for f in os.listdir(PASTA) if f.endswith(".txt")]
-    except: arquivos = []
-    selecao = st.radio("Biblioteca:", ["+ Novo Rascunho"] + arquivos)
+    try: arqs = [f for f in os.listdir(PASTA) if f.endswith(".txt")]
+    except: arqs = []
+    escolha = st.radio("Seus Estudos:", ["+ Novo"] + arqs)
 
-c_editor, c_tools = st.columns([2.5, 1.5])
+# ÁREA DE TRABALHO
+c_edit, c_tools = st.columns([2, 1])
 
-with c_editor:
-    tit_padrao = ""
-    txt_padrao = ""
-    if selecao != "+ Novo Rascunho":
-        tit_padrao = selecao.replace(".txt", "")
+with c_edit:
+    t_val = ""
+    c_val = ""
+    if escolha != "+ Novo":
+        t_val = escolha.replace(".txt", "")
         try:
-            with open(os.path.join(PASTA, selecao), "r") as f: txt_padrao = f.read()
+            with open(os.path.join(PASTA, escolha), "r") as f: c_val = f.read()
         except: pass
-
-    st.markdown("#### 📝 Editor de Esboço")
-    titulo = st.text_input("Título", value=tit_padrao)
-    texto = st.text_area("Papel", value=txt_padrao, height=600, label_visibility="collapsed")
+        
+    st.markdown("#### 📝 Rascunho")
+    titulo = st.text_input("Título", value=t_val)
+    texto = st.text_area("Texto", value=c_val, height=600, label_visibility="collapsed")
     
     if st.button("💾 GRAVAR NA NUVEM", type="primary"):
         if titulo:
             with open(os.path.join(PASTA, f"{titulo}.txt"), "w") as f: f.write(texto)
-            st.toast("Estudo Salvo!", icon="✅")
+            st.toast("Salvo!", icon="✅")
 
 with c_tools:
-    st.markdown("#### 🧰 Ferramentas")
-    aba1, aba2, aba3, aba4 = st.tabs(["📖", "🗣️", "📰", "📚"])
+    t1, t2, t3, t4 = st.tabs(["📖", "🗣️", "📰", "📚"])
     
-    with aba1:
-        st.caption("Exegese")
-        ref = st.text_input("Versículo:", placeholder="Jo 3:16")
+    with t1:
+        st.caption("Bíblia/Exegese")
+        ref = st.text_input("Ref:")
         if st.button("Analisar"):
-            if anim_ia: st_lottie(anim_ia, height=50, key="l1")
-            st.markdown(gemini(f"Exegese completa de: {ref}", api_key))
-
-    with aba2:
-        st.caption("Tradutor Teológico")
-        txt_trad = st.text_area("Texto estrangeiro:")
+            st.info(gemini(f"Exegese de {ref}", api_key))
+            
+    with t2:
+        st.caption("Tradutor")
+        txt = st.text_area("Texto:")
         if st.button("Traduzir"):
-            st.info(gemini(f"Traduza para português culto: {txt_trad}", api_key))
-
-    with aba3:
-        st.caption("Atualidades")
-        tema = st.text_input("Tema:")
-        if st.button("Buscar Fatos"):
-            news = buscar_news(tema)
-            if news:
-                for n in news: st.markdown(f"🔹 [{n['title']}]({n['url']})")
-                st.write(gemini(f"Ilustração com: {news}", api_key))
-            else: st.warning("Nada achado.")
-
-    with aba4:
-        st.caption("Ler Livro PDF")
-        pdf = st.file_uploader("Arraste o PDF", type="pdf")
-        if pdf and st.button("Ler e Resumir"):
-            cont = ler_pdf(pdf)
-            st.success("Lido!")
-            st.markdown(gemini(f"Resuma este livro cristão: {cont[:3000]}", api_key))
+            st.success(gemini(f"Traduza para PT Teológico: {txt}", api_key))
+            
+    with t3:
+        st.caption("Notícias")
+        tm = st.text_input("Tema:")
+        if st.button("Buscar"):
+            res = news_search(tm)
+            if res:
+                for n in res: st.markdown(f"- [{n['title']}]({n['url']})")
+                st.write(gemini(f"Ilustre com: {res}", api_key))
+            else: st.warning("Nada.")
+            
+    with t4:
+        st.caption("PDF")
+        pdf = st.file_uploader("Upload", type="pdf")
+        if pdf and st.button("Ler"):
+            cont = pdf_read(pdf)
+            st.markdown(gemini(f"Resuma: {cont[:2000]}", api_key))

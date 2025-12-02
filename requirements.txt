@@ -5,3 +5,25 @@ requests
 streamlit-lottie
 PyPDF2
 watchdog
+seu_projeto/
+├── app.py
+├── utils/
+│   ├── bible_loader.py
+│   ├── lexicon_loader.py
+│   ├── reference_search.py
+│   ├── chave_kai.py
+│   ├── __init__.py
+├── Banco_Biblia/
+│   ├── bibles/
+│   │   ├── acf.json
+│   │   ├── kjv.json
+│   ├── lexico/
+│   │   ├── strongs.json
+│   ├── crossrefs/
+│   │   ├── referencias.json
+│   ├── chave/
+│       ├── kai.json
+├── Banco_Sermoes/
+│   └── pastor/
+├── build_full_bibles.py
+├── helpers.py

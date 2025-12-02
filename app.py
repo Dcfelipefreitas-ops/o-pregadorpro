@@ -2,281 +2,292 @@ import streamlit as st
 import json
 import os
 import requests
-import time
 import PyPDF2
-from pathlib import Path
+from gtts import gTTS
+import tempfile
+import io
 
-# --- 1. CONFIGURAÇÃO GERAL (Nome Corrigido) ---
-st.set_page_config(page_title="O Pregador", layout="wide", page_icon="✝️", initial_sidebar_state="expanded")
+# --- 1. CONFIGURAÇÃO MODERN (Glassmorphism) ---
+st.set_page_config(page_title="O Pregador", layout="wide", page_icon="⚡", initial_sidebar_state="expanded")
 
-# --- 2. PREVENÇÃO DE ERROS ---
-try:
-    from duckduckgo_search import DDGS
-    import google.generativeai as genai
-    from streamlit_lottie import st_lottie
-    LOTTIE_OK = True
-except ImportError:
-    LOTTIE_OK = False
-
-# --- 3. ESTILO "LOGOS GOLD" (Visual Premium) ---
+# --- 2. CSS FUTURISTA (LAN HOUSE / NEON / GLASS) ---
 st.markdown("""
 <style>
-    header, footer {visibility: hidden;}
-    .block-container {padding-top: 0rem; max-width: 98%;}
-    .stApp {background-color: #0b0d10;}
+    /* FUNDO E GERAL */
+    .stApp {
+        background: radial-gradient(circle at 10% 20%, #0f172a 0%, #000000 90%);
+        color: #fff;
+    }
     
-    /* Efeito Dourado */
-    .gold-text {
-        background: linear-gradient(to bottom, #cfc09f, #D4AF37, #7a5c2f); 
-        -webkit-background-clip: text; 
-        -webkit-text-fill-color: transparent; 
-        color: #C5A059;
-        font-family: 'Times New Roman', serif;
-        font-weight: 800;
+    /* REMOVER PADS */
+    .block-container {padding-top: 1rem; max-width: 98%;}
+    header, footer {visibility: hidden;}
+    
+    /* TEXT AREAS (EFEITO VIDRO) */
+    .stTextArea textarea {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+        border-radius: 12px;
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+    }
+    .stTextArea textarea:focus {
+        border-color: #3b82f6; /* Azul Neon */
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+    }
+    
+    /* INPUTS */
+    .stTextInput input {
+        background: rgba(0,0,0,0.3) !important;
+        border: 1px solid #333 !important;
+        border-radius: 8px;
+        color: white !important;
+    }
+    
+    /* BOTÕES MODERNOS */
+    .stButton button {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid #333;
+        color: #94a3b8;
+        border-radius: 8px;
+        transition: 0.3s;
+        text-transform: uppercase;
+        font-size: 12px;
         letter-spacing: 1px;
     }
-    
-    /* Menu Lateral */
-    [data-testid="stSidebar"] {background-color: #111318; border-right: 1px solid #333;}
-    
-    /* Editor */
-    .stTextArea textarea {
-        font-family: 'Merriweather', serif; font-size: 19px !important; line-height: 1.6;
-        background-color: #16191f; color: #d1d5db; border: 1px solid #2d313a; padding: 25px;
-    }
-    .stTextArea textarea:focus {border-color: #C5A059;}
-    
-    /* Abas */
-    .stTabs [aria-selected="true"] {
-        background-color: #16191f !important; border-top: 2px solid #C5A059 !important; color: #C5A059 !important;
+    .stButton button:hover {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+        box-shadow: 0 0 10px #3b82f6;
     }
     
-    /* Cartões de Info */
-    .card {
-        background-color: #1c2027; border-left: 3px solid #C5A059; padding: 15px; margin-bottom: 10px; border-radius: 4px;
+    /* CARD DE BÍBLIA */
+    .verse-card {
+        background: rgba(255,255,255,0.03);
+        border-left: 4px solid #3b82f6;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
     }
-    a {text-decoration: none; color: #D4AF37;}
+    
+    /* SIDEBAR */
+    [data-testid="stSidebar"] {
+        background-color: #020617;
+        border-right: 1px solid #1e293b;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. FUNÇÕES HÍBRIDAS (Aqui resolvemos o problema de "não acessar nada") ---
+# --- 3. LÓGICA DE GERENCIAMENTO (ESTADO) ---
+if 'texto_esboco' not in st.session_state: st.session_state['texto_esboco'] = ""
+if 'titulo_sermao' not in st.session_state: st.session_state['titulo_sermao'] = ""
+if 'audio_cache' not in st.session_state: st.session_state['audio_cache'] = None
 
-def pegar_biblia_online(ref):
-    """Se não tiver arquivo, busca na internet"""
+# Importação Segura
+try:
+    from duckduckgo_search import DDGS
+    import google.generativeai as genai
+    HAS_LIBS = True
+except: HAS_LIBS = False
+
+# --- 4. FUNÇÕES PODEROSAS ---
+def speak_text(text):
+    """Gera áudio MP3 do texto (Google TTS)"""
     try:
-        # Tenta formatar 'Joao 3 16' para 'john+3:16'
-        partes = ref.split()
-        if len(partes) >= 2:
-            livro = partes[0]
-            cap_ver = partes[1] if ":" in partes[1] else f"{partes[1]}:{partes[2] if len(partes)>2 else '1'}"
-            
-            # API Gratuita (Almeida/KJV)
-            url = f"https://bible-api.com/{livro}+{cap_ver}?translation=almeida"
-            r = requests.get(url, timeout=3)
-            if r.status_code == 200:
-                data = r.json()
-                return f"{data['reference']}\n\n{data['text']}"
-    except:
-        pass
-    return "Não encontrado. Tente formato: 'Joao 3 16'"
+        tts = gTTS(text=text, lang='pt')
+        # Cria arquivo temporário em memória
+        fp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        tts.save(fp.name)
+        return fp.name
+    except: return None
 
-def carregar_biblia(ref, versao="almeida"):
-    # 1. Tenta Arquivo Local (Caso você tenha subido)
+def get_bible_online(ref):
+    """Busca Bíblia Online"""
     try:
-        parts = ref.split()
-        livro, cap, ver = parts[0], parts[1], parts[2]
-        path = f"Banco_Biblia/bibles/{versao}.json"
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data[livro][str(cap)][str(ver)]
-    except: 
-        # 2. Se falhar, usa ONLINE (Para funcionar AGORA)
-        return pegar_biblia_online(ref)
+        livro, resto = ref.split(" ", 1)
+        # Tenta formatar para API (Simples)
+        url = f"https://bible-api.com/{livro}+{resto}?translation=almeida"
+        r = requests.get(url, timeout=3)
+        if r.status_code == 200:
+            return r.json()
+    except: pass
+    return None
 
-def lexico_strong_fallback(codigo):
-    # Link direto para estudo já que o JSON é gigante para baixar agora
-    base_url = "https://biblehub.com/greek" if "G" in codigo.upper() else "https://biblehub.com/hebrew"
-    num = ''.join(filter(str.isdigit, codigo))
-    return f"""
-    Termo: {codigo}
-    <br>Devido ao tamanho do léxico completo, <a href='{base_url}/{num}.htm' target='_blank'>Clique aqui para ver a definição completa no BibleHub</a>.
-    """
-
-def ia_gratis(prompt):
-    """Llama 3 Grátis"""
-    try:
-        url = "https://api-free-llm.gptfree.cc/v1/chat/completions"
-        payload = {
-            "model": "llama-3.1-8b-instruct",
-            "messages": [{"role": "user", "content": prompt}]
-        }
-        r = requests.post(url, json=payload, timeout=8)
-        return r.json()["choices"][0]["message"]["content"]
-    except:
-        return "⚠️ IA Grátis instável. Configure a chave do Google no menu lateral para estabilidade total."
-
-def ler_pdf_texto(file_like):
-    try:
-        reader = PyPDF2.PdfReader(file_like)
-        text = []
-        for i, p in enumerate(reader.pages):
-            if i > 40: break 
-            text.append(p.extract_text() or "")
-        return "\n".join(text)
-    except: return "Erro ao ler PDF."
-
-# --- 5. GOOGLE IA (GEMINI) ---
-def ia_google(prompt, key):
-    if not key: return None # Retorna vazio se nao tiver chave
+def gemini_fixer(texto, key):
+    """IA que corrige e melhora texto"""
+    if not key: return texto
     try:
         genai.configure(api_key=key)
-        return genai.GenerativeModel('gemini-1.5-flash').generate_content(prompt).text
-    except: return "Erro na API Google."
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Pede para agir como revisor editorial
+        p = f"Corrija a gramática, melhore a coesão e dê um tom pastoral culto a este texto, mantendo o sentido original: \n\n{texto}"
+        return model.generate_content(p).text
+    except: return texto
 
-# --- 6. TELA DE LOGIN ---
-USUARIOS = {"admin": "1234", "pastor": "pregar"}
+# --- 5. LOGIN MODERNO ---
+def login_screen():
+    if 'logado' not in st.session_state:
+        st.session_state.update({'logado': False, 'user': ''})
+        
+    if not st.session_state['logado']:
+        c1, c2, c3 = st.columns([1,2,1])
+        with c2:
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            st.markdown("<h1 style='text-align:center; font-weight:900; background: -webkit-linear-gradient(45deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;'>⚡ PREGADOR AI</h1>", unsafe_allow_html=True)
+            with st.form("log"):
+                u = st.text_input("ID")
+                p = st.text_input("SENHA", type="password")
+                if st.form_submit_button("LOGIN DE ACESSO", type="primary"):
+                    if (u=="admin" and p=="1234") or (u=="pastor" and p=="pregar"):
+                        st.session_state.update({'logado': True, 'user': u})
+                        st.rerun()
+                    else: st.error("Acesso Negado")
+        return False
+    return True
 
-if 'logado' not in st.session_state:
-    st.session_state['logado'] = False
-    st.session_state['user'] = ''
+if not login_screen(): st.stop()
 
-if not st.session_state['logado']:
-    c1,c2,c3 = st.columns([1,2,1])
-    with c2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        # NOME CORRIGIDO AQUI
-        st.markdown("<h1 style='text-align: center;'><span class='gold-text' style='font-size: 50px'>O PREGADOR</span></h1>", unsafe_allow_html=True)
-        with st.form("frm_login"):
-            u = st.text_input("Usuário")
-            s = st.text_input("Senha", type="password")
-            if st.form_submit_button("ACESSAR", type="primary"):
-                if u in USUARIOS and USUARIOS[u] == s:
-                    st.session_state['logado'] = True
-                    st.session_state['user'] = u
-                    st.rerun()
-                else: st.error("Acesso Negado.")
-    st.stop()
-
-# --- 7. INTERFACE PRINCIPAL ---
+# --- 6. APLICAÇÃO PRINCIPAL ---
 USER = st.session_state['user']
-PASTA = Path("Banco_Sermoes") / USER
-PASTA.mkdir(parents=True, exist_ok=True)
+PASTA = os.path.join("Banco_Sermoes", USER)
+if not os.path.exists(PASTA): os.makedirs(PASTA)
 
+# SIDEBAR (Perfil)
 with st.sidebar:
-    st.markdown("<h2 class='gold-text'>✝ O PREGADOR</h2>", unsafe_allow_html=True)
-    st.caption(f"Bem-vindo, {USER}")
+    st.title("⚡ CONFIG")
+    st.caption(f"Operador: {USER}")
     
-    # Seleção de IA
-    motor_ia = st.selectbox("INTELIGÊNCIA:", ["Llama 3 (Grátis)", "Google Gemini (Chave)"])
+    # API KEY
     api_key = st.secrets.get("GOOGLE_API_KEY", "")
-    if not api_key:
-        api_key = st.text_input("Chave Google API", type="password")
+    if not api_key: api_key = st.text_input("🔑 Chave AI (Google)", type="password")
     
     st.divider()
     
-    # Arquivos
-    try: docs = [f.stem for f in PASTA.glob("*.txt")]
-    except: docs = []
-    sel = st.radio("BIBLIOTECA:", ["+ NOVO ESTUDO"] + docs)
+    # ARQUIVOS
+    try: files = [f.replace(".txt","") for f in os.listdir(PASTA) if f.endswith(".txt")]
+    except: files = []
+    
+    st.markdown("### 📂 PROJETOS")
+    choice = st.radio("Arquivo:", ["+ NOVO"] + files, label_visibility="collapsed")
+    
+    st.markdown("### 🎤 DICTATION")
+    st.info("Para digitar com a voz: No Windows, clique na caixa de texto e aperte `Win + H`. No Mac, aperte `Fn + Fn`.")
     
     st.divider()
-    if st.button("SAIR"):
+    if st.button("DESCONECTAR"):
         st.session_state['logado'] = False
         st.rerun()
 
-# Layout Principal
-c_left, c_right = st.columns([2, 1.2])
+# LÓGICA DE CARREGAMENTO
+if choice != "+ NOVO" and choice != st.session_state['titulo_sermao']:
+    # Carrega arquivo se mudou a seleção
+    try:
+        with open(os.path.join(PASTA, f"{choice}.txt"), "r") as f:
+            st.session_state['texto_esboco'] = f.read()
+            st.session_state['titulo_sermao'] = choice
+    except: pass
+elif choice == "+ NOVO":
+    # Se escolheu novo, não limpa tudo para não perder trabalho, só o título
+    if st.session_state['titulo_sermao'] in files:
+        st.session_state['titulo_sermao'] = ""
+        st.session_state['texto_esboco'] = ""
 
-# EDITOR DE TEXTO (Esquerda)
-with c_left:
-    content = ""
-    title_val = ""
-    if sel != "+ NOVO ESTUDO":
-        title_val = sel
-        try: content = (PASTA / f"{sel}.txt").read_text(encoding="utf-8")
-        except: pass
+# --- LAYOUT PRINCIPAL (3 Painéis) ---
+col_biblia, col_editor, col_ferramenta = st.columns([1, 2, 0.8])
+
+# 1. PAINEL ESQUERDO: BÍBLIA INSTANTÂNEA
+with col_biblia:
+    st.markdown("### 📖 BÍBLIA")
+    ref_input = st.text_input("Buscar Ref:", placeholder="Joao 3 16")
     
-    col_t1, col_t2 = st.columns([3,1])
-    with col_t1:
-        new_title = st.text_input("TEMA", value=title_val, label_visibility="collapsed", placeholder="Título do Sermão...")
-    with col_t2:
-        if st.button("💾 GRAVAR", use_container_width=True, type="primary"):
-            if new_title:
-                (PASTA / f"{new_title}.txt").write_text(content, encoding="utf-8")
-                st.toast("Salvo na Nuvem!")
-
-    # Editor que atualiza variável
-    text_area = st.text_area("Papel", value=content, height=720, label_visibility="collapsed")
-    if new_title and text_area != content:
-        (PASTA / f"{new_title}.txt").write_text(text_area, encoding="utf-8")
-
-# FERRAMENTAS (Direita)
-with c_right:
-    st.markdown("<p style='color:#C5A059; font-weight:bold'>PAINEL DE ESTUDOS</p>", unsafe_allow_html=True)
-    t1, t2, t3, t4 = st.tabs(["BÍBLIA", "ORIGINAL", "IA/CHAT", "LIVROS"])
+    # Busca Texto
+    json_biblia = None
+    if ref_input:
+        json_biblia = get_bible_online(ref_input)
     
-    # ABA 1: BÍBLIA
-    with t1:
-        st.info("Digite ref: Joao 3 16 (Sem dois pontos)")
-        ref_in = st.text_input("Referência:")
+    if json_biblia:
+        texto_limpo = json_biblia['text'].strip()
+        ref_limpa = json_biblia['reference']
         
-        if st.button("📖 LER TEXTO"):
-            if ref_in:
-                # Aqui usa a função que busca ONLINE se não tiver arquivo
-                res_txt = carregar_biblia(ref_in) 
-                st.markdown(f"<div class='card'>{res_txt}</div>", unsafe_allow_html=True)
-            else:
-                st.warning("Digite algo (ex: Joao 3 16)")
-
-    # ABA 2: ORIGINAIS (LEXICO/STRONG)
-    with t2:
-        st.caption("Strong & Referências")
-        strong_id = st.text_input("Strong ID (ex: G25)")
-        if st.button("BUSCAR SIGNIFICADO"):
-            # Usa o fallback online
-            res_strong = lexico_strong_fallback(strong_id)
-            st.markdown(f"<div class='card'>{res_strong}</div>", unsafe_allow_html=True)
+        # Mostra o card
+        st.markdown(f"""
+        <div class="verse-card">
+            <b>{ref_limpa}</b><br>
+            <i>{texto_limpo}</i>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.divider()
-        cross = st.text_input("Tema / Ref Cruzada (ex: Fé)")
-        if st.button("VER REFERÊNCIAS"):
-             prompt_ref = f"Dê 5 referências cruzadas bíblicas sobre: {cross}"
-             if motor_ia == "Llama 3 (Grátis)":
-                 st.write(ia_gratis(prompt_ref))
-             else:
-                 st.write(ia_google(prompt_ref, api_key))
+        c_insert, c_audio = st.columns(2)
+        
+        # BOTÃO INSERIR
+        with c_insert:
+            if st.button("⬇ Inserir"):
+                # Adiciona ao final do texto atual
+                st.session_state['texto_esboco'] += f"\n\n**{ref_limpa}**\n{texto_limpo}"
+                st.toast("Versículo adicionado ao esboço!")
+                
+        # BOTÃO ÁUDIO
+        with c_audio:
+            if st.button("🔊 Ouvir"):
+                audio_file = speak_text(f"{ref_limpa}. {texto_limpo}")
+                if audio_file:
+                    st.audio(audio_file, format='audio/mp3')
 
-    # ABA 3: INTELIGÊNCIA ARTIFICIAL
-    with t3:
-        st.caption(f"Motor: {motor_ia}")
-        prompt_ia = st.text_area("Pergunta ao Assistente:")
-        if st.button("ENVIAR"):
-            if not prompt_ia: st.warning("Digite a pergunta.")
+# 2. PAINEL CENTRAL: EDITOR
+with col_editor:
+    c_tit_e, c_save_e = st.columns([3, 1])
+    with c_tit_e:
+        # Título gerenciado pelo estado
+        novo_tit = st.text_input("PROJETO", value=st.session_state['titulo_sermao'], placeholder="Nome da Pregação...")
+        st.session_state['titulo_sermao'] = novo_tit
+    with c_save_e:
+        if st.button("💾 GRAVAR", type="primary", use_container_width=True):
+            if st.session_state['titulo_sermao']:
+                caminho = os.path.join(PASTA, f"{st.session_state['titulo_sermao']}.txt")
+                with open(caminho, "w") as f:
+                    f.write(st.session_state['texto_esboco'])
+                st.toast("Projeto salvo com segurança.")
+    
+    # Editor Principal
+    txt = st.text_area("EDITOR", value=st.session_state['texto_esboco'], height=600, label_visibility="collapsed")
+    st.session_state['texto_esboco'] = txt
+    
+    # Barra de Ferramentas do Editor
+    st.markdown("---")
+    cf1, cf2 = st.columns([1, 1])
+    with cf1:
+        if st.button("✨ CORRIGIR & MELHORAR TEXTO"):
+            if not api_key: st.error("Requer chave Google")
             else:
-                with st.spinner("Pesquisando..."):
-                    resposta = ""
-                    if motor_ia == "Llama 3 (Grátis)":
-                        resposta = ia_gratis(prompt_ia)
-                    else:
-                        resp_google = ia_google(prompt_ia, api_key)
-                        if resp_google: resposta = resp_google
-                        else: resposta = "Erro ou falta de Chave Google."
-                    
-                    st.markdown(resposta)
+                with st.spinner("IA Revisando seu texto..."):
+                    corrected = gemini_fixer(st.session_state['texto_esboco'], api_key)
+                    st.session_state['texto_esboco'] = corrected
+                    st.rerun()
 
-    # ABA 4: PDF
-    with t4:
-        st.caption("Leitor de Livros PDF")
-        pdf_file = st.file_uploader("Arrastar PDF aqui", type="pdf")
-        if pdf_file:
-            if st.button("LER E RESUMIR"):
-                with st.spinner("Lendo..."):
-                    raw_txt = ler_pdf_texto(pdf_file)
-                    st.success("Lido!")
-                    p_sum = f"Resuma os pontos teológicos principais para pregador: {raw_txt[:3000]}"
-                    
-                    if motor_ia == "Llama 3 (Grátis)":
-                        st.write(ia_gratis(p_sum))
-                    else:
-                        st.write(ia_google(p_sum, api_key))
+# 3. PAINEL DIREITO: ATALHOS RÁPIDOS
+with col_ferramenta:
+    st.markdown("### 🧰 TOOLS")
+    
+    with st.expander("🗣 TRADUTOR", expanded=True):
+        trad_txt = st.text_area("Texto em Inglês:")
+        if st.button("Traduzir"):
+            # Lógica simples de tradução via IA
+            genai.configure(api_key=api_key)
+            t = genai.GenerativeModel('gemini-1.5-flash').generate_content(f"Traduza para português: {trad_txt}").text
+            st.info(t)
+            if st.button("Inserir Tradução"):
+                 st.session_state['texto_esboco'] += f"\n\n[Tradução]: {t}"
+                 
+    with st.expander("🔎 WEB SEARCH"):
+        q = st.text_input("Tema:")
+        if st.button("Buscar"):
+            try:
+                r = DDGS().text(q, max_results=2)
+                for res in r:
+                    st.caption(f"{res['title']}")
+                    st.write(res['body'][:100]+"...")
+            except: st.error("Erro busca")

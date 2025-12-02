@@ -234,4 +234,3 @@ with c_tools:
     with abas[0]:
         pg = st.text_area("Pergunta:")
         col_raz, col_emo = st.columns(2)
-        if

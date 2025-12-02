@@ -1,227 +1,286 @@
 import streamlit as st
 import os
 import requests
-import json
-import PyPDF2
-from gtts import gTTS
 import tempfile
+from gtts import gTTS
+import PyPDF2
 
-# --- 1. CONFIGURAÇÃO ESTÁVEL ---
-st.set_page_config(page_title="O Pregador", layout="wide", page_icon="🧷", initial_sidebar_state="expanded")
+# --- 1. CONFIGURAÇÃO GERAL (V10 BUSINESS) ---
+st.set_page_config(page_title="O Pregador", layout="wide", page_icon="🪵", initial_sidebar_state="expanded")
 
-# --- 2. VARIAVEIS DE ESTADO ---
+# --- 2. GESTÃO DE ESTADO (Para não resetar a cada clique) ---
 if 'logado' not in st.session_state: st.session_state['logado'] = False
+if 'layout_split' not in st.session_state: st.session_state['layout_split'] = 70
 if 'bg_url' not in st.session_state: st.session_state['bg_url'] = "https://images.unsplash.com/photo-1497294815431-9365093b7331?q=80&w=2070&auto=format&fit=crop"
-if 'layout_split' not in st.session_state: st.session_state['layout_split'] = 60
+if 'anuncios_ativos' not in st.session_state: st.session_state['anuncios_ativos'] = ""
 
-# --- 3. CSS SEPARADO (PARA NÃO DAR ERRO DE RENDERIZAÇÃO) ---
-def apply_style():
-    st.markdown(f"""
-    <style>
-        /* Import Font */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
-        
-        /* Wallpaper Fixo (Não pisca na atualização) */
-        [data-testid="stAppViewContainer"] {{
-            background-image: url("{st.session_state['bg_url']}");
-            background-size: cover;
-            background-position: center; 
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }}
-        
-        /* Vidro (Glassmorphism) */
-        [data-testid="stSidebar"], .stTextArea textarea, .stTextInput input, div[data-testid="stExpander"] {{
-            background-color: rgba(15, 23, 42, 0.85) !important;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.1) !important;
-            border-radius: 12px !important;
-            color: #e2e8f0 !important;
-        }}
-        
-        /* Ajuste Editor */
-        .stTextArea textarea {{
-            font-family: 'Inter', sans-serif;
-            font-size: 16px !important;
-            line-height: 1.6 !important;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }}
-        .stTextArea textarea:focus {{ border-color: #3b82f6 !important; }}
-        
-        /* Botões Apple Style */
-        .stButton button {{
-            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-            border: 1px solid #334155;
-            color: white;
-            border-radius: 8px;
-            font-weight: 500;
-        }}
-        .stButton button:hover {{
-            border-color: #3b82f6;
-            color: #3b82f6;
-        }}
-        
-        /* Limpeza Geral */
-        header, footer {{visibility: hidden;}}
-        .block-container {{padding-top: 1rem;}}
-        
-        /* Logo Titulo */
-        .big-font {{ font-size:40px !important; font-weight: 800; color: white; text-align: center; }}
-    </style>
-    """, unsafe_allow_html=True)
-
-apply_style()
-
-# --- 4. FUNÇÕES DE SUPORTE ---
+# Importações de IA (Segurança)
 try:
     from duckduckgo_search import DDGS
     import google.generativeai as genai
-    LIBS_OK = True
-except: LIBS_OK = False
+    HAS_IA = True
+except: HAS_IA = False
 
-def gemini(prompt, key):
-    if not key or not LIBS_OK: return "⚠️ API Key ou Libs faltando."
-    try:
-        genai.configure(api_key=key)
-        return genai.GenerativeModel('gemini-1.5-flash').generate_content(prompt).text
-    except Exception as e: return str(e)
+# --- 3. CSS EXCLUSIVO "WOODEN APPLE" ---
+# Mistura o vidro da Apple com a textura de madeira do pregador
+st.markdown(f"""
+<style>
+    /* FONTE */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    
+    /* WALLPAPER DINÂMICO */
+    [data-testid="stAppViewContainer"] {{
+        background-image: url("{st.session_state['bg_url']}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+    
+    /* MODAIS DE VIDRO */
+    [data-testid="stSidebar"], .stTextArea textarea, div[data-testid="stExpander"] {{
+        background: rgba(18, 18, 20, 0.85) !important;
+        backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #f0f0f0 !important;
+        border-radius: 12px;
+    }}
+    
+    /* EDITOR DE TEXTO (Papel Profissional) */
+    .stTextArea textarea {{
+        font-family: 'Inter', sans-serif;
+        font-size: 18px !important;
+        line-height: 1.6;
+        padding: 20px;
+    }}
+    .stTextArea textarea:focus {{
+        border-color: #eab308 !important; /* Amarelo Ouro */
+    }}
+    
+    /* BOTÕES COM TEXTURA SUAVE */
+    .stButton button {{
+        background-color: #262626;
+        color: white;
+        border: 1px solid #404040;
+        border-radius: 8px;
+        transition: 0.2s;
+    }}
+    .stButton button:hover {{
+        background-color: #eab308;
+        color: black;
+        border-color: #eab308;
+    }}
+    
+    /* LOGO DA MADEIRA NO CSS */
+    .wooden-clip {{
+        font-size: 50px;
+        text-align: center;
+        margin-bottom: -20px;
+    }}
+    
+    /* ESPAÇO DE ANÚNCIO */
+    .ad-card {{
+        background: rgba(255, 215, 0, 0.1);
+        border: 1px solid gold;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 20px;
+        text-align: center;
+    }}
+    .ad-card a {{ color: #eab308; font-weight: bold; text-decoration: none; }}
+</style>
+""", unsafe_allow_html=True)
 
-def bible_api(ref):
+# --- 4. FUNÇÕES DE IA E NEGÓCIO ---
+
+def conectar_ia(chave):
+    if not chave: return None
     try:
-        # Ex: Joao+3:16
-        r = requests.get(f"https://bible-api.com/{ref.replace(' ', '+')}?translation=almeida", timeout=3)
+        genai.configure(api_key=chave)
+        return genai.GenerativeModel('gemini-1.5-flash')
+    except: return None
+
+def corretor_pro(texto, modelo):
+    """Corrige o texto mantendo o estilo pastoral"""
+    if not modelo: return texto
+    try:
+        p = f"Atue como um editor de livros cristãos. Corrija gramática, pontuação e melhore a fluidez deste texto, mantendo a teologia correta:\n\n{texto}"
+        return modelo.generate_content(p).text
+    except: return texto
+
+def gerar_anuncios(tema, modelo):
+    """MONETIZAÇÃO: Gera links de afiliados baseados no sermão"""
+    if not modelo or len(tema) < 5: return "Buscando parceiros..."
+    try:
+        p = f"Com base no tema '{tema}', sugira 2 títulos de livros cristãos reais para estudo aprofundado. Retorne apenas Título - Autor."
+        return modelo.generate_content(p).text
+    except: return ""
+
+def modo_dev_codigo(pedido, modelo):
+    """Gera código Python para o próprio app"""
+    if not modelo: return "IA Offline."
+    try:
+        p = f"Gere apenas o código Python (Streamlit) para atender este pedido: {pedido}. Não explique, só mande o código."
+        return modelo.generate_content(p).text
+    except: return "Erro ao gerar."
+
+def buscar_biblia(ref):
+    try:
+        r = requests.get(f"https://bible-api.com/{ref.replace(' ', '+')}?translation=almeida", timeout=2)
         if r.status_code == 200: return r.json()
     except: return None
 
 # --- 5. TELA DE LOGIN ---
-def login_screen():
-    if not st.session_state['logado']:
-        c1,c2,c3 = st.columns([1,2,1])
-        with c2:
-            st.markdown("<br><br>", unsafe_allow_html=True)
-            st.markdown("<p class='big-font'>🧷 O PREGADOR</p>", unsafe_allow_html=True)
-            with st.form("login_safe"):
-                u = st.text_input("Usuário")
-                p = st.text_input("Senha", type="password")
-                if st.form_submit_button("Acessar Área de Trabalho", type="primary"):
-                    if (u=="admin" and p=="1234") or (u=="pastor" and p=="pregar"):
-                        st.session_state['logado'] = True
-                        st.session_state['user'] = u
-                        st.rerun()
-                    else: st.error("Erro no login")
-        return False
-    return True
+if not st.session_state['logado']:
+    c1, c2, c3 = st.columns([1,2,1])
+    with c2:
+        st.markdown("<div class='wooden-clip'>🪵</div>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center'>O PREGADOR</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color:#888'>Edição Business</p>", unsafe_allow_html=True)
+        
+        with st.form("login"):
+            u = st.text_input("Login")
+            s = st.text_input("Senha", type="password")
+            if st.form_submit_button("Entrar no Sistema", type="primary"):
+                # Senha simples
+                if u in ["admin", "pastor"] and s in ["1234", "pregar"]:
+                    st.session_state['logado'] = True
+                    st.session_state['user'] = u
+                    st.rerun()
+                else: st.error("Negado")
+    st.stop()
 
-if not login_screen(): st.stop()
-
-# --- 6. APP PRINCIPAL ---
+# --- 6. ÁREA DE TRABALHO ---
 USER = st.session_state['user']
 PASTA = os.path.join("Banco_Sermoes", USER)
 if not os.path.exists(PASTA): os.makedirs(PASTA)
 
-# > SIDEBAR
+# -> BARRA LATERAL (MENU & ANÚNCIOS)
 with st.sidebar:
-    st.markdown("## 🧷 PREGADOR OS")
-    st.caption(f"Usuário: {USER}")
+    st.image("https://cdn-icons-png.flaticon.com/512/9384/9384192.png", width=60) # Imagem de Pregador de Roupa (Link público estável)
+    st.markdown("### O PREGADOR")
     
-    tab_arq, tab_conf = st.tabs(["📂 Projetos", "⚙️ Ajustes"])
+    # 1. SETUP DE API (Essencial para IA)
+    api_key = st.text_input("Chave Google IA (Senha)", type="password")
+    if not api_key: api_key = st.secrets.get("GOOGLE_API_KEY", "")
+    modelo = conectar_ia(api_key)
     
-    with tab_arq:
+    tab1, tab2 = st.tabs(["ARQUIVOS", "CONFIG"])
+    
+    with tab1:
+        # Lista de arquivos
         try: files = [f.replace(".txt","") for f in os.listdir(PASTA) if f.endswith(".txt")]
         except: files = []
-        project = st.radio("Selecione:", ["+ Novo"] + files, label_visibility="collapsed")
+        sel = st.radio("Seus Projetos:", ["+ Novo"] + files, label_visibility="collapsed")
         
-        if st.button("Sair"):
-            st.session_state['logado'] = False
+        if st.button("Sair"): st.session_state['logado']=False; st.rerun()
+
+    with tab2:
+        st.caption("Personalização Visual")
+        novo_fundo = st.text_input("Link da Imagem Fundo:", value=st.session_state['bg_url'])
+        if st.button("Mudar Fundo"):
+            st.session_state['bg_url'] = novo_fundo
             st.rerun()
+        
+        tamanho = st.slider("Largura Editor", 50, 90, st.session_state['layout_split'])
+        st.session_state['layout_split'] = tamanho
 
-    with tab_conf:
-        # Ajuste Fundo
-        bg = st.text_input("Wallpaper URL:", value=st.session_state['bg_url'])
-        if st.button("Trocar Fundo"):
-            st.session_state['bg_url'] = bg
-            st.rerun()
-            
-        # API Key
-        key = st.text_input("Google Key:", type="password")
-        if not key: key = st.secrets.get("GOOGLE_API_KEY", "")
+    # --- ÁREA DE MONETIZAÇÃO (ANÚNCIOS INTELIGENTES) ---
+    st.divider()
+    st.markdown("### ⭐ Loja do Pregador")
+    # Mostra sugestões baseadas no que o pastor está escrevendo
+    if st.session_state['anuncios_ativos']:
+        st.info("📚 **Sugestão de Estudo:**")
+        st.caption(st.session_state['anuncios_ativos'])
+        st.markdown("[Comprar na Amazon >](https://amazon.com.br)", unsafe_allow_html=True)
+    else:
+        st.caption("Escreva um sermão para ver sugestões de livros...")
 
-# > LOGICA ARQUIVO
-current_text = ""
-current_title = ""
+# -> LAYOUT DO EDITOR E FERRAMENTAS
+proporcao = st.session_state['layout_split'] / 100
+col_main, col_tools = st.columns([proporcao, 1 - proporcao])
 
-if project != "+ Novo":
-    current_title = project
+# LOGICA CARREGAMENTO
+texto_atual = ""
+titulo_atual = ""
+if sel != "+ Novo":
+    titulo_atual = sel
     try:
-        with open(os.path.join(PASTA, f"{project}.txt"), "r") as f:
-            current_text = f.read()
+        with open(os.path.join(PASTA, f"{sel}.txt"), "r") as f: texto_atual = f.read()
     except: pass
 
-# > ÁREA DE TRABALHO (SLIDER)
-c_editor, c_tools = st.columns([2, 1]) # Fixo para evitar erro de calculo
+with col_main:
+    # Cabeçalho
+    c_h1, c_h2 = st.columns([4, 1])
+    with c_h1:
+        new_tit = st.text_input("Título", value=titulo_atual, placeholder="Título da Mensagem...", label_visibility="collapsed")
+    with c_h2:
+        if st.button("💾 SALVAR", use_container_width=True, type="primary"):
+            if new_tit:
+                with open(os.path.join(PASTA, f"{new_tit}.txt"), "w") as f: f.write(texto_atual)
+                # Aciona IA para gerar anúncio monetizado
+                anuncio = gerar_anuncios(new_tit, modelo)
+                st.session_state['anuncios_ativos'] = anuncio
+                st.toast("Salvo & Anúncios Atualizados!")
+                st.rerun()
 
-with c_editor:
-    # Header do Editor
-    c_head1, c_head2 = st.columns([4, 1])
-    with c_head1:
-        new_title = st.text_input("Título", value=current_title, placeholder="Nome do Sermão...", label_visibility="collapsed")
-    with c_head2:
-        if st.button("💾 GRAVAR", type="primary", use_container_width=True):
-            if new_title:
-                with open(os.path.join(PASTA, f"{new_title}.txt"), "w") as f:
-                    f.write(current_text) # Salva o que estava na memoria
-                st.toast("Salvo!", icon="☁️")
+    # O PAPEL (EDITOR)
+    texto_editado = st.text_area("Papel", value=texto_atual, height=750, label_visibility="collapsed")
     
-    # O PAPEL (TEXTO)
-    text_body = st.text_area("Papel", value=current_text, height=700, label_visibility="collapsed")
+    # Barra de Corretor Integrada
+    c_corr1, c_corr2 = st.columns([1,3])
+    with c_corr1:
+        if st.button("✨ CORRIGIR ORTOGRAFIA"):
+            if modelo:
+                with st.spinner("Revisando..."):
+                    corrigido = corretor_pro(texto_editado, modelo)
+                    # Atualiza o arquivo automaticamente
+                    with open(os.path.join(PASTA, f"{new_tit}.txt"), "w") as f: f.write(corrigido)
+                    st.success("Texto melhorado! Recarregue.")
+            else: st.warning("IA Offline.")
+    with c_corr2:
+        st.caption("Dica: Use `Win + H` para digitar com voz direto no navegador.")
+
+with col_tools:
+    st.markdown("#### 🛠 Ferramentas")
+    aba1, aba2, aba3, aba_dev = st.tabs(["📖 BÍBLIA", "🗣 TRAD", "🌍 WEB", "👨‍💻 DEV"])
     
-    # Auto-Sync (Gambiarrinha segura)
-    if new_title and text_body != current_text:
-        with open(os.path.join(PASTA, f"{new_title}.txt"), "w") as f:
-            f.write(text_body)
+    with aba1: # Bíblia com Áudio
+        ref = st.text_input("Verso (Jo 3 16)")
+        if ref:
+            dados = buscar_biblia(ref)
+            if dados:
+                txt_b = f"{dados['text']}"
+                st.info(f"{dados['reference']}\n\n{txt_b}")
+                
+                c_a1, c_a2 = st.columns(2)
+                if c_a1.button("Inserir"):
+                    novo_t = texto_editado + f"\n\n**{dados['reference']}**\n{txt_b}"
+                    with open(os.path.join(PASTA, f"{new_tit}.txt"), "w") as f: f.write(novo_t)
+                    st.rerun()
+                
+                if c_a2.button("🔊 Ouvir"):
+                    tts = gTTS(txt_b, lang='pt')
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                        tts.save(fp.name)
+                        st.audio(fp.name)
 
-with c_tools:
-    # FERRAMENTAS ESTILO IOS
-    st.markdown("#### 📱 Apps")
-    
-    with st.expander("📖 Bíblia + Áudio", expanded=True):
-        ref_b = st.text_input("Verso (ex: Salmos 23)")
-        if ref_b:
-            res = bible_api(ref_b)
-            if res:
-                t_bib = res['text']
-                st.info(f"{t_bib}")
-                c_btn1, c_btn2 = st.columns(2)
-                with c_btn1:
-                    if st.button("⬇ Inserir"):
-                        with open(os.path.join(PASTA, f"{new_title}.txt"), "w") as f:
-                            f.write(text_body + f"\n\n**{res['reference']}**\n{t_bib}")
-                        st.rerun()
-                with c_btn2:
-                    if st.button("🔊 Tocar"):
-                        try:
-                            mp3 = gTTS(text=t_bib, lang='pt')
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-                                mp3.save(fp.name)
-                                st.audio(fp.name, format="audio/mp3")
-                        except: st.warning("Erro Áudio")
+    with aba2: # Tradutor IA
+        origem = st.text_area("Texto em Inglês/Grego:")
+        if st.button("Traduzir"):
+            if modelo: st.write(modelo.generate_content(f"Traduza para teologia PT-BR: {origem}").text)
 
-    with st.expander("🗣 Tradutor IA"):
-        tr_text = st.text_area("Texto Original:")
-        if st.button("Traduzir PT-BR"):
-            st.write(gemini(f"Traduza para português culto e pastoral: {tr_text}", key))
+    with aba3: # Web / Monetização
+        termo = st.text_input("Pesquisar:")
+        if st.button("Buscar"):
+            try:
+                res = DDGS().text(termo, max_results=3)
+                for r in res:
+                    st.markdown(f"**[{r['title']}]({r['href']})**")
+            except: st.error("Erro busca")
 
-    with st.expander("⚡ Assistente & Corretor"):
-        opt = st.selectbox("Ação:", ["Corrigir Texto", "Sugerir Introdução", "Analisar Teologia"])
-        if st.button("Executar IA"):
-            prompt_final = ""
-            if opt == "Corrigir Texto":
-                prompt_final = f"Corrija este texto gramaticalmente e melhore o estilo: {text_body}"
-            elif opt == "Analisar Teologia":
-                prompt_final = f"Analise teologicamente: {text_body}"
-            else:
-                prompt_final = f"Crie uma introdução para o sermão '{new_title}'"
-            
-            with st.spinner("Processando..."):
-                st.success(gemini(prompt_final, key))
+    with aba_dev: # DEV MODE (Gerar códigos)
+        st.warning("⚠️ Modo Criador")
+        pedido = st.text_area("O que você quer adicionar ao código?")
+        if st.button("Gerar Código"):
+            st.code(modo_dev_codigo(pedido, modelo), language='python')
+            st.info("Copie este código e peça para eu integrar se gostar.")

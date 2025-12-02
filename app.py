@@ -205,7 +205,7 @@ if menu == "🏠 Início":
                 st.session_state['devocional'] = consultar_cerebro(prompt, api_key)
             st.info(st.session_state['devocional'])
         else:
-            st.warning("Insira sua chave API no menu.")
+            st.warning("AIzaSyBFQuslVRjAHjhLAaolm4xf2P0c__WKiCw")
             
     with c2:
         anim_study = load_lottie_safe(LOTTIE_URLS["study"])

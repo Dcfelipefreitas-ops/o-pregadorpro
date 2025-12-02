@@ -193,4 +193,145 @@ with st.sidebar:
         st.session_state['layout_split'] = val
         
         novo_bg = st.text_input("Fundo URL:", st.session_state['bg_url'])
+        if st.button("Mudar Fundo"): 
+            st.session_state['bg_url'] = novo_bg
+            st.rerun()
+            
+        st.divider()
+        api_key = st.secrets.get("GOOGLE_API_KEY", "")
+        if not api_key: api_key = st.text_input("API Key Google:", type="password")
+
+    with tab_qr:
+        st.caption("Acesse @felipefreitashope")
+        try:
+            buf = BytesIO()
+            img = gerar_qr("https://instagram.com/felipefreitashope")
+            img.save(buf)
+            st.image(buf)
+        except: pass
+
+    # MONETIZAÇÃO (ADS GOSPEL)
+    st.markdown("---")
+    st.markdown("##### ⭐ Ofertas Para Você")
+    # Card de Anúncio Inteligente
+    st.markdown(f"""
+    <div class="ad-box">
+        SUGESTÃO: {st.session_state['anuncio_atual']}<br>
+        <a href="https://amazon.com.br" target="_blank" style="font-size:12px; text-decoration:underline;">COMPRAR AGORA</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ÁREA DE TRABALHO
+ratio = st.session_state['layout_split'] / 100
+c_edit, c_tools = st.columns([ratio, 1 - ratio])
+
+# Lógica Texto
+txt_curr = ""
+tit_curr = ""
+if sel != "+ Novo":
+    tit_curr = sel
+    try: 
+        with open(os.path.join(PASTA, f"{sel}.txt"), "r") as f: txt_curr = f.read()
+    except: pass
+
+# --- EDITOR (CENTRO) ---
+with c_edit:
+    # 1. CABEÇALHO E TÍTULO
+    cc1, cc2 = st.columns([3,1])
+    with cc1:
+        new_tit = st.text_input("TEMA", value=tit_curr, placeholder="Título da Mensagem...", label_visibility="collapsed")
+    with cc2:
+        if st.button("💾 GRAVAR", type="primary", use_container_width=True):
+            if new_tit:
+                with open(os.path.join(PASTA, f"{new_tit}.txt"), "w") as f: f.write(st.session_state['texto_esboco'])
+                # GERA ANÚNCIO NOVO BASEADO NO TEMA
+                if api_key:
+                    novo_anuncio = ai_brain(f"Sugira um livro cristão existente sobre: {new_tit}", api_key, "Marketing")
+                    st.session_state['anuncio_atual'] = novo_anuncio
+                st.toast("Salvo! Veja a oferta na barra lateral.")
+                st.rerun()
+
+    # 2. PAPEL DE TRABALHO
+    if not st.session_state['texto_esboco'] and txt_curr:
+        st.session_state['texto_esboco'] = txt_curr
     
+    main_text = st.text_area("EDITOR", value=st.session_state['texto_esboco'], height=700, label_visibility="collapsed")
+    st.session_state['texto_esboco'] = main_text
+
+    # 3. BARRA DE COMANDO (CORRETOR/VOZ)
+    st.caption("Ferramentas do Editor")
+    
+    # Gravador de Áudio (Experimental)
+    audio_val = st.audio_input("🎤 Digitar por Voz (Grave e a IA escreve)")
+    if audio_val and api_key:
+        st.info("Áudio recebido! Para transcrição real, use Win+H. A transcrição de arquivo requer servidor dedicado.")
+    
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        if st.button("🗣 TRADUZIR TUDO"):
+            if api_key:
+                res = ai_brain(main_text, api_key, "Tradutor")
+                st.session_state['texto_esboco'] = res
+                st.rerun()
+    with b2:
+        if st.button("✨ CORRIGIR AGORA"):
+            if api_key:
+                # O comando Professor aqui corrige e substitui o texto direto
+                res = ai_brain(f"Corrija apenas a gramática deste texto mantendo o sentido: {main_text}", api_key, "Coder") 
+                st.session_state['texto_esboco'] = res
+                st.rerun()
+    with b3:
+        if st.button("🎓 AVALIAR"):
+            if api_key: st.info(ai_brain(main_text, api_key, "Professor"))
+
+    # Autosave
+    if new_tit and main_text != txt_curr:
+        with open(os.path.join(PASTA, f"{new_tit}.txt"), "w") as f: f.write(main_text)
+
+# --- SATÉLITE (DIREITA) ---
+with c_tools:
+    st.markdown("#### 🧠 CÉREBRO")
+    tabs = st.tabs(["IA MODOS", "BÍBLIA", "DEV"])
+    
+    with tabs[0]:
+        ask = st.text_area("Pergunta:")
+        br, bs = st.columns(2)
+        if br.button("🧠 RAZÃO"):
+            st.write(ai_brain(ask, api_key, "Razão"))
+        if bs.button("❤️ EMOÇÃO"):
+            st.write(ai_brain(ask, api_key, "Sentimento"))
+
+    with tabs[1]:
+        ref = st.text_input("Verso (Jo 3 16)")
+        if ref:
+            bd = get_bible(ref.replace(' ', '+'))
+            if bd:
+                txt_b = bd['text']
+                st.markdown(f"**{bd['reference']}**\n{txt_b}")
+                
+                ck1, ck2 = st.columns(2)
+                if ck1.button("⬇ Inserir"):
+                    st.session_state['texto_esboco'] += f"\n\n**{bd['reference']}**\n{txt_b}"
+                    st.rerun()
+                if ck2.button("🔊 Ouvir"):
+                    try:
+                        tts = gTTS(txt_b, lang='pt')
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                            tts.save(f.name)
+                            st.audio(f.name)
+                    except: st.error("Erro Audio")
+            else: st.warning("Nada achado.")
+
+    with tabs[2]:
+        st.info("Crie novas funções:")
+        ped = st.text_input("O que criar? (Ex: Botão dízimo)")
+        if st.button("GERAR CÓDIGO"):
+            st.code(ai_brain(ped, api_key, "Coder"))
+
+# --- 8. RODAPÉ FIXO ---
+st.markdown("""
+<div class="footer-insta">
+    DESENVOLVEDOR: <a href="https://instagram.com/felipefreitashope" target="_blank">@FELIPEFREITASHOPE</a> 
+    | V12 PRO BUSINESS
+</div>
+""", unsafe_allow_html=True)

@@ -1,753 +1,878 @@
-# app.py (VERSÃO UNIFICADA, CORRIGIDA, COM INTERLINEAR, NOTES (SQLite) E CONVERTERS)
 import streamlit as st
+from duckduckgo_search import DDGS
+import google.generativeai as genai
 import os
 import requests
-import tempfile
-import qrcode
-from io import BytesIO, StringIO
-from datetime import datetime
-import json
-import sqlite3
-import PyPDF2
-from gtts import gTTS
+from streamlit_lottie import st_lottie
+import time
 
-# --- IMPORTS OPCIONAIS (evitam crash se não instalados) ---
-try:
-    import speech_recognition as sr
-    SR_OK = True
-except Exception:
-    SR_OK = False
+# --- Configuração da página ---
+st.set_page_config(page_title="O Pregador", layout="wide", page_icon="✝️")
 
-try:
-    import google.generativeai as genai
-    GENAI_INSTALLED = True
-except Exception:
-    GENAI_INSTALLED = False
+# --- Usuários simples (substituir por DB real no futuro) ---
+USUARIOS = {
+    "admin": "1234",
+    "pastor1": "pregar",
+    "convidado": "jesus",
+}
 
-try:
-    from duckduckgo_search import DDGS
-    DDGS_OK = True
-except Exception:
-    DDGS_OK = False
+def verificar_login():
+    """Mostra a tela de login e controla `st.session_state`."""
+    if 'logado' not in st.session_state:
+        st.session_state['logado'] = False
+        st.session_state['usuario_atual'] = ''
 
-# --- 1. CONFIGURAÇÃO GERAL ---
-st.set_page_config(
-    page_title="O Pregador",
-    layout="wide",
-    page_icon="🧷",
-    initial_sidebar_state="expanded"
-)
+    if not st.session_state['logado']:
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.markdown("## 🔐 Acesso Restrito")
+            st.markdown("### O Pregador")
+            user = st.text_input("Usuário")
+            senha = st.text_input("Senha", type="password")
 
-# --- 2. ESTADO INICIAL ---
-if 'logado' not in st.session_state:
-    st.session_state.update({'logado': False, 'user': ''})
-if 'bg_url' not in st.session_state:
-    st.session_state['bg_url'] = "https://images.unsplash.com/photo-1497294815431-9365093b7331?q=80&w=2070&auto=format&fit=crop"
-if 'layout_split' not in st.session_state:
-    st.session_state['layout_split'] = 60
-if 'texto_esboco' not in st.session_state:
-    st.session_state['texto_esboco'] = ""
-if 'login_streak' not in st.session_state:
-    st.session_state['login_streak'] = 1
-if 'last_login' not in st.session_state:
-    st.session_state['last_login'] = str(datetime.now().date())
-if 'anuncio_atual' not in st.session_state:
-    st.session_state['anuncio_atual'] = "📚 Bíblia de Estudo Premium"
-if 'idioma' not in st.session_state:
-    st.session_state['idioma'] = "Português"
-if 'api_input' not in st.session_state:
-    st.session_state['api_input'] = ""
-
-USER = st.session_state.get('user', 'Admin')
-
-# --- PASTAS & DB ---
-os.makedirs("Banco_Biblia/bibles", exist_ok=True)
-os.makedirs("Banco_Biblia/lexico", exist_ok=True)
-os.makedirs("Banco_Biblia/crossrefs", exist_ok=True)
-os.makedirs("Banco_Biblia/chave", exist_ok=True)
-os.makedirs("Banco_Sermoes", exist_ok=True)
-DB_NOTES = os.path.join("Banco_Sermoes", "notes.db")
-
-# --- UTILIDADES & FUNÇÕES CENTRAIS ---
-
-def update_streak():
-    hoje = str(datetime.now().date())
-    if st.session_state['last_login'] != hoje:
-        st.session_state['login_streak'] += 1
-        st.session_state['last_login'] = hoje
-
-def safety_filter(prompt):
-    blacklist = ["porn", "sex", "erotic", "xxx", "fraude", "hack", "roubar", "cassino", "bet", "apostas"]
-    if any(p in prompt.lower() for p in blacklist):
+            if st.button("Entrar"):
+                if user in USUARIOS and USUARIOS[user] == senha:
+                    st.session_state['logado'] = True
+                    st.session_state['usuario_atual'] = user
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos.")
         return False
     return True
 
-def ai_brain(prompt, key, mode="Professor"):
-    if not key:
-        return "⚠️ Configure a Chave Google no Menu (st.secrets['GOOGLE_API_KEY'] ou campo de configurações)."
-    if not safety_filter(prompt):
-        return "🚫 Conteúdo bloqueado por segurança e ética."
-    if not GENAI_INSTALLED:
-        return "⚠️ google.generativeai não instalado no ambiente."
-    try:
-        genai.configure(api_key=key)
-        roles = {
-            "Razão": "Teólogo apologético e histórico. Use lógica e exegese.",
-            "Sentimento": "Pastor pentecostal e acolhedor. Use emoção e consolo.",
-            "Professor": "Professor de homilética. Corrija o texto e aponte erros.",
-            "Coder": "Programador Senior Python/Streamlit.",
-            "Tradutor": "Tradutor especialista em Teologia Cristã.",
-            "Marketing": "Gere um título de livro cristão fictício."
-        }
-        lang_instruction = f"Responda sempre em {st.session_state.get('idioma','Português')}."
-        system_prompt = f"MODO: {roles.get(mode,'Assistente')}\n{lang_instruction}\nCONTEXTO: {prompt}"
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        out = model.generate_content(system_prompt)
-        if hasattr(out, "text"):
-            return out.text
-        return str(out)
-    except Exception as e:
-        return f"Erro na Nuvem IA: {e}"
 
-def transcrever_audio_file(uploaded_file):
-    if not SR_OK:
-        return "Transcrição local não disponível. Instale 'speechrecognition' e dependências."
-    try:
-        recognizer = sr.Recognizer()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            tmp.write(uploaded_file.read())
-            tmp_path = tmp.name
-        with sr.AudioFile(tmp_path) as source:
-            audio_data = recognizer.record(source)
-            try:
-                text = recognizer.recognize_google(audio_data, language="pt-BR")
-                return text
-            except sr.UnknownValueError:
-                return "Não foi possível reconhecer o áudio."
-            except sr.RequestError as e:
-                return f"Erro no serviço de reconhecimento: {e}"
-    except Exception as e:
-        return f"Erro ao processar áudio: {e}"
-
-def get_bible(ref):
-    if not ref:
-        return None
-    try:
-        r = ref.strip()
-        r = r.replace(",", " ").replace(".", " ")
-        if ":" in r:
-            query = r.replace(" ", "+")
-        else:
-            parts = r.split()
-            if len(parts) >= 3:
-                book = parts[0]; chapter = parts[1]; verse = parts[2]
-                query = f"{book}+{chapter}:{verse}"
-            else:
-                query = r.replace(" ", "+")
-        url = f"https://bible-api.com/{query}?translation=almeida"
-        resp = requests.get(url, timeout=6)
-        if resp.status_code == 200:
-            return resp.json()
-        return None
-    except Exception:
-        return None
-
-def gerar_qr(link):
-    qr = qrcode.QRCode(box_size=10, border=1)
-    qr.add_data(link)
-    qr.make(fit=True)
-    return qr.make_image(fill_color="black", back_color="white")
-
-def read_pdf_text(file_like):
-    try:
-        reader = PyPDF2.PdfReader(file_like)
-        pages = []
-        for i, p in enumerate(reader.pages[:40]):
-            txt = p.extract_text()
-            if txt:
-                pages.append(txt)
-        return "\n".join(pages)
-    except Exception as e:
-        return f"Erro ao ler PDF: {e}"
-
-# --- CSS (mantive visual e cores) ---
-st.markdown(f"""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-    html, body, [class*="css"] {{font-family: 'Inter', sans-serif;}}
-    [data-testid="stAppViewContainer"] {{
-        background-image: url("{st.session_state['bg_url']}");
-        background-size: cover; background-position: center; background-attachment: fixed;
-    }}
-    [data-testid="stSidebar"], .stTextArea textarea, .stTextInput input, div[data-testid="stExpander"], .stSelectbox {{
-        background-color: rgba(20, 22, 28, 0.90) !important;
-        backdrop-filter: blur(15px);
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 12px !important;
-        color: #e0e0e0 !important;
-    }}
-    header, footer {{visibility: hidden;}}
-    .block-container {{padding-top: 1rem; max-width: 96%;}}
-    .brand-box {{ text-align: center; padding-bottom: 20px; border-bottom: 1px solid #333; margin-bottom: 15px; }}
-    .brand-title {{ font-size: 26px; font-weight: 800; color: #D4AF37; letter-spacing: 2px; margin-top: 5px; }}
-    .ad-card {{ background: linear-gradient(135deg, #FFD700, #DAA520); color: black; padding: 12px; border-radius: 8px; margin-top: 10px; text-align: center; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }}
-    .stButton button {{ background-color: #2b2b2b; color: #eee; border: 1px solid #444; border-radius: 6px; font-weight: 600; }}
-    .stButton button:hover {{ border-color: #D4AF37; color: #D4AF37; background-color: #1a1a1a; }}
-    .footer-insta {{ position: fixed; bottom: 0; left: 0; width: 100%; background: #000; color: #666; text-align: center; padding: 6px; font-size: 11px; z-index: 9999; border-top: 1px solid #222; }}
-    .footer-insta a {{ color: #E1306C; font-weight: bold; text-decoration: none; }}
-    .interlinear-col {{ padding: 6px; border-left: 1px solid rgba(255,255,255,0.03); }}
-</style>
-""", unsafe_allow_html=True)
-
-# --- LOGIN ---
-if not st.session_state['logado']:
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style="text-align:center; background: rgba(0,0,0,0.7); padding: 30px; border-radius: 20px;">
-            <img src="https://cdn-icons-png.flaticon.com/512/9430/9430594.png" width="90">
-            <h1 style="color:#D4AF37; font-family:'Inter'; margin-top:10px;">O PREGADOR</h1>
-            <p style="color:#ccc">Workstation Pastoral Inteligente</p>
-        </div>
-        """, unsafe_allow_html=True)
-        with st.form("login_seguro"):
-            u = st.text_input("Identificação")
-            p = st.text_input("Credencial", type="password")
-            if st.form_submit_button("ENTRAR NO SISTEMA", type="primary"):
-                if u in ["admin", "pastor", "felipe"] and p in ["1234", "pregar", "hope"]:
-                    st.session_state['logado'] = True
-                    st.session_state['user'] = u
-                    update_streak()
-                    st.rerun()
-                else:
-                    st.error("Acesso Não Autorizado")
+# Se não logado, interrompe
+if not verificar_login():
     st.stop()
 
-# --- APLICAÇÃO PRINCIPAL ---
-USER = st.session_state.get('user', 'Admin')
-PASTA = os.path.join("Banco_Sermoes", USER)
-os.makedirs(PASTA, exist_ok=True)
+USUARIO_ATUAL = st.session_state['usuario_atual']
 
-# --- BÍBLIA + LÉXICO + STRONG + CROSSREFS + INTERLINEAR ---
-def carregar_json(caminho):
+
+# --- Helpers ---
+def load_lottieurl(url):
     try:
-        with open(caminho, "r", encoding="utf-8") as f:
-            return json.load(f)
+        r = requests.get(url, timeout=6)
+        return r.json()
     except Exception:
-        return {}
+        return None
 
-BIBLIA = carregar_json("Banco_Biblia/bibles/acf.json")
-LEXICO = carregar_json("Banco_Biblia/lexico/strongs.json")
-XREF   = carregar_json("Banco_Biblia/crossrefs/referencias.json")
-KAI    = carregar_json("Banco_Biblia/chave/kai.json")
-INTERLINEAR = carregar_json("Banco_Biblia/interlinear.json")  # formato: {"Book": {"3": {"16": {"pt":"...", "gr":"...", "strongs":["G25"]}}}}
+anim_book = load_lottieurl("https://lottie.host/5a666e37-d2c4-4a47-98d9-247544062a4d/lB6y7y6a1W.json")
 
-def buscar_palavra(termo):
-    resultados = []
-    if not termo or not isinstance(termo, str):
-        return resultados
 
-    termo_raw = termo.strip()
-    termo = termo_raw.lower()
-
-    # Strong search pattern detection (G#### / H####)
-    if (termo_raw.upper().startswith("G") or termo_raw.upper().startswith("H")) and termo_raw[1:].isdigit():
-        for livro, capitulos in BIBLIA.items():
-            for cap, versos in capitulos.items():
-                for num, texto in versos.items():
-                    if termo_raw.upper() in (texto or ""):
-                        resultados.append((livro, cap, num, texto))
-        return resultados
-
-    # Operators AND, OR, NEAR
-    if " AND " in termo_raw.upper():
-        a, b = termo_raw.upper().split(" AND ", 1)
-        a = a.lower(); b = b.lower()
-        for livro, capitulos in BIBLIA.items():
-            for cap, versos in capitulos.items():
-                for num, texto in versos.items():
-                    t = (texto or "").lower()
-                    if a in t and b in t:
-                        resultados.append((livro, cap, num, texto))
-        return resultados
-
-    if " OR " in termo_raw.upper():
-        a, b = termo_raw.upper().split(" OR ", 1)
-        a = a.lower(); b = b.lower()
-        for livro, capitulos in BIBLIA.items():
-            for cap, versos in capitulos.items():
-                for num, texto in versos.items():
-                    t = (texto or "").lower()
-                    if a in t or b in t:
-                        resultados.append((livro, cap, num, texto))
-        return resultados
-
-    if " NEAR " in termo_raw.upper():
-        a, b = termo_raw.upper().split(" NEAR ", 1)
-        a = a.lower(); b = b.lower()
-        for livro, capitulos in BIBLIA.items():
-            for cap, versos in capitulos.items():
-                for num, texto in versos.items():
-                    t = (texto or "").lower()
-                    if a in t and b in t:
-                        try:
-                            posA = t.index(a)
-                            posB = t.index(b)
-                            if abs(posA - posB) < 200:
-                                resultados.append((livro, cap, num, texto))
-                        except ValueError:
-                            continue
-        return resultados
-
-    # Wildcard *
-    if termo_raw.endswith("*"):
-        base = termo_raw[:-1].lower()
-        for livro, capitulos in BIBLIA.items():
-            for cap, versos in capitulos.items():
-                for num, texto in versos.items():
-                    t = (texto or "").lower()
-                    if any(w.startswith(base) for w in t.split()):
-                        resultados.append((livro, cap, num, texto))
-        return resultados
-
-    # Simple contains
-    for livro, capitulos in BIBLIA.items():
-        for cap, versos in capitulos.items():
-            for num, texto in versos.items():
-                if termo in (texto or "").lower():
-                    resultados.append((livro, cap, num, texto))
-    return resultados
-
-def strongs_info(codigo):
-    codigo = codigo.upper().strip()
-    if codigo in LEXICO:
-        return LEXICO[codigo]
-    return "❌ Código não encontrado no Léxico Strong."
-
-def referencias_cruzadas(ref):
-    ref = ref.strip()
-    return XREF.get(ref, [])
-
-def chave_kai(term):
-    term = term.lower().strip()
-    return KAI.get(term, [])
-
-def interlinear_entry(book, chapter, verse):
+def consultar_gemini(prompt, chave):
+    if not chave:
+        return "⚠️ Coloque a chave API no menu (Google Generative AI)."
     try:
-        return INTERLINEAR.get(book, {}).get(str(chapter), {}).get(str(verse), {})
-    except Exception:
-        return {}
+        genai.configure(api_key=chave)
+        model = genai.GenerativeModel('gemini-pro')
+        return model.generate_content(prompt).text
+    except Exception as e:
+        return f"Erro ao chamar a API: {e}"
 
-# --- NOTES (SQLite) ---
-def get_db_connection():
-    conn = sqlite3.connect(DB_NOTES, check_same_thread=False)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user TEXT,
-            book TEXT,
-            chapter TEXT,
-            verse TEXT,
-            title TEXT,
-            content TEXT,
-            created_at TEXT
-        )
-    """)
-    conn.commit()
-    return conn
 
-def add_note(user, book, chapter, verse, title, content):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO notes (user, book, chapter, verse, title, content, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (user, book, str(chapter), str(verse), title, content, str(datetime.now())))
-    conn.commit()
-    conn.close()
+def buscar_web(texto, max_results=3):
+    try:
+        ddgs = DDGS()
+        results = ddgs.text(texto, max_results=max_results)
+        if not results:
+            return "Nenhum resultado encontrado."
+        lines = []
+        for r in results:
+            title = r.get('title') or r.get('body') or '(sem título)'
+            body = r.get('body') or ''
+            lines.append(f"• {title}: {body}")
+        return "\n\n".join(lines)
+    except Exception as e:
+        return f"Erro na busca web: {e}"
 
-def get_notes_for_verse(user, book, chapter, verse):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT id, title, content, created_at FROM notes
-        WHERE user=? AND book=? AND chapter=? AND verse=?
-        ORDER BY created_at DESC
-    """, (user, book, str(chapter), str(verse)))
-    rows = cur.fetchall()
-    conn.close()
-    return rows
 
-def delete_note(note_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM notes WHERE id=?", (note_id,))
-    conn.commit()
-    conn.close()
+# --- Diretórios por usuário ---
+PASTA_RAIZ = "Banco_de_Sermoes"
+PASTA_USUARIO = os.path.join(PASTA_RAIZ, USUARIO_ATUAL)
+os.makedirs(PASTA_USUARIO, exist_ok=True)
 
-# --- CONVERTERS (CSV / TSK -> JSON) ---
-def convert_strongs_csv_to_json(csv_bytes):
+
+# --- Estilo básico ---
+st.markdown(
     """
-    Expects CSV with columns: code, lemma, transliteration, strong_type, definition
-    Returns dict { "G1": {...}, "H2": {...} }
-    """
-    text = csv_bytes.decode('utf-8', errors='ignore')
-    lines = [l for l in text.splitlines() if l.strip()]
-    result = {}
-    for i, line in enumerate(lines):
-        # naive CSV parse (comma separated). For robust solution use csv module.
-        parts = [p.strip() for p in line.split(',')]
-        if len(parts) < 2:
-            continue
-        code = parts[0].upper()
-        entry = {
-            "lemma": parts[1] if len(parts) > 1 else "",
-            "translit": parts[2] if len(parts) > 2 else "",
-            "type": parts[3] if len(parts) > 3 else "",
-            "def": parts[4] if len(parts) > 4 else ""
-        }
-        result[code] = entry
-    return result
+    <style>
+    .stTextArea textarea {font-family: 'Georgia', serif; font-size: 18px;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-def convert_tsk_to_json(tsk_text):
-    """
-    Very simple converter for TSK-like files (Thematic Study Key). This is placeholder:
-    Splits by lines, looks for verses like 'John 3:16 — text' and indexes them.
-    """
-    lines = [l.strip() for l in tsk_text.splitlines() if l.strip()]
-    out = {}
-    for line in lines:
-        # try to find pattern "Book Chapter:Verse - text"
-        parts = line.split('—', 1)
-        if len(parts) == 2:
-            ref = parts[0].strip()
-            text = parts[1].strip()
-            out[ref] = text
-        else:
-            # fallback append to last
-            pass
-    return out
 
-# --- SIDEBAR ---
+# --- Barra lateral ---
 with st.sidebar:
-    st.markdown(f"""
-    <div class="brand-box">
-        <img src="https://cdn-icons-png.flaticon.com/512/9430/9430594.png" width="50">
-        <div class="brand-title">O PREGADOR</div>
-        <div style="color:#4CAF50; font-size:12px; margin-top:5px">🟢 {st.session_state['login_streak']} Dias Online</div>
-    </div>
+    try:
+        if anim_book:
+            st_lottie(anim_book, height=70)
+    except Exception:
+        pass
+
+    st.write(f"Olá, **{USUARIO_ATUAL.upper()}**")
+
+    if st.button("Sair / Logout"):
+        st.session_state['logado'] = False
+        st.rerun()
+
+    st.divider()
+    with st.expander("🔐 Chave Google"):
+        api_key = st.text_input("API Key", type="password")
+
+    arquivos = [f for f in os.listdir(PASTA_USUARIO) if f.endswith('.txt')]
+    arquivo_atual = st.radio("Meus Estudos:", ["+ Novo"] + arquivos)
+
+
+# --- Área principal ---
+col_editor, col_tools = st.columns([2.5, 1.5])
+
+with col_editor:
+    titulo_padrao = ""
+    conteudo_padrao = ""
+    if arquivo_atual != "+ Novo":
+        titulo_padrao = arquivo_atual.replace('.txt', '')
+        try:
+            with open(os.path.join(PASTA_USUARIO, arquivo_atual), 'r', encoding='utf-8') as f:
+                conteudo_padrao = f.read()
+        except Exception:
+            conteudo_padrao = ""
+
+    novo_titulo = st.text_input("Título", value=titulo_padrao)
+    texto = st.text_area("Esboço", value=conteudo_padrao, height=600)
+
+    if st.button("💾 Salvar", type='primary'):
+        if not novo_titulo:
+            st.warning("Digite um título antes de salvar.")
+        else:
+            path = os.path.join(PASTA_USUARIO, f"{novo_titulo}.txt")
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(texto)
+            st.success("Salvo na sua conta!")
+
+
+with col_tools:
+    aba1, aba2 = st.tabs(["🔍 Web", "🤖 IA"]) 
+
+    with aba1:
+        q = st.text_input("Pesquisa:")
+        if st.button("Buscar"):
+            with st.spinner("Buscando na web..."):
+                st.info(buscar_web(q))
+
+    with aba2:
+        if st.button("Analisar Texto"):
+            prompt = f"Analise este esboço e gere sugestões práticas:\n\n{texto}"
+            with st.spinner("Consultando IA..."):
+                resp = consultar_gemini(prompt, api_key if 'api_key' in locals() else None)
+                st.write(resp)
+
+
+# Rodapé opcional
+st.markdown("---")
+st.caption("App local para esboços — conteúdo e integrações dependem de suas chaves e arquivos locais.")
+import streamlit as st
+from duckduckgo_search import DDGS
+import google.generativeai as genai
+import os
+import requests
+from streamlit_lottie import st_lottie
+import time
+
+# --- Configuração da página ---
+st.set_page_config(page_title="O Pregador", layout="wide", page_icon="✝️")
+
+# --- Usuários simples (substituir por DB real no futuro) ---
+USUARIOS = {
+    "admin": "1234",
+    "pastor1": "pregar",
+    "convidado": "jesus",
+}
+
+def verificar_login():
+    """Mostra a tela de login e controla `st.session_state`."""
+    if 'logado' not in st.session_state:
+        st.session_state['logado'] = False
+        st.session_state['usuario_atual'] = ''
+
+    if not st.session_state['logado']:
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.markdown("## 🔐 Acesso Restrito")
+            st.markdown("### O Pregador")
+            user = st.text_input("Usuário")
+            senha = st.text_input("Senha", type="password")
+
+            if st.button("Entrar"):
+                if user in USUARIOS and USUARIOS[user] == senha:
+                    st.session_state['logado'] = True
+                    st.session_state['usuario_atual'] = user
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos.")
+        return False
+    return True
+
+
+# Se não logado, interrompe
+if not verificar_login():
+    st.stop()
+
+USUARIO_ATUAL = st.session_state['usuario_atual']
+
+
+# --- Helpers ---
+def load_lottieurl(url):
+    try:
+        r = requests.get(url, timeout=6)
+        return r.json()
+    except Exception:
+        return None
+
+anim_book = load_lottieurl("https://lottie.host/5a666e37-d2c4-4a47-98d9-247544062a4d/lB6y7y6a1W.json")
+
+
+def consultar_gemini(prompt, chave):
+    if not chave:
+        return "⚠️ Coloque a chave API no menu (Google Generative AI)."
+    try:
+        genai.configure(api_key=chave)
+        model = genai.GenerativeModel('gemini-pro')
+        return model.generate_content(prompt).text
+    except Exception as e:
+        return f"Erro ao chamar a API: {e}"
+
+
+def buscar_web(texto, max_results=3):
+    try:
+        ddgs = DDGS()
+        results = ddgs.text(texto, max_results=max_results)
+        if not results:
+            return "Nenhum resultado encontrado."
+        lines = []
+        for r in results:
+            title = r.get('title') or r.get('body') or '(sem título)'
+            body = r.get('body') or ''
+            lines.append(f"• {title}: {body}")
+        return "\n\n".join(lines)
+    except Exception as e:
+        return f"Erro na busca web: {e}"
+
+
+# --- Diretórios por usuário ---
+PASTA_RAIZ = "Banco_de_Sermoes"
+PASTA_USUARIO = os.path.join(PASTA_RAIZ, USUARIO_ATUAL)
+os.makedirs(PASTA_USUARIO, exist_ok=True)
+
+
+# --- Estilo básico ---
+st.markdown(
+    """
+    <style>
+    .stTextArea textarea {font-family: 'Georgia', serif; font-size: 18px;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# --- Barra lateral ---
+with st.sidebar:
+    try:
+        if anim_book:
+            st_lottie(anim_book, height=70)
+    except Exception:
+        pass
+
+    st.write(f"Olá, **{USUARIO_ATUAL.upper()}**")
+
+    if st.button("Sair / Logout"):
+        st.session_state['logado'] = False
+        st.rerun()
+
+    st.divider()
+    with st.expander("🔐 Chave Google"):
+        api_key = st.text_input("API Key", type="password")
+
+    arquivos = [f for f in os.listdir(PASTA_USUARIO) if f.endswith('.txt')]
+    arquivo_atual = st.radio("Meus Estudos:", ["+ Novo"] + arquivos)
+
+
+# --- Área principal ---
+col_editor, col_tools = st.columns([2.5, 1.5])
+
+with col_editor:
+    titulo_padrao = ""
+    conteudo_padrao = ""
+    if arquivo_atual != "+ Novo":
+        titulo_padrao = arquivo_atual.replace('.txt', '')
+        try:
+            with open(os.path.join(PASTA_USUARIO, arquivo_atual), 'r', encoding='utf-8') as f:
+                conteudo_padrao = f.read()
+        except Exception:
+            conteudo_padrao = ""
+
+    novo_titulo = st.text_input("Título", value=titulo_padrao)
+    texto = st.text_area("Esboço", value=conteudo_padrao, height=600)
+
+    if st.button("💾 Salvar", type='primary'):
+        if not novo_titulo:
+            st.warning("Digite um título antes de salvar.")
+        else:
+            path = os.path.join(PASTA_USUARIO, f"{novo_titulo}.txt")
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(texto)
+            st.success("Salvo na sua conta!")
+
+
+with col_tools:
+    aba1, aba2 = st.tabs(["🔍 Web", "🤖 IA"])
+
+    with aba1:
+        q = st.text_input("Pesquisa:")
+        if st.button("Buscar"):
+            with st.spinner("Buscando na web..."):
+                st.info(buscar_web(q))
+
+    with aba2:
+        if st.button("Analisar Texto"):
+            prompt = f"Analise este esboço e gere sugestões práticas:\n\n{texto}"
+            with st.spinner("Consultando IA..."):
+                resp = consultar_gemini(prompt, api_key if 'api_key' in locals() else None)
+                st.write(resp)
+
+
+# Rodapé opcional
+st.markdown("---")
+st.caption("App local para esboços — conteúdo e integrações dependem de suas chaves e arquivos locais.")
+
+import streamlit as st
+from duckduckgo_search import DDGS
+import google.generativeai as genai
+import os
+import requests
+from streamlit_lottie import st_lottie
+import time
+
+# --- 1. CONFIGURAÇÃO INICIAL ---
+st.set_page_config(page_title="O Pregador", layout="wide", page_icon="✝️")
+
+# --- 2. SISTEMA DE LOGIN (SEGURANÇA) ---
+# Aqui você define os usuários e senhas. 
+# No futuro, isso pode vir de um banco de dados real.
+USUARIOS = {
+    "admin": "1234",      # Usuário mestre
+    "pastor1": "pregar",  # Teste
+    "convidado": "jesus"  # Teste
+}
+
+def verificar_login():
+    """Cria a tela de bloqueio"""
+    if 'logado' not in st.session_state:
+        st.session_state['logado'] = False
+        st.session_state['usuario_atual'] = ''
+
+    if not st.session_state['logado']:
+        col1, col2, col3 = st.columns([1,1,1])
+        with col2:
+            st.markdown("## 🔐 Acesso Restrito")
+            st.markdown("### O Pregador")
+            user = st.text_input("Usuário")
+            senha = st.text_input("Senha", type="password")
+            
+            if st.button("Entrar"):
+                if user in USUARIOS and USUARIOS[user] == senha:
+                    st.session_state['logado'] = True
+                    st.session_state['usuario_atual'] = user
+                    st.rerun() # Recarrega a página
+                else:
+                    st.error("Usuário ou senha incorretos.")
+        return False # Não deixa o resto do app rodar
+    return True # Deixa rodar
+
+# Se não estiver logado, para tudo aqui.
+if not verificar_login():
+    st.stop()
+
+# --- DAQUI PRA BAIXO, SÓ RODA SE TIVER LOGADO ---
+
+# Pega o nome do pastor logado
+USUARIO_ATUAL = st.session_state['usuario_atual']
+
+# --- 3. ANIMAÇÕES ---
+def load_lottieurl(url):
+    try: return requests.get(url).json()
+    except: return None
+
+anim_book = load_lottieurl("https://lottie.host/5a666e37-d2c4-4a47-98d9-247544062a4d/lB6y7y6a1W.json")
+
+# --- 4. SISTEMA DE ARQUIVOS (SEPARADO POR USUÁRIO) ---
+# Cria uma pasta principal e uma subpasta para CADA usuário
+PASTA_RAIZ = "Banco_de_Sermoes"
+PASTA_USUARIO = os.path.join(PASTA_RAIZ, USUARIO_ATUAL)
+
+if not os.path.exists(PASTA_USUARIO):
+    os.makedirs(PASTA_USUARIO)
+
+# --- 5. FUNÇÕES ---
+def consultar_gemini(prompt, chave):
+    if not chave: return "⚠️ Coloque a chave API no menu."
+    try:
+        genai.configure(api_key=chave)
+        model = genai.GenerativeModel('gemini-pro')
+        return model.generate_content(prompt).text
+    except Exception as e: return f"Erro: {e}"
+
+def buscar_web(texto):
+    try:
+        res = DDGS().text(texto, max_results=3)
+        return "\n".join([f"📎 {r.get('title','(sem título)')}: {r.get('body','')}" for r in res]) if res else "Nada."
+    except: return "Erro busca."
+
+# --- 6. INTERFACE DO APP ---
+
+# CSS
+st.markdown("""
+    <style>
+    .stTextArea textarea {font-family: 'Georgia', serif; font-size: 18px;}
+    </style>
     """, unsafe_allow_html=True)
 
-    st.caption(f"Pastor(a): {USER.capitalize()}")
-
-    menu_tabs = st.tabs(["📂 PROJETOS", "⚙️ CONFIG", "📱 SOCIAL"])
-    api_input_local = st.session_state.get('api_input', '')
-
-    with menu_tabs[0]:
-        try:
-            files = [f.replace(".txt", "") for f in os.listdir(PASTA) if f.endswith(".txt")]
-        except Exception:
-            files = []
-        sel = st.radio("Selecione o Estudo:", ["+ Novo Projeto"] + files, label_visibility="collapsed")
-        st.write("")
-        if st.button("🚪 Sair do Sistema"):
-            st.session_state['logado'] = False
-            st.rerun()
-
-    with menu_tabs[1]:
-        st.write("**Personalização**")
-        st.session_state['idioma'] = st.selectbox("Idioma da IA:", ["Português", "English", "Español"], index=0 if st.session_state.get('idioma', 'Português') == 'Português' else 1)
-        tamanho = st.slider("Área do Editor", 30, 80, st.session_state['layout_split'])
-        st.session_state['layout_split'] = tamanho
-        novo_bg = st.text_input("Wallpaper URL:", st.session_state['bg_url'])
-        if st.button("Aplicar Fundo"):
-            st.session_state['bg_url'] = novo_bg
-            st.rerun()
-        st.divider()
-        st.write("**Credenciais (opcional)**")
-        api_input_local = st.text_input("Chave Google API:", type="password", value=st.session_state.get('api_input', ''))
-        st.session_state['api_input'] = api_input_local
-
-    with menu_tabs[2]:
-        st.write("**Contato do Dev**")
-        try:
-            buf = BytesIO()
-            img = gerar_qr("https://instagram.com/felipefreitashope")
-            img.save(buf, format="PNG")
-            buf.seek(0)
-            st.image(buf, caption="Scan para Instagram")
-        except Exception:
-            pass
-        st.divider()
-        st.markdown(f"""
-        <div class="ad-card">
-            📖 Sugestão:<br>{st.session_state['anuncio_atual']}<br>
-            <a href="https://amazon.com.br" style="color:#000; text-decoration:underline;">ADQUIRIR AGORA</a>
-        </div>
-        """, unsafe_allow_html=True)
-
-# --- ÁREA DE TRABALHO ---
-ratio = st.session_state['layout_split'] / 100
-c_editor, c_tools = st.columns([ratio, 1 - ratio])
-
-# Gerenciamento de arquivo
-txt_curr = ""
-tit_curr = ""
-if 'sel' not in locals():
-    sel = "+ Novo Projeto"
-if sel != "+ Novo Projeto":
-    tit_curr = sel
+# BARRA LATERAL
+with st.sidebar:
     try:
-        with open(os.path.join(PASTA, f"{sel}.txt"), "r", encoding="utf-8") as f:
-            txt_curr = f.read()
+        st_lottie(anim_book, height=50)
     except Exception:
-        txt_curr = ""
+        pass
+    st.write(f"Olá, **{USUARIO_ATUAL.upper()}**")
+    
+    if st.button("Sair / Logout"):
+        st.session_state['logado'] = False
+        st.rerun()
+        
+    st.divider()
+    with st.expander("🔐 Chave Google"):
+        api_key = st.text_input("API Key", type="password")
+    
+    # Lista APENAS arquivos deste usuário
+    arquivos = [f for f in os.listdir(PASTA_USUARIO) if f.endswith(".txt")]
+    arquivo_atual = st.radio("Meus Estudos:", ["+ Novo"] + arquivos)
 
-if 'last_file' not in st.session_state or st.session_state.get('last_file') != sel:
-    st.session_state['texto_esboco'] = txt_curr
-    st.session_state['last_file'] = sel
+# ÁREA PRINCIPAL
+col_editor, col_tools = st.columns([2.5, 1.5])
 
-# EDITOR PRINCIPAL
-with c_editor:
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        new_tit = st.text_input("TEMA", value=tit_curr, placeholder="Título da Pregação...", label_visibility="collapsed")
-    with c2:
-        if st.button("💾 GRAVAR", type="primary", use_container_width=True):
-            if new_tit:
-                save_path = os.path.join(PASTA, f"{new_tit}.txt")
-                try:
-                    with open(save_path, "w", encoding="utf-8") as f:
-                        f.write(st.session_state.get('texto_esboco', ''))
-                    api_key = st.session_state.get('api_input', '') or st.secrets.get("GOOGLE_API_KEY", "")
-                    if api_key and GENAI_INSTALLED:
-                        sugestao = ai_brain(f"Indique 1 livro cristão clássico sobre: '{new_tit}'. Apenas título.", api_key, "Marketing")
-                        st.session_state['anuncio_atual'] = sugestao
-                    st.success("Estudo Salvo e Seguro!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
-
-    main_text = st.text_area("PAPEL", value=st.session_state.get('texto_esboco', ''), height=700, label_visibility="collapsed")
-    st.session_state['texto_esboco'] = main_text
-
-    st.caption("🛠️ Ações Rápidas de IA")
-
-    st.markdown("**Ditar para o Editor (upload WAV recomendado)**")
-    audio_file = st.file_uploader("Envie WAV (recomendado) ou MP3/M4A", type=['wav', 'mp3', 'm4a'], accept_multiple_files=False)
-    if audio_file is not None:
-        if audio_file.type == "audio/wav" or audio_file.name.lower().endswith(".wav"):
-            st.info("Processando WAV...")
-            texto_voz = transcrever_audio_file(audio_file)
-            st.text_area("Transcrição", value=texto_voz, height=150)
-            if st.button("Inserir transcrição no editor"):
-                st.session_state['texto_esboco'] = st.session_state.get('texto_esboco', '') + "\n\n" + texto_voz
-                st.rerun()
-        else:
-            st.warning("Formato diferente de WAV. Para MP3/M4A você precisa de 'pydub' + 'ffmpeg' no servidor para transcrição automática. Use download + ditado local se necessário.")
-
-    b1, b2, b3 = st.columns(3)
-    api_key = st.session_state.get('api_input', '') or st.secrets.get("GOOGLE_API_KEY", "")
-    with b1:
-        if st.button("✨ REVISAR ORTOGRAFIA"):
-            if api_key and GENAI_INSTALLED:
-                with st.spinner("Professor revisando..."):
-                    res = ai_brain(f"Corrija apenas a gramática mantendo o sentido e estilo pastoral:\n{main_text}", api_key, "Professor")
-                    st.code(res, language="text")
-                    st.success("Copie o texto acima 👆")
-            else:
-                st.warning("Configure Google API e instale google.generativeai para usar revisão avançada.")
-    with b2:
-        if st.button("🗣 TRADUZIR TUDO"):
-            if api_key and GENAI_INSTALLED:
-                res = ai_brain(main_text, api_key, "Tradutor")
-                st.session_state['texto_esboco'] = res
-                st.rerun()
-            else:
-                st.warning("Configure Google API e instale google.generativeai para usar tradução.")
-    with b3:
-        if st.button("🎓 AVALIAR HOMILÉTICA"):
-            if api_key and GENAI_INSTALLED:
-                st.info(ai_brain(main_text, api_key, "Professor"))
-            else:
-                st.info("Configure Google API + google.generativeai para avaliação.")
-
-    if new_tit and main_text != txt_curr:
+with col_editor:
+    titulo_padrao = ""
+    conteudo_padrao = ""
+    if arquivo_atual != "+ Novo":
+        titulo_padrao = arquivo_atual.replace(".txt", "")
         try:
-            with open(os.path.join(PASTA, f"{new_tit}.txt"), "w", encoding="utf-8") as f:
-                f.write(main_text)
-        except Exception:
-            pass
+            with open(os.path.join(PASTA_USUARIO, arquivo_atual), "r", encoding="utf-8") as f: conteudo_padrao = f.read()
+        except: pass
 
-# SATÉLITE: ferramentas (IA, Bíblia, PDF, DEV)
-with c_tools:
-    st.markdown("#### 🧠 CENTRAL")
-    tab_ia, tab_biblia, tab_pdf, tab_dev = st.tabs(["🤖 IA", "📖 BÍBLIA", "📚 LIVRO", "👨‍💻 DEV"])
+    novo_titulo = st.text_input("Título", value=titulo_padrao)
+    texto = st.text_area("Esboço", value=conteudo_padrao, height=600)
+    
+    if st.button("💾 Salvar", type="primary"):
+        if novo_titulo:
+            # Salva na pasta do usuário específico
+            with open(os.path.join(PASTA_USUARIO, f"{novo_titulo}.txt"), "w", encoding="utf-8") as f: f.write(texto)
+            st.success("Salvo na sua conta!")
 
-    # IA
-    with tab_ia:
-        st.write("Conselheiro Virtual")
-        ask = st.text_area("Pergunta:", height=100, placeholder="Digite sua dúvida teológica...")
-        c_r, c_e = st.columns(2)
-        if c_r.button("🧠 Razão"):
-            if api_key:
-                st.markdown(ai_brain(ask, api_key, "Razão"))
-            else:
-                st.warning("Configure Google API.")
-        if c_e.button("❤️ Emoção"):
-            if api_key:
-                st.markdown(ai_brain(ask, api_key, "Sentimento"))
-            else:
-                st.warning("Configure Google API.")
+with col_tools:
+    aba1, aba2 = st.tabs(["🔍 Web", "🤖 IA"])
+    with aba1:
+        q = st.text_input("Pesquisa:")
+        if st.button("Buscar"):
+            st.info(buscar_web(q))
+    with aba2:
+        if st.button("Analisar Texto"):
+            resp = consultar_gemini(f"Analise: {texto}", api_key)
+            st.write(resp)
+import streamlit as st
+from duckduckgo_search import DDGS
+import google.generativeai as genai
+import os
+import requests
+from streamlit_lottie import st_lottie
+import time
 
-    # BÍBLIA
-    with tab_biblia:
-        st.write("Consulta Rápida")
-        ref = st.text_input("Verso (Ex: Jo 3 16 ou John 3:16)")
-        if ref:
-            bd = get_bible(ref)
-            if bd:
-                txt_b = bd.get('text', '')
-                ref_label = bd.get('reference', ref)
-                st.success(f"{ref_label}")
-                st.write(txt_b)
+# --- 1. CONFIGURAÇÃO E VISUAL ---
+st.set_page_config(page_title="O Pregador Pro", layout="wide", page_icon="✝️")
 
-                # Interlinear display (if available)
+# Animações
+LOTTIE_BOOK = "https://lottie.host/5a666e37-d2c4-4a47-98d9-247544062a4d/lB6y7y6a1W.json"
+                        else:
+                            st.warning("Nenhuma notícia relevante encontrada hoje.")
+
+    st.markdown("---")
+    st.subheader("📂 Meus Sermões")
+
+    # Lista de arquivos
+    arquivos = [f for f in os.listdir("estudos") if f.endswith(".txt")]
+    arquivo_atual = st.radio("Selecione para editar:", ["+ Novo Estudo"] + arquivos)
+
+
+# Colunas Principais: Editor (Maior) | Ferramentas (Menor)
+col_editor, col_tools = st.columns([3, 1.2])
+
+
+# --- ÁREA DE ESCRITA (CENTRO) ---
+with col_editor:
+    # Se o usuário escolheu mover o cabide para o topo do editor, renderiza aqui
+    if st.session_state.get("hanger_pos", "") == "Topo do editor":
+        size_map = {"Pequeno (40px)": 40, "Médio (64px)": 64, "Grande (88px)": 88}
+        svg_size = size_map.get(st.session_state.get("hanger_size", "Médio (64px)"), 64)
+        svg_top = f"""
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+  <div style="flex:1">
+    <h1 style="margin:0;">✝️ O Pregador</h1>
+    <div style="color:#555; font-size:13px; margin-top:4px;">v1.0 - Modo Estudo</div>
+  </div>
+  <div>
+    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:{svg_size}px; height:{svg_size}px;" class="hanger-metal hanger-glow">
+      <defs>
+        import streamlit as st
+        from duckduckgo_search import DDGS
+        import google.generativeai as genai
+        import os
+        import requests
+        from streamlit_lottie import st_lottie
+        import time
+
+        # --- 1. CONFIGURAÇÃO E VISUAL ---
+        st.set_page_config(page_title="O Pregador Pro", layout="wide", page_icon="✝️")
+
+        # Animações
+        LOTTIE_BOOK = "https://lottie.host/5a666e37-d2c4-4a47-98d9-247544062a4d/lB6y7y6a1W.json"
+        LOTTIE_NEWS = "https://lottie.host/b0429a39-a9e9-4089-8d5c-1970b551e18e/5e171b3b1f.json" 
+        LOTTIE_AI = "https://lottie.host/93310461-1250-482f-87d9-482a46696d5b/6u0v8v5j2a.json"
+
+        def load_lottieurl(url):
+            try: return requests.get(url).json()
+            except: return None
+
+        anim_book = load_lottieurl(LOTTIE_BOOK)
+        anim_news = load_lottieurl(LOTTIE_NEWS)
+        anim_ai = load_lottieurl(LOTTIE_AI)
+
+        # Estilo "TheWord" Dark
+        st.markdown("""
+            <style>
+            .block-container {padding-top: 1rem;}
+            header, footer {visibility: hidden;} # type: ignore
+            [data-testid="stSidebar"] {background-color: #262730; border-right: 1px solid #444;}
+    
+            /* Área de Texto */
+            .stTextArea textarea {
+                font-family: 'Georgia', serif; 
+                font-size: 19px !important;
+                background-color: #1a1b21; 
+                color: #e0e0e0;
+                border: 1px solid #333;
+            }
+    
+            /* Caixas de Informação */
+            .info-box {
+                background-color: #2d2f36;
+                padding: 15px;
+                border-radius: 10px;
+                border-left: 5px solid #4CAF50;
+                margin-bottom: 10px;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
+        # --- 2. INTELIGÊNCIA ---
+        def consultar_gemini(prompt, chave):
+            if not chave: return "⚠️ Coloque a chave API no menu."
+            try:
+                genai.configure(api_key=chave)
+                model = genai.GenerativeModel('gemini-pro')
+                return model.generate_content(prompt).text
+            except Exception as e: return f"Erro: {e}"
+
+        def buscar_noticias(tema):
+            """Busca notícias recentes no Brasil sobre o tema"""
+            try:
+                # Busca notícias no Brasil (pt-br)
+                results = DDGS().news(keywords=tema, region="br-pt", max_results=3)
+                if not results: return None
+                return results
+            except: return None
+
+        # --- 3. INTERFACE ---
+        PASTA_RAIZ = "Meus_Estudos"
+        if not os.path.exists(PASTA_RAIZ): os.makedirs(PASTA_RAIZ)
+
+        # BARRA LATERAL
+        with st.sidebar:
+            st_lottie(anim_book, height=60, key="logo")
+            st.markdown("### O Pregador")
+            with st.expander("🔐 Chave Google"):
+                api_key = st.text_input("API Key", type="password")
+    
+            st.divider()
+            arquivos = [f for f in os.listdir(PASTA_RAIZ) if f.endswith(".txt")]
+            arquivo_atual = st.radio("Meus Sermões:", ["+ Novo"] + arquivos)
+
+        # ÁREA PRINCIPAL
+        col_editor, col_tools = st.columns([2.5, 1.5])
+
+        # ESQUERDA: EDITOR
+        with col_editor:
+            titulo_padrao = ""
+            conteudo_padrao = ""
+            if arquivo_atual != "+ Novo":
+                titulo_padrao = arquivo_atual.replace(".txt", "")
                 try:
-                    # attempt to parse common book name formatting
-                    parts = ref.replace(":", " ").split()
-                    book = parts[0] if parts else ""
-                    chapter = parts[1] if len(parts) > 1 else ""
-                    verse_num = parts[2] if len(parts) > 2 else ""
-                    inter = interlinear_entry(book, chapter, verse_num)
-                except Exception:
-                    inter = {}
+                    with open(os.path.join(PASTA_RAIZ, arquivo_atual), "r") as f: conteudo_padrao = f.read()
+                except: pass
 
-                if inter:
-                    st.markdown("**Interlinear (se disponível localmente)**")
-                    cols = st.columns([1,1,0.8])
-                    cols[0].markdown(f"**PT:**\n{inter.get('pt','—')}")
-                    cols[1].markdown(f"**Original:**\n{inter.get('orig','—')}")
-                    cols[2].markdown(f"**Strongs:**\n{', '.join(inter.get('strongs',[])) if inter.get('strongs') else '—'}")
-
-                ck1, ck2, ck3 = st.columns(3)
-                if ck1.button("⬇ Inserir"):
-                    st.session_state['texto_esboco'] += f"\n\n**{ref_label}**\n{txt_b}"
-                    st.rerun()
-                if ck2.button("🔊 Ouvir"):
+            novo_titulo = st.text_input("Título", value=titulo_padrao, placeholder="Título...")
+            texto = st.text_area("Esboço", value=conteudo_padrao, height=700, label_visibility="collapsed")
+    
+            if st.button("💾 Salvar", type="primary", use_container_width=True):
+                if novo_titulo:
+                    with open(os.path.join(PASTA_RAIZ, f"{novo_titulo}.txt"), "w") as f: f.write(texto)
                     try:
-                        tts = gTTS(txt_b, lang='pt')
-                        mp3_fp = BytesIO()
-                        tts.write_to_fp(mp3_fp)
-                        mp3_fp.seek(0)
-                        st.audio(mp3_fp, format='audio/mp3')
-                    except Exception as e:
-                        st.error(f"Erro Audio: {e}")
-                if ck3.button("📝 Notas deste Verso"):
-                    # show notes UI
-                    try:
-                        parts = ref.replace(":", " ").split()
-                        book = parts[0]; chapter = parts[1]; verse_num = parts[2]
+                        st.toast("Salvo!", icon="✅")
                     except Exception:
-                        st.warning("Formato do verso inválido para notas (use 'Jo 3 16').")
-                        book = chapter = verse_num = ""
-                    if book:
-                        rows = get_notes_for_verse(USER, book, chapter, verse_num)
-                        st.markdown("### Notas salvas")
-                        for row in rows:
-                            nid, title, content, created_at = row
-                            st.markdown(f"**{title}** — {created_at}")
-                            st.write(content)
-                            if st.button(f"Deletar {nid}"):
-                                delete_note(nid)
-                                st.success("Nota deletada")
-                                st.rerun()
-                        st.markdown("### Adicionar nova nota")
-                        n_title = st.text_input("Título da nota")
-                        n_content = st.text_area("Conteúdo da nota")
-                        if st.button("Salvar nota"):
-                            add_note(USER, book, chapter, verse_num, n_title or "Nota", n_content or "")
-                            st.success("Nota salva")
-                            st.rerun()
-            else:
-                st.warning("Versículo não encontrado (API offline ou formato inválido). Use 'Jo 3 16' ou 'John 3:16'.")
+                        st.success("Salvo!")
 
-    # PDF
-    with tab_pdf:
-        st.write("Resumir Livro")
-        pdf = st.file_uploader("Upload PDF", type="pdf")
-        if pdf and st.button("Analisar PDF"):
-            raw = read_pdf_text(pdf)
-            st.success("Lido! Gerando resumo...")
-            if api_key and GENAI_INSTALLED:
-                summary = ai_brain(f"Resuma este texto teológico: {raw[:4000]}", api_key, "Professor")
-                st.markdown(summary)
-            else:
-                st.write(raw[:2000])
-                st.info("Para resumo automático configure Google API e instale google.generativeai.")
+        # DIREITA: FERRAMENTAS AVANÇADAS
+        with col_tools:
+            aba_biblia, aba_contexto, aba_atual = st.tabs(["📖 Bíblia", "🏛️ Contexto", "📰 Notícias"])
+    
+            # --- ABA 1: BÍBLIA COMPARATIVA ---
+            with aba_biblia:
+                st.caption("Comparar Versões (Integrado)")
+                ref = st.text_input("Referência (ex: Romanos 12:2)")
+                col_v1, col_v2 = st.columns(2)
+                v1 = col_v1.selectbox("Ver. 1", ["Almeida (ARC)", "NVI", "King James"])
+                v2 = col_v2.selectbox("Ver. 2", ["Linguagem de Hoje", "Grego/Hebraico", "A Mensagem"])
+        
+                if st.button("Comparar Textos"):
+                    with st.status("Buscando textos...", expanded=True):
+                        prompt = f"""
+                        Aja como uma Bíblia Digital.
+                        Traga o texto de: {ref}.
+                
+                        FORMATO DE RESPOSTA (Use Markdown):
+                        ### {v1}
+                        (Texto fiel na versão {v1})
+                
+                        ### {v2}
+                        (Texto fiel na versão {v2})
+                
+                        Destaque em negrito as principais diferenças de palavras entre as duas.
+                        """
+                        resp = consultar_gemini(prompt, api_key)
+                        st.markdown(resp)
 
-    # DEV: converters + misc
-    with tab_dev:
-        st.caption("Fábrica de Código e Ferramentas de Importação")
-        st.markdown("**1) Convert Strongs CSV → JSON**")
-        csv_file = st.file_uploader("Suba CSV de Strongs (code,lemma,translit,type,definition)", type=['csv'], key="csv_strongs")
-        if csv_file and st.button("Converter CSV para JSON"):
-            try:
-                js = convert_strongs_csv_to_json(csv_file.read())
-                out_path = "Banco_Biblia/lexico/strongs_converted.json"
-                with open(out_path, "w", encoding="utf-8") as f:
-                    json.dump(js, f, ensure_ascii=False, indent=2)
-                st.success(f"Salvo em {out_path}")
-            except Exception as e:
-                st.error(f"Erro conversão: {e}")
+            import streamlit as st
+            from duckduckgo_search import DDGS
+            import google.generativeai as genai
+            import os
+            import requests
+            from streamlit_lottie import st_lottie
+            import time
 
-        st.markdown("**2) Convert TSK-like → JSON**")
-        tsk_file = st.file_uploader("Suba arquivo TSK (texto)", type=['txt'], key="tsk_file")
-        if tsk_file and st.button("Converter TSK para JSON"):
-            try:
-                txt = tsk_file.read().decode('utf-8', errors='ignore')
-                out = convert_tsk_to_json(txt)
-                out_path = "Banco_Biblia/converted_tsk.json"
-                with open(out_path, "w", encoding="utf-8") as f:
-                    json.dump(out, f, ensure_ascii=False, indent=2)
-                st.success(f"Salvo em {out_path}")
-            except Exception as e:
-                st.error(f"Erro conversão TSK: {e}")
+            # --- 1. CONFIGURAÇÃO E VISUAL ---
+            st.set_page_config(page_title="O Pregador Pro", layout="wide", page_icon="✝️")
 
-        st.markdown("**3) Import Interlinear JSON**")
-        inter_file = st.file_uploader("Suba JSON Interlinear (opcional)", type=['json'], key="inter_json")
-        if inter_file and st.button("Instalar Interlinear"):
-            try:
-                content = json.load(inter_file)
-                out_path = "Banco_Biblia/interlinear.json"
-                with open(out_path, "w", encoding="utf-8") as f:
-                    json.dump(content, f, ensure_ascii=False, indent=2)
-                st.success(f"Interlinear salvo em {out_path}")
-            except Exception as e:
-                st.error(f"Erro salvar interlinear: {e}")
+            # Animações
+            LOTTIE_BOOK = "https://lottie.host/5a666e37-d2c4-4a47-98d9-247544062a4d/lB6y7y6a1W.json"
+            LOTTIE_NEWS = "https://lottie.host/b0429a39-a9e9-4089-8d5c-1970b551e18e/5e171b3b1f.json" 
+            LOTTIE_AI = "https://lottie.host/93310461-1250-482f-87d9-482a46696d5b/6u0v8v5j2a.json"
 
-        st.markdown("**4) Quick utilities**")
-        if st.button("Verificar paths e permissões"):
-            ok = True
-            msgs = []
-            for p in ["Banco_Biblia/bibles", "Banco_Biblia/lexico", "Banco_Biblia/chave", "Banco_Sermoes"]:
+            def load_lottieurl(url):
+                try: return requests.get(url).json()
+                except: return None
+
+            anim_book = load_lottieurl(LOTTIE_BOOK)
+            anim_news = load_lottieurl(LOTTIE_NEWS)
+            anim_ai = load_lottieurl(LOTTIE_AI)
+
+            # Estilo "TheWord" Dark
+            st.markdown("""
+                <style>
+                .block-container {padding-top: 1rem;}
+                header, footer {visibility: hidden;}
+                [data-testid="stSidebar"] {background-color: #262730; border-right: 1px solid #444;}
+    
+                /* Área de Texto */
+                .stTextArea textarea {
+                    font-family: 'Georgia', serif; 
+                    font-size: 19px !important;
+                    background-color: #1a1b21; 
+                    color: #e0e0e0;
+                    border: 1px solid #333;
+                }
+    
+                /* Caixas de Informação */
+                .info-box {
+                    background-color: #2d2f36;
+                    padding: 15px;
+                    border-radius: 10px;
+                    border-left: 5px solid #4CAF50;
+                    margin-bottom: 10px;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+
+            # --- 2. INTELIGÊNCIA ---
+            def consultar_gemini(prompt, chave):
+                if not chave: return "⚠️ Coloque a chave API no menu."
                 try:
-                    os.makedirs(p, exist_ok=True)
-                    msgs.append(f"{p}: OK")
-                except Exception as e:
-                    ok = False
-                    msgs.append(f"{p}: ERRO {e}")
-            st.write("\n".join(msgs))
-            if ok:
-                st.success("Ambiente OK")
-            else:
-                st.error("Problemas detectados. Veja mensagens acima.")
+                    genai.configure(api_key=chave)
+                    model = genai.GenerativeModel('gemini-pro')
+                    return model.generate_content(prompt).text
+                except Exception as e: return f"Erro: {e}"
 
-# RODAPÉ
-st.markdown("""
-<div class="footer-insta">
-    DESENVOLVEDOR: <a href="https://instagram.com/felipefreitashope" target="_blank">@FELIPEFREITASHOPE</a> 
-    | V13 PLATINUM
-</div>
-""", unsafe_allow_html=True)
+            def buscar_noticias(tema):
+                """Busca notícias recentes no Brasil sobre o tema"""
+                try:
+                    # Busca notícias no Brasil (pt-br)
+                    results = DDGS().news(keywords=tema, region="br-pt", max_results=3)
+                    if not results: return None
+                    return results
+                except: return None
+
+            # --- 3. INTERFACE ---
+            PASTA_RAIZ = "Meus_Estudos"
+            if not os.path.exists(PASTA_RAIZ): os.makedirs(PASTA_RAIZ)
+
+            # BARRA LATERAL
+            with st.sidebar:
+                st_lottie(anim_book, height=60, key="logo")
+                st.markdown("### O Pregador")
+                with st.expander("🔐 Chave Google"):
+                    api_key = st.text_input("API Key", type="password")
+    
+                st.divider()
+                arquivos = [f for f in os.listdir(PASTA_RAIZ) if f.endswith(".txt")]
+                arquivo_atual = st.radio("Meus Sermões:", ["+ Novo"] + arquivos)
+
+            # ÁREA PRINCIPAL
+            col_editor, col_tools = st.columns([2.5, 1.5])
+
+            # ESQUERDA: EDITOR
+            with col_editor:
+                titulo_padrao = ""
+                conteudo_padrao = ""
+                if arquivo_atual != "+ Novo":
+                    titulo_padrao = arquivo_atual.replace(".txt", "")
+                    try:
+                        with open(os.path.join(PASTA_RAIZ, arquivo_atual), "r") as f: conteudo_padrao = f.read()
+                    except: pass
+
+                novo_titulo = st.text_input("Título", value=titulo_padrao, placeholder="Título...")
+                texto = st.text_area("Esboço", value=conteudo_padrao, height=700, label_visibility="collapsed")
+    
+                if st.button("💾 Salvar", type="primary", use_container_width=True):
+                    if novo_titulo:
+                        with open(os.path.join(PASTA_RAIZ, f"{novo_titulo}.txt"), "w") as f: f.write(texto)
+                        try:
+                            st.toast("Salvo!", icon="✅")
+                        except Exception:
+                            st.success("Salvo!")
+
+            # DIREITA: FERRAMENTAS AVANÇADAS
+            with col_tools:
+                aba_biblia, aba_contexto, aba_atual = st.tabs(["📖 Bíblia", "🏛️ Contexto", "📰 Notícias"])
+    
+                # --- ABA 1: BÍBLIA COMPARATIVA ---
+                with aba_biblia:
+                    st.caption("Comparar Versões (Integrado)")
+                    ref = st.text_input("Referência (ex: Romanos 12:2)")
+                    col_v1, col_v2 = st.columns(2)
+                    v1 = col_v1.selectbox("Ver. 1", ["Almeida (ARC)", "NVI", "King James"])
+                    v2 = col_v2.selectbox("Ver. 2", ["Linguagem de Hoje", "Grego/Hebraico", "A Mensagem"])
+        
+                    if st.button("Comparar Textos"):
+                        with st.status("Buscando textos...", expanded=True):
+                            prompt = f"""
+                            Aja como uma Bíblia Digital.
+                            Traga o texto de: {ref}.
+                
+                            FORMATO DE RESPOSTA (Use Markdown):
+                            ### {v1}
+                            (Texto fiel na versão {v1})
+                
+                            ### {v2}
+                            (Texto fiel na versão {v2})
+                
+                            Destaque em negrito as principais diferenças de palavras entre as duas.
+                            """
+                            resp = consultar_gemini(prompt, api_key)
+                            st.markdown(resp)
+
+                # --- ABA 2: RAIO-X DO TEXTO (HISTÓRIA) ---
+                with aba_contexto:
+                    st.caption("Contexto Histórico e Original")
+                    st.info("O App vai analisar o versículo ou seu esboço.")
+        
+                    if st.button("🔎 Analisar Profundamente"):
+                        if not api_key: st.error("Precisa da Chave Google.")
+                        else:
+                            with st.status("Consultando enciclopédias...", expanded=True):
+                                try:
+                                    st_lottie(anim_ai, height=80)
+                                except: pass
+                                prompt_historia = f"""
+                                Faça uma análise exegética e histórica de: {ref if ref else "deste esboço: " + texto[:200]}.
+                    
+                                TÓPICOS OBRIGATÓRIOS:
+                                1. 🏛️ **Contexto Histórico:** Quem escreveu, para quem e o que estava acontecendo na época?
+                                2. 🔑 **Palavras-Chave:** Analise 2 palavras fortes no original (Grego ou Hebraico) e seu significado.
+                                3. 💡 **Curiosidade:** Um fato cultural da época que muda o entendimento.
+                                """
+                                analise = consultar_gemini(prompt_historia, api_key)
+                                st.markdown(analise)
+
+                # --- ABA 3: NOTÍCIAS E ATUALIDADES ---
+                with aba_atual:
+                    st.caption("Conectar com o Hoje")
+                    st.write("Encontra fatos atuais que combinam com sua mensagem.")
+        
+                    tema_busca = st.text_input("Qual o tema central?", placeholder="Ex: Corrupção, Ansiedade, Guerra")
+        
+                    if st.button("Buscar Notícias Atuais"):
+                        if not tema_busca: st.warning("Digite um tema acima.")
+                        else:
+                            # 1. Busca no DuckDuckGo
+                            with st.status("Lendo jornais...", expanded=True):
+                                try:
+                                    st_lottie(anim_news, height=80)
+                                except: pass
+                                noticias = buscar_noticias(tema_busca)
+                    
+                                if noticias:
+                                    st.success("Notícias encontradas!")
+                                    texto_noticias = ""
+                                    for n in noticias:
+                                        st.markdown(f"""
+                                        <div class="info-box">
+                                            <b>📰 {n['title']}</b><br>
+                                            <span style="font-size:12px">{n.get('date','')} - {n.get('source','')}</span><br>
+                                            <a href="{n.get('url','')}" target="_blank">Ler notícia original</a>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                        texto_noticias += f"- {n.get('title','(sem título)')} ({n.get('source','')})\n"
+                        
+                                    # 2. IA Faz a Ponte
+                                    st.write("---")
+                                    st.write("🤖 **Sugestão do Pregador:**")
+                                    ponte = consultar_gemini(f"""
+                                    Tenho um sermão sobre '{tema_busca}'.
+                                    Aqui estão notícias de hoje:
+                                    {texto_noticias}
+                        
+                                    Como posso usar uma dessas notícias para introduzir ou ilustrar meu sermão?
+                                    Crie uma 'Ponte de Ligação' curta e impactante.
+                                    """, api_key)
+                                    st.write(ponte)
+                                else:
+                                    st.warning("Nenhuma notícia relevante encontrada hoje.")

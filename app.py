@@ -337,6 +337,139 @@ elif menu == "Gabinete Pastoral":
             st.session_state["arquivo_carregado"] = sel_file
         except:
             st.error("Erro ao abrir arquivo.")
+            # ==============================================================================
+# 13. MÓDULO: GABINETE PASTORAL (CORREÇÃO DE BUG "REMOVECHILD")
+# ==============================================================================
+elif menu == "Gabinete Pastoral":
+    st.title("📝 Gabinete Pastoral")
+    
+    # 1. SETUP DE METADADOS
+    METADATA_PATH = os.path.join(DIRS["SERMOES"], "metadata.json")
+    if not os.path.exists(METADATA_PATH):
+        SafeIO.salvar_json(METADATA_PATH, {"sermons": []})
+    
+    with st.expander("⚙️ Configurações do Editor"):
+        fs = st.slider("Tamanho da Fonte", 12, 30, 18)
+        # Removi o autosave automático agressivo para evitar o erro de 'removeChild' durante a digitação
+        st.caption("Dica: Salve manualmente para garantir a segurança dos dados.")
+
+    # 2. SELETOR DE ARQUIVOS
+    c_tit, c_tags = st.columns([3, 1])
+    
+    # Lista arquivos
+    files = [f for f in os.listdir(DIRS["SERMOES"]) if f.endswith(".txt")]
+    
+    # IMPORTANTE: Seletor com chave única para não bugar o estado
+    sel_file = c_tit.selectbox("📂 Abrir Sermão / Arquivo:", ["- Novo Documento -"] + files)
+    
+    tags = c_tags.text_input("Tags", "Domingo, Série")
+
+    # 3. LÓGICA DE CARREGAMENTO (ESTÁVEL)
+    # Se mudou de arquivo, carregamos o conteúdo novo.
+    # Se é o mesmo arquivo, mantemos o que está na memória (session_state)
+    
+    if "ultimo_arquivo_aberto" not in st.session_state:
+        st.session_state["ultimo_arquivo_aberto"] = None
+
+    content_inicial = ""
+
+    # Se o usuário trocou o arquivo no selectbox, forçamos a leitura do disco
+    if sel_file != st.session_state["ultimo_arquivo_aberto"]:
+        if sel_file != "- Novo Documento -":
+            try:
+                with open(os.path.join(DIRS["SERMOES"], sel_file), 'r', encoding='utf-8') as f:
+                    content_inicial = f.read()
+            except:
+                content_inicial = ""
+        else:
+            content_inicial = ""
+        # Atualiza o rastreador
+        st.session_state["ultimo_arquivo_aberto"] = sel_file
+        # Limpa o buffer do editor para receber o novo texto
+        st.session_state[f"editor_{sel_file}"] = content_inicial
+    else:
+        # Se não trocou de arquivo, usamos o estado atual do texto (caso ele já tenha digitado algo não salvo)
+        # Isso previne que o texto suma se a tela piscar
+        pass
+
+    # Título editável (Baseado no arquivo selecionado, mas permitindo mudança)
+    titulo_doc = st.text_input("Título do Documento", value=sel_file.replace(".txt", "") if sel_file != "- Novo Documento -" else "")
+
+    # 4. O EDITOR (CORRIGIDO)
+    if QUILL_AVAILABLE:
+        # AQUI ESTÁ A CORREÇÃO DO ERRO:
+        # A 'key' agora é dinâmica. Cada arquivo tem sua própria chave.
+        # Isso impede o Streamlit de tentar reaproveitar o HTML antigo e causar o erro 'removeChild'.
+        
+        unique_key = f"editor_{sel_file}" 
+        
+        # Barra de ferramentas Word Style
+        toolbar = [
+            ['bold', 'italic', 'underline', 'strike'],
+            [{'header': 1}, {'header': 2}],
+            [{'list': 'ordered'}, {'list': 'bullet'}],
+            [{'align': []}], [{'color': []}, {'background': []}],
+            ['clean']
+        ]
+        
+        content = st_quill(
+            value=content_inicial, 
+            key=unique_key,  # <--- ESSA É A CURA DO BUG
+            height=500,
+            toolbar=toolbar,
+            html=True
+        )
+    else:
+        content = st.text_area("Editor Texto Simples", content_inicial, height=500)
+
+    # 5. BOTÕES DE AÇÃO
+    st.markdown("---")
+    c_save, c_tools = st.columns([1, 2])
+    
+    with c_save:
+        if st.button("💾 SALVAR AGORA", type="primary", use_container_width=True):
+            if titulo_doc:
+                fn = f"{titulo_doc}.txt"
+                with open(os.path.join(DIRS["SERMOES"], fn), 'w', encoding="utf-8") as f:
+                    f.write(content)
+                st.toast("Sermão salvo com sucesso!", icon="✅")
+                time.sleep(1) # Dá tempo de ler a mensagem
+                st.rerun() # Atualiza a lista de arquivos
+            else:
+                st.error("Digite um título para salvar.")
+
+    with c_tools:
+        c_enc, c_docx, c_pdf = st.columns(3)
+        
+        if c_enc.button("🔒 Encriptar"):
+            pw = st.session_state["config"].get("enc_password")
+            if pw and content:
+                enc = encrypt_sermon_aes(pw, content)
+                if enc:
+                    with open(os.path.join(DIRS["GABINETE"], f"{titulo_doc}.enc"), 'w', encoding="utf-8") as f:
+                        f.write(enc)
+                    st.success("Arquivo blindado.")
+                else:
+                    st.error("Erro na encriptação (Biblioteca ausente).")
+            else:
+                st.error("Senha mestra não configurada ou texto vazio.")
+                
+        if c_docx.button("📄 Word"):
+            fn = f"{titulo_doc}.docx"
+            path = os.path.join(DIRS["SERMOES"], fn)
+            export_html_to_docx_better(titulo_doc, content, path)
+            with open(path, "rb") as f:
+                st.download_button("Baixar .docx", f, file_name=fn)
+                
+        if c_pdf.button("📄 PDF"):
+            fn = f"{titulo_doc}.pdf"
+            path = os.path.join(DIRS["SERMOES"], fn)
+            export_text_to_pdf(titulo_doc, content, path)
+            try:
+                with open(path, "rb") as f:
+                    st.download_button("Baixar .pdf", f, file_name=fn)
+            except:
+                st.error("PDF indisponível no momento.")
 
     # --- ÁREA DO EDITOR (VISUAL WORD) ---
     with c_editor:

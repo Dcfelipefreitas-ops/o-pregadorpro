@@ -1,9 +1,9 @@
 openai==0.27.8
-streamlit==1.31.0
+streamlit==1.37.0
 google-generativeai==0.3.0
 duckduckgo-search==3.9.10
 streamlit-lottie==0.0.5
-requests==2.31.0
+requests==2.32.4
  fpdf
 plotly
 pandas

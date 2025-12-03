@@ -817,31 +817,33 @@ if app_mode == "Dashboard & Cuidado":
                 options=["Esgotamento", "Cansaço", "Neutro", "Bem", "Pleno"]
             )
             input_note = st.text_area("Observações do dia", height=100)
-            
+
+            # Botón para registrar estado (dentro de c1)
             if st.button("REGISTRAR ESTADO"):
                 data = _read_json_safe(DB_FILES["SOUL_METRICS"])
-+
-+                # Defensa: si el archivo contiene uma lista legacy, migrar a dict
-+                if isinstance(data, list):
-+                    data = {"historico": data}
-+                elif not isinstance(data, dict):
-+                    data = {"historico": []}
-+
+                
+                # Defensa: si el archivo contiene una lista legacy, migrar a dict
+                if isinstance(data, list):
+                    data = {"historico": data}
+                elif not isinstance(data, dict):
+                    data = {"historico": []}
+
                 data.setdefault("historico", []).append({
                     "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "humor": input_mood,
                     "nota": input_note
                 })
-+
+
                 if _write_json_atomic(DB_FILES["SOUL_METRICS"], data):
                     st.success("Registro gravado no banco de dados.")
                 else:
                     st.error("Error al guardar el registro en disco.")
-        
+
+        # Columna derecha: histórico (fuera del if de escritura, sempre visible)
         with c2:
             st.markdown("**Histórico Recente**")
             data = _read_json_safe(DB_FILES["SOUL_METRICS"])
-            # Compatibilidad: el fichero pode ser um dict {"historico": [...]} o uma lista [...]
+            # Compatibilidade: el fichero pode ser um dict {"historico": [...]} o una lista [...]
             if isinstance(data, dict):
                 history = data.get("historico", [])[-5:]
             elif isinstance(data, list):

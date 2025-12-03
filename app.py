@@ -820,13 +820,23 @@ if app_mode == "Dashboard & Cuidado":
             
             if st.button("REGISTRAR ESTADO"):
                 data = _read_json_safe(DB_FILES["SOUL_METRICS"])
++
++                # Defensa: si el archivo contiene uma lista legacy, migrar a dict
++                if isinstance(data, list):
++                    data = {"historico": data}
++                elif not isinstance(data, dict):
++                    data = {"historico": []}
++
                 data.setdefault("historico", []).append({
                     "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "humor": input_mood,
                     "nota": input_note
                 })
-                _write_json_atomic(DB_FILES["SOUL_METRICS"], data)
-                st.success("Registro gravado no banco de dados.")
++
+                if _write_json_atomic(DB_FILES["SOUL_METRICS"], data):
+                    st.success("Registro gravado no banco de dados.")
+                else:
+                    st.error("Error al guardar el registro en disco.")
         
         with c2:
             st.markdown("**Histórico Recente**")

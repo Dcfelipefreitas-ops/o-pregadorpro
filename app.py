@@ -392,3 +392,26 @@ elif menu == "Biblioteca":
     st.info("Módulo de Arquivos Indexados Ativo.")
 
 # --
+# Continuação lógica da linha cortada:
+        cfg["theme_color"] = nc
+        cfg["font_size"] = nf
+        cfg["api_key"] = nk
+        
+        # Persistir no Disco
+        SafeIO.salvar_json(DBS["CONFIG"], cfg)
+        
+        # Feedback e Reinicialização
+        st.success("PARÂMETROS DE SISTEMA ATUALIZADOS.")
+        time.sleep(1.5)
+        st.rerun()
+
+# ==============================================================================
+# 7. RODAPÉ DO SISTEMA (FOOTER)
+# ==============================================================================
+st.markdown("---")
+st.markdown(f"""
+<div style="text-align:center; font-size:10px; color:#333; font-family:'JetBrains Mono';">
+    THEOLOGY OS KERNEL V27 | GENEVA PROTOCOL ACTIVE<br>
+    RUNTIME: {time.strftime('%H:%M:%S UTC')}
+</div>
+""", unsafe_allow_html=True)

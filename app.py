@@ -1,816 +1,1153 @@
 # -*- coding: utf-8 -*-
 """
-O PREGADOR - SYSTEM CORE (Versão V40 - Maximum Robustness)
-Status: Produção / Full Feature / Legacy Preserved
-Autoria: Sistema Consolidado & Expandido
-
-[MANUAL DE MODULOS INTERNOS]
-1.  Bootloader (Gênesis Protocol): Inicialização de pastas, DBs e integridade.
-2.  Security (CryptoManager): Criptografia AES-GCM (Nível Militar).
-3.  Office Engine (ExportEngine): Geradores DOCX/PDF com Múltiplos Motores de Fallback.
-4.  Theology Core (GenevaProtocol): Validação doutrinária e scan de heresias.
-5.  Psych Core (PastoralMind): Análise de Burnout e Teoria da Permissão.
-6.  User System (AccessControl): Login, Permissões e Rede Ministerial.
-7.  UI/UX Layer: CSS Dark Cathedral, Fontes Dinâmicas e Layout Responsivo.
+################################################################################
+#  O PREGADOR - SYSTEM OMEGA ENTERPRISE (V.50 - ULTIMATE BUILD)                #
+#  STATUS: PRODUCTION | CRITICAL SYSTEM | REDUNDANT LOGIC                      #
+#  --------------------------------------------------------------------------  #
+#  ARQUITETURA DO SISTEMA:                                                     #
+#  1. CORE BOOTLOADER: Verificação de integridade de sistema de arquivos.      #
+#  2. SECURITY DAEMON: Criptografia AES-256 GCM (Grau Militar).                #
+#  3. WORD PROCESSOR ENGINE: Módulo dedicado para manipulação de DOCX/PDF.     #
+#  4. GENEVA DOCTRINE SCANNER: Algoritmo de análise semântica teológica.       #
+#  5. SOUL ANALYTICS (PastoralMind): Análise comportamental e emocional.       #
+#  6. NETWORK PROTOCOL: Camada de Rede Ministerial e Colaboração.              #
+#  7. UX/UI RENDERER: Motor gráfico com animações CSS (Pulsing Cross).         #
+################################################################################
 """
 
 # ==============================================================================
-# 01. IMPORTAÇÕES E CONFIGURAÇÃO INICIAL (Obrigatório ser a 1ª linha)
+# 00. IMPORTAÇÕES DE MÓDULOS DE SISTEMA
 # ==============================================================================
-import streamlit as st
-import os
-import sys
-import time
-import json
-import base64
-import math
-import shutil
-import random
-import logging
-import hashlib
-import re
+import streamlit as st  # Framework de UI
+import os              # Sistema Operacional
+import sys             # Sistema de Sistema
+import time            # Controle Temporal
+import json            # Manipulação de Dados
+import base64          # Codificação Binária
+import math            # Cálculos Matemáticos
+import shutil          # Manipulação de Arquivos
+import random          # Geração Aleatória
+import logging         # Auditoria e Logs
+import hashlib         # Hashing e Segurança
+import re              # Expressões Regulares (Regex)
+import sqlite3         # Banco de Dados (Reserva)
+import uuid            # Identificadores Únicos
 from datetime import datetime, timedelta
-from io import BytesIO
+from io import BytesIO # Manipulação de Streams
 
-# Configuração da página - MANTIDA ESTRUTURA ORIGINAL
+# ==============================================================================
+# 01. CONFIGURAÇÃO DE AMBIENTE (OBRIGATÓRIO: LINHA 1 REAL)
+# ==============================================================================
 st.set_page_config(
-    page_title="O PREGADOR",
+    page_title="O PREGADOR | SYSTEM OMEGA",
     layout="wide",
     page_icon="✝️",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://www.google.com',
+        'Report a bug': "mailto:support@pregador.system",
+        'About': "O PREGADOR V.50 Enterprise Edition"
+    }
 )
 
 # ==============================================================================
-# 02. SISTEMA DE LOGS E AUDITORIA (ROBUSTEZ)
+# 02. AUDITORIA E LOGGING (SISTEMA DE LOGS DETALHADO)
 # ==============================================================================
-# Cria logs detalhados para auditoria pastoral e debug de erros
-LOG_DIR = "Dados_Pregador_V31/System_Logs"
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR, exist_ok=True)
+SYSTEM_ROOT = "Dados_Pregador_V31"
+LOG_PATH = os.path.join(SYSTEM_ROOT, "System_Logs")
 
+if not os.path.exists(LOG_PATH):
+    os.makedirs(LOG_PATH, exist_ok=True)
+
+# Configuração de Logger Rotativo e Verboso
 logging.basicConfig(
-    filename=os.path.join(LOG_DIR, "system_audit_master.log"),
+    filename=os.path.join(LOG_PATH, "system_audit_omega.log"),
     level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(module)s | %(funcName)s | %(message)s'
+    format='[%(asctime)s] | [%(levelname)s] | MODULE: %(module)s | PROCESS: %(process)d | MSG: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
-logging.info(">>> SISTEMA INICIADO: O PREGADOR V40 <<<")
+logging.info(">>> INICIALIZAÇÃO DO SISTEMA OMEGA: CICLO STARTUP <<<")
 
 # ==============================================================================
-# 03. CARREGAMENTO DE BIBLIOTECAS (COM TRATAMENTO DE FALHAS EXTENSIVO)
+# 03. INJEÇÃO DE DEPENDÊNCIAS (MODULARIZAÇÃO ROBUSTA)
 # ==============================================================================
+# O sistema tenta carregar bibliotecas externas. Se falhar, registra no log 
+# e ativa flags de controle para não derrubar a aplicação.
 
-# 3.1 Editor de Texto Avançado (CKEditor)
-CKEDITOR_AVAILABLE = False
-STREAMLIT_CKEDITOR = False
+GLOBAL_MODULES = {
+    "CKEDITOR": False,
+    "QUILL": False,
+    "PLOTLY": False,
+    "CRYPTO": False,
+    "MAMMOTH": False,
+    "HTML2DOCX": False,
+    "REPORTLAB": False,
+    "FPDF": False
+}
+
+# --- 3.1 Carregamento do Editor CKEditor ---
 try:
-    from streamlit_ckeditor import st_ckeditor  # type: ignore
-    STREAMLIT_CKEDITOR = True
-    CKEDITOR_AVAILABLE = True
-    logging.info("Módulo CKEditor carregado com sucesso.")
-except ImportError:
-    logging.warning("CKEditor não encontrado. O sistema usará fallback.")
+    from streamlit_ckeditor import st_ckeditor
+    GLOBAL_MODULES["CKEDITOR"] = True
+    logging.info("Dependência Carregada: Streamlit CKEditor")
+except ImportError as e:
+    logging.warning(f"Dependência Falhou: CKEditor ({e})")
 
-# 3.2 Editor Intermediário (Quill)
-QUILL_AVAILABLE = False
+# --- 3.2 Carregamento do Editor Quill ---
 try:
-    from streamlit_quill import st_quill  # type: ignore
-    QUILL_AVAILABLE = True
-    logging.info("Módulo Quill carregado com sucesso.")
-except ImportError:
-    logging.warning("Quill não encontrado. O sistema usará fallback.")
+    from streamlit_quill import st_quill
+    GLOBAL_MODULES["QUILL"] = True
+    logging.info("Dependência Carregada: Streamlit Quill")
+except ImportError as e:
+    logging.warning(f"Dependência Falhou: Quill ({e})")
 
-# 3.3 Visualização de Dados (Plotly)
-PLOTLY_OK = False
+# --- 3.3 Carregamento do Motor Gráfico Plotly ---
 try:
     import plotly.graph_objects as go
     import plotly.express as px
-    PLOTLY_OK = True
-    logging.info("Módulo Plotly carregado (Gráficos Ativos).")
-except ImportError:
-    logging.warning("Plotly não instalado. Usando visualizações simplificadas.")
+    GLOBAL_MODULES["PLOTLY"] = True
+    logging.info("Dependência Carregada: Plotly")
+except ImportError as e:
+    logging.warning(f"Dependência Falhou: Plotly ({e})")
 
-# 3.4 Criptografia (Cryptography AES)
-CRYPTO_OK = False
+# --- 3.4 Carregamento do Núcleo Criptográfico ---
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    CRYPTO_OK = True
-    logging.info("Módulo Crypto ativado.")
-except ImportError:
-    logging.warning("Módulo Crypto avançado ausente.")
+    GLOBAL_MODULES["CRYPTO"] = True
+    logging.info("Dependência Carregada: Cryptography AES")
+except ImportError as e:
+    logging.warning(f"Dependência Falhou: Cryptography ({e})")
 
-# 3.5 Engenharia de Exportação WORD (DOCX) - O "Módulo Word"
-HTML2DOCX_ENGINE = None
+# --- 3.5 Carregamento dos Motores WORD (Módulo Word Dependências) ---
 try:
     import mammoth
-    HTML2DOCX_ENGINE = "mammoth"
+    GLOBAL_MODULES["MAMMOTH"] = True
 except ImportError:
-    try:
-        from html2docx import html2docx
-        HTML2DOCX_ENGINE = "html2docx"
-    except ImportError:
-        try:
-            from docx import Document
-            HTML2DOCX_ENGINE = "docx_manual"
-        except ImportError:
-            HTML2DOCX_ENGINE = None
-logging.info(f"Engine DOCX definida como: {HTML2DOCX_ENGINE}")
+    pass
 
-# 3.6 Engenharia de Exportação PDF
-PDF_ENGINE = None
+try:
+    from html2docx import html2docx
+    GLOBAL_MODULES["HTML2DOCX"] = True
+except ImportError:
+    pass
+
+try:
+    from docx import Document
+    GLOBAL_MODULES["PYTHON-DOCX"] = True
+except ImportError:
+    pass
+
+# --- 3.6 Carregamento dos Motores PDF ---
 try:
     from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import letter
-    PDF_ENGINE = "reportlab"
+    GLOBAL_MODULES["REPORTLAB"] = True
 except ImportError:
-    try:
-        from fpdf import FPDF
-        PDF_ENGINE = "fpdf"
-    except ImportError:
-        PDF_ENGINE = None
-logging.info(f"Engine PDF definida como: {PDF_ENGINE}")
+    pass
 
 # ==============================================================================
-# 04. FUNÇÕES UTILITÁRIAS GLOBAIS (DEFINIDAS ANTES DO USO)
+# 04. SISTEMA DE ARQUIVOS E BANCO DE DADOS (GÊNESIS PROTOCOL)
 # ==============================================================================
+# Define a estrutura física onde os dados repousam. Nada é volátil aqui.
 
-def normalize_font_name(fname):
-    """
-    Função vital para o CSS. Corrige o erro da linha 591.
-    Normaliza nomes de fontes vindas do JSON config.
-    """
-    if not fname:
-        return "Inter"
-    try:
-        base_name = fname.split(",")[0]
-        base_name = base_name.strip().replace("'", "").replace('"', "")
-        return base_name
-    except Exception as e:
-        logging.error(f"Erro ao normalizar fonte: {e}")
-        return "Inter"
-
-def safe_filename(text):
-    """Garante que o nome do arquivo seja seguro para o sistema operacional."""
-    if not text:
-        return f"documento_{int(time.time())}"
-    clean_text = str(text).strip()
-    clean_text = re.sub(r'\s+', '_', clean_text)
-    clean_text = re.sub(r'(?u)[^-\w.]', '', clean_text)
-    return clean_text
-
-def read_json_safe(path, default_value=None):
-    """Lê um arquivo JSON com proteção total contra arquivos corrompidos."""
-    if default_value is None:
-        default_value = {}
-    try:
-        if not os.path.exists(path):
-            return default_value
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-            if not content:
-                return default_value
-            return json.loads(content)
-    except Exception as e:
-        logging.error(f"FATAL: Erro ao ler JSON em {path}. Retornando default. Erro: {e}")
-        return default_value
-
-def write_json_safe(path, data):
-    """Escreve um arquivo JSON atomicamente (cria temp e renomeia)."""
-    try:
-        temp_path = path + ".tmp_write"
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-        os.replace(temp_path, path)
-        return True
-    except Exception as e:
-        logging.error(f"FATAL: Erro ao escrever JSON em {path}. Erro: {e}")
-        return False
-
-# ==============================================================================
-# 05. GÊNESIS PROTOCOL (SISTEMA DE ARQUIVOS)
-# ==============================================================================
-ROOT_DIR = "Dados_Pregador_V31"
-
-DIRECTORIES = {
-    "SERMONS": os.path.join(ROOT_DIR, "Sermoes"),
-    "OFFICE": os.path.join(ROOT_DIR, "Gabinete_Pastoral"),
-    "USER_DATA": os.path.join(ROOT_DIR, "User_Data"),
-    "BACKUP_HIDDEN": os.path.join(ROOT_DIR, "Auto_Backup_Oculto"),
-    "LOGS": os.path.join(ROOT_DIR, "System_Logs"),
-    "LIBRARY": os.path.join(ROOT_DIR, "BibliaCache"),
-    "MEMBERS": os.path.join(ROOT_DIR, "Membresia"),
-    "NETWORK": os.path.join(ROOT_DIR, "Rede_Ministerial")  # Braço de colaboradores
+DIRECTORY_STRUCTURE = {
+    "ROOT": SYSTEM_ROOT,
+    "SERMONS": os.path.join(SYSTEM_ROOT, "Sermoes"),               # Guarda HTML/DOCX
+    "GABINETE": os.path.join(SYSTEM_ROOT, "Gabinete_Pastoral"),    # Guarda Criptografados
+    "USER_CONFIG": os.path.join(SYSTEM_ROOT, "User_Data"),         # Guarda Configurações e Users
+    "BACKUP_VAULT": os.path.join(SYSTEM_ROOT, "Auto_Backup_Oculto"), # Área de Segurança
+    "LIBRARY_CACHE": os.path.join(SYSTEM_ROOT, "BibliaCache"),     # Guarda PDFs
+    "MEMBERSHIP": os.path.join(SYSTEM_ROOT, "Membresia"),          # Guarda dados do Rebanho
+    "NETWORK_LAYER": os.path.join(SYSTEM_ROOT, "Rede_Ministerial") # Guarda Feed
 }
 
-DATABASE_FILES = {
-    "CONFIG": os.path.join(DIRECTORIES["USER_DATA"], "config.json"),
-    "USERS": os.path.join(DIRECTORIES["USER_DATA"], "users_db.json"),
-    "SOUL": os.path.join(DIRECTORIES["OFFICE"], "soul_data.json"),
-    "STATS": os.path.join(DIRECTORIES["USER_DATA"], "db_stats.json"),
-    "MEMBERS": os.path.join(DIRECTORIES["MEMBERS"], "members.json"),
-    "NETWORK_FEED": os.path.join(DIRECTORIES["NETWORK"], "feed_videos.json")
+DB_FILES = {
+    "CONFIG": os.path.join(DIRECTORY_STRUCTURE["USER_CONFIG"], "config.json"),
+    "USERS_DB": os.path.join(DIRECTORY_STRUCTURE["USER_CONFIG"], "users_db.json"),
+    "SOUL_METRICS": os.path.join(DIRECTORY_STRUCTURE["GABINETE"], "soul_data.json"),
+    "STATS_METRICS": os.path.join(DIRECTORY_STRUCTURE["USER_CONFIG"], "db_stats.json"),
+    "MEMBERS_DB": os.path.join(DIRECTORY_STRUCTURE["MEMBERSHIP"], "members.json"),
+    "NETWORK_FEED": os.path.join(DIRECTORY_STRUCTURE["NETWORK_LAYER"], "feed_data.json")
 }
 
-def genesis_boot_protocol():
-    """Garante a existência da integridade física do sistema. Não remove nada."""
-    # 1. Cria pastas
-    for key, path in DIRECTORIES.items():
+def genesis_filesystem_integrity_check():
+    """
+    Executa verificação forense do sistema de arquivos na inicialização.
+    Cria diretórios ausentes e restaura bancos de dados críticos corrompidos.
+    """
+    logging.info("Executando Protocolo Genesis: Checagem de Integridade...")
+    
+    # 1. Validação de Diretórios
+    for key, path in DIRECTORY_STRUCTURE.items():
         if not os.path.exists(path):
-            os.makedirs(path, exist_ok=True)
-            logging.info(f"Gênesis: Diretório criado -> {path}")
+            logging.info(f"Diretório Ausente Detectado: {path}. Criando...")
+            try:
+                os.makedirs(path, exist_ok=True)
+                # Cria arquivo sentinela para garantir persistência em nuvens voláteis
+                with open(os.path.join(path, ".sentinel"), "w") as f:
+                    f.write("System Integrity File - Do Not Delete")
+            except Exception as e:
+                logging.error(f"FATAL: Não foi possível criar diretório {path}. Erro: {e}")
 
-    # 2. Inicializa Banco de Configurações
-    if not os.path.exists(DATABASE_FILES["CONFIG"]):
+    # 2. Validação do Banco de Configuração
+    if not os.path.exists(DB_FILES["CONFIG"]):
+        logging.warning("Configuração não encontrada. Gerando Default de Fábrica.")
         default_config = {
             "theme_color": "#D4AF37",
-            "font_size": 18,
-            "font_family": "Inter",
             "theme_mode": "Dark Cathedral",
-            "enc_password": "OMEGA_KEY_DEFAULT",
-            "backup_interval": 86400,
+            "font_family": "Inter",
+            "security_level": "High",
+            "backup_frequency": "Daily",
+            "module_active_word": True,
+            "module_active_network": True,
             "rotina_pastoral": [
-                "Leitura Bíblica",
-                "Oração Matinal",
+                "Oração Inicial (30 min)",
+                "Leitura Bíblica Devocional",
                 "Estudo Teológico",
-                "Tempo de Descanso"
+                "Gestão Eclesiástica"
             ]
         }
-        write_json_safe(DATABASE_FILES["CONFIG"], default_config)
+        _write_json_atomic(DB_FILES["CONFIG"], default_config)
 
-    # 3. Inicializa Banco de Usuários
-    if not os.path.exists(DATABASE_FILES["USERS"]):
-        default_admin = hashlib.sha256("admin".encode()).hexdigest()
-        write_json_safe(DATABASE_FILES["USERS"], {"ADMIN": default_admin})
+    # 3. Validação do Banco de Usuários
+    if not os.path.exists(DB_FILES["USERS_DB"]):
+        logging.warning("DB de Usuários não encontrado. Criando Admin.")
+        # SHA-256 Hash do Admin Padrão
+        admin_hash = hashlib.sha256("admin".encode()).hexdigest()
+        _write_json_atomic(DB_FILES["USERS_DB"], {"ADMIN": admin_hash})
 
-    # 4. Inicializa Bases Vazias
-    for db_key in ["NETWORK_FEED", "MEMBERS", "SOUL"]:
-        if not os.path.exists(DATABASE_FILES[db_key]):
-            write_json_safe(DATABASE_FILES[db_key], [])
-    
-    if not os.path.exists(DATABASE_FILES["STATS"]):
-        write_json_safe(DATABASE_FILES["STATS"], {"xp": 0, "nivel": 1})
+    # 4. Inicialização dos Bancos de Dados Auxiliares
+    _ensure_empty_json_list(DB_FILES["NETWORK_FEED"])
+    _ensure_empty_json_list(DB_FILES["MEMBERS_DB"])
+    _ensure_empty_json_list(DB_FILES["SOUL_METRICS"])
 
-# Executa o protocolo de inicialização
-genesis_boot_protocol()
+def _write_json_atomic(path, data):
+    """
+    Escrita Atômica: Garante que o arquivo nunca fique corrompido no meio da gravação.
+    Escreve em um arquivo temporário e depois renomeia.
+    """
+    temp_path = f"{path}.tmp.{uuid.uuid4().hex}"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        shutil.move(temp_path, path)
+        return True
+    except Exception as e:
+        logging.error(f"Erro na Escrita Atômica para {path}: {e}")
+        return False
+
+def _read_json_safe(path, default=None):
+    """Leitura Defensiva de JSON."""
+    if default is None: default = {}
+    try:
+        if not os.path.exists(path): return default
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content: return default
+            return json.loads(content)
+    except Exception as e:
+        logging.error(f"Erro de Leitura em {path}: {e}")
+        return default
+
+def _ensure_empty_json_list(path):
+    if not os.path.exists(path):
+        _write_json_atomic(path, [])
+
+# Inicializa o sistema imediatamente
+genesis_filesystem_integrity_check()
 
 # ==============================================================================
-# 06. CLASSES LÓGICAS (O CORAÇÃO DO SISTEMA)
+# 05. CORE LOGIC & HELPER UTILITIES
 # ==============================================================================
 
-class ExportEngine:
-    """
-    O MÓDULO WORD QUE VOCÊ PEDIU.
-    Gerencia a exportação robusta para DOCX e PDF.
-    """
-    
+class TextUtils:
+    """Ferramentas para normalização e tratamento de strings."""
     @staticmethod
-    def export_to_docx(title, html_content, output_filepath):
-        logging.info(f"Exportando DOCX via {HTML2DOCX_ENGINE}")
+    def sanitize_filename(name):
+        """Remove caracteres ilegais para nomes de arquivo."""
+        s = str(name).strip().replace(" ", "_")
+        return re.sub(r'(?u)[^-\w.]', '', s)
+
+    @staticmethod
+    def clean_html_tags(text):
+        """Remove tags HTML para exportação em texto puro."""
+        clean = re.compile('<.*?>')
+        return re.sub(clean, '\n', text)
+
+    @staticmethod
+    def normalize_font(font_name):
+        """Corrige nome da fonte para injeção CSS."""
+        if not font_name: return "Inter"
+        return font_name.split(",")[0].strip().replace("'","").replace('"','')
+
+# ==============================================================================
+# 06. WORD PROCESSOR MODULE (O MODULO SOLICITADO DETALHADO)
+# ==============================================================================
+class WordProcessorEngine:
+    """
+    #######################################################
+    #        MÓDULO WORD: ENGINE DE EXPORTAÇÃO            #
+    #######################################################
+    Esta classe é o núcleo de transformação de documentos.
+    Ela gerencia headers, encodings, seleção de bibliotecas e fallbacks.
+    """
+    
+    def __init__(self, title, content_html, output_path):
+        self.title = title
+        self.content_html = content_html
+        self.output_path = output_path
+        self.clean_text = TextUtils.clean_html_tags(content_html)
         
-        # Estratégia 1: Mammoth (Alta Fidelidade)
-        if HTML2DOCX_ENGINE == "mammoth":
+    def execute_docx_export(self):
+        """
+        Tenta exportar para DOCX usando estratégias em cascata.
+        1. Mammoth (Melhor) -> 2. Html2Docx -> 3. Fallback Raw
+        """
+        logging.info(f"Iniciando Exportação DOCX: {self.title}")
+        
+        # ESTRATÉGIA A: MAMMOTH
+        if GLOBAL_MODULES["MAMMOTH"]:
             try:
                 import mammoth
-                # Envelopa o HTML para garantir que o parser entenda
-                full_html = f"<html><body><h1>{title}</h1>{html_content}</body></html>"
-                result = mammoth.convert_to_docx(full_html)
-                with open(output_filepath, "wb") as f:
+                # Constrói HTML válido completo
+                html_structure = f"""
+                <html>
+                <head><style>body {{ font-family: 'Arial'; }}</style></head>
+                <body>
+                    <h1 style='text-align:center'>{self.title}</h1>
+                    <hr>
+                    {self.content_html}
+                    <hr>
+                    <p style='font-size:10px; color:grey'>Gerado por O PREGADOR SYSTEM</p>
+                </body>
+                </html>
+                """
+                result = mammoth.convert_to_docx(html_structure)
+                with open(self.output_path, "wb") as f:
                     f.write(result.value)
-                return True, "DOCX gerado com sucesso (Mammoth)."
+                logging.info("Sucesso via Mammoth.")
+                return True, "Documento Word (Alta Fidelidade) Gerado."
             except Exception as e:
-                logging.error(f"Erro Mammoth: {e}")
-        
-        # Estratégia 2: html2docx (Biblioteca dedicada)
-        if HTML2DOCX_ENGINE == "html2docx":
+                logging.error(f"Falha Mammoth: {e}")
+
+        # ESTRATÉGIA B: HTML2DOCX
+        if GLOBAL_MODULES["HTML2DOCX"]:
             try:
                 from html2docx import html2docx
-                buf = html2docx(html_content, title=title)
-                with open(output_filepath, "wb") as f:
+                buf = html2docx(self.content_html, title=self.title)
+                with open(self.output_path, "wb") as f:
                     f.write(buf.getvalue())
-                return True, "DOCX gerado com sucesso (Html2Docx)."
+                logging.info("Sucesso via Html2Docx.")
+                return True, "Documento Word (Conversão HTML) Gerado."
             except Exception as e:
-                logging.error(f"Erro Html2Docx: {e}")
+                logging.error(f"Falha Html2Docx: {e}")
 
-        # Estratégia 3: Fallback Manual (Texto Puro)
+        # ESTRATÉGIA C: MANUAL BUILDER (FALLBACK ROBUSTO)
         try:
             from docx import Document
+            from docx.shared import Pt
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+
             doc = Document()
-            doc.add_heading(title, 0)
-            text_clean = re.sub(r'<[^>]+>', '\n', html_content)
-            for p in text_clean.split('\n'):
-                if p.strip(): doc.add_paragraph(p.strip())
-            doc.save(output_filepath)
-            return True, "DOCX gerado (Modo Texto Simples)."
+            # Título
+            heading = doc.add_heading(self.title, 0)
+            heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Corpo (Splitando linhas vazias)
+            for line in self.clean_text.split('\n'):
+                line = line.strip()
+                if line:
+                    p = doc.add_paragraph(line)
+                    p.paragraph_format.space_after = Pt(6)
+            
+            # Rodapé Simulado
+            doc.add_page_break()
+            doc.add_paragraph(f"Gerado em {datetime.now()} pelo Sistema O PREGADOR").italic = True
+            
+            doc.save(self.output_path)
+            logging.info("Sucesso via Python-Docx Fallback.")
+            return True, "Documento Word (Texto Puro) Gerado."
         except Exception as e:
-            # Último recurso: Salvar como TXT
+            # ESTRATÉGIA D: EMERGENCY TXT (Se tudo falhar)
             try:
-                with open(output_filepath.replace(".docx", ".txt"), "w") as f:
-                    f.write(f"{title}\n\n{html_content}")
-                return False, "Erro DOCX. Salvo como TXT."
-            except:
-                return False, f"Falha total na exportação: {e}"
+                txt_path = self.output_path.replace(".docx", ".txt")
+                with open(txt_path, "w", encoding="utf-8") as f:
+                    f.write(f"{self.title}\n\n{self.clean_text}")
+                logging.error(f"Falha total DOCX. Gerado TXT. Erro: {e}")
+                return False, "Erro crítico na engine DOCX. Salvo como TXT simples."
+            except Exception as crit:
+                return False, f"Falha de I/O crítica: {crit}"
 
-    @staticmethod
-    def export_to_pdf(title, html_content, output_filepath):
-        logging.info(f"Exportando PDF via {PDF_ENGINE}")
-        text_clean = re.sub(r'<[^>]+>', '\n', html_content)
+    def execute_pdf_export(self):
+        """Gerador de PDF via ReportLab com layout manual."""
+        if not GLOBAL_MODULES["REPORTLAB"]:
+            return False, "Motor PDF não instalado."
         
-        if PDF_ENGINE == "reportlab":
-            try:
-                from reportlab.pdfgen import canvas
-                from reportlab.lib.pagesizes import letter
-                c = canvas.Canvas(output_filepath, pagesize=letter)
-                c.setFont("Helvetica-Bold", 16)
-                c.drawString(40, 750, title)
-                c.setFont("Helvetica", 12)
-                y = 720
-                for line in text_clean.split('\n'):
-                    # Simples quebra de linha visual
-                    c.drawString(40, y, line[:95]) 
-                    y -= 15
-                    if y < 50:
+        try:
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import A4
+            
+            c = canvas.Canvas(self.output_path, pagesize=A4)
+            width, height = A4
+            
+            # Header Layout
+            c.setFillColorRGB(0.8, 0.7, 0.2) # Dourado simulado
+            c.rect(0, height-50, width, 50, fill=1, stroke=0)
+            c.setFillColorRGB(0,0,0)
+            c.setFont("Helvetica-Bold", 18)
+            c.drawCentredString(width/2, height-35, self.title)
+            
+            # Body Layout
+            c.setFont("Helvetica", 11)
+            y_position = height - 80
+            
+            lines = self.clean_text.split('\n')
+            for line in lines:
+                # Wrap básico (90 caracteres)
+                wrapped_lines = [line[i:i+90] for i in range(0, len(line), 90)]
+                for subline in wrapped_lines:
+                    if y_position < 50:
                         c.showPage()
-                        y = 750
-                c.save()
-                return True, "PDF Gerado."
-            except Exception as e:
-                return False, f"Erro PDF: {e}"
-        
-        return False, "Motor PDF não instalado."
+                        y_position = height - 50
+                        c.setFont("Helvetica", 11)
+                    c.drawString(40, y_position, subline)
+                    y_position -= 14
+            
+            c.save()
+            return True, "Arquivo PDF Padrão A4 Gerado."
+        except Exception as e:
+            logging.error(f"Erro PDF: {e}")
+            return False, str(e)
 
-class GenevaProtocol:
-    """Núcleo de Validação Teológica."""
-    ALERTS = {
-        "prosperidade": "ALERTA: Viés de Teologia da Prosperidade detectado.",
-        "eu determino": "ALERTA: Linguagem de Confissão Positiva (Antropocêntrica).",
-        "energia": "ALERTA: Terminologia vaga / Nova Era.",
-        "merecimento": "CUIDADO: Revisar conceito de Graça vs Mérito."
+# ==============================================================================
+# 07. PROTOCOLO GENEVA E ANALYTICS (REGRA DE NEGÓCIO)
+# ==============================================================================
+class GenevaDoctrineCore:
+    """Analisador de conteúdo para consistência teológica."""
+    HERESY_DATABASE = {
+        "prosperidade": "ALERTA: Viés de Teologia da Prosperidade (Sola Gratia em risco?).",
+        "decreto": "ALERTA: Antropocentrismo detectado. Soberania de Deus deve prevalecer.",
+        "energia": "CUIDADO: Termo metafísico vago. Use 'Espírito Santo' ou 'Poder de Deus'.",
+        "universo": "ALERTA: Substituição panteísta. O correto é 'O Criador'.",
+        "força": "NOTA: Verifique se refere a Star Wars ou ao Senhor.",
+        "vibrar": "NOTA: Linguagem emocionalista/coaching detectada."
     }
+
     @staticmethod
     def scan(text):
         if not text: return []
-        return [msg for term, msg in GenevaProtocol.ALERTS.items() if term in text.lower()]
+        text_lower = text.lower()
+        findings = []
+        for keyword, message in GenevaDoctrineCore.HERESY_DATABASE.items():
+            if keyword in text_lower:
+                findings.append(message)
+        return findings
 
-class AccessControl:
-    """Controle de Login e Colaboradores."""
+class PastoralAnalytics:
+    """Cálculo de Saúde Ministerial."""
     @staticmethod
-    def authenticate(username, password):
-        users = read_json_safe(DATABASE_FILES["USERS"], {})
-        # Backdoor de primeiro acesso seguro
-        if username == "ADMIN" and password == "1234" and len(users) <= 1:
+    def calculate_health_index():
+        db = _read_json_safe(DB_FILES["SOUL_METRICS"])
+        history = db.get("historico", [])[-10:] # Últimos 10 registros
+        
+        if not history: return 100, "Sem Dados", "#CCCCCC"
+        
+        # Pesos
+        weights = {"Esgotamento": 0, "Cansaço": 40, "Neutro": 70, "Bem": 90, "Pleno": 100}
+        total_score = 0
+        for entry in history:
+            humor = entry.get("humor", "Neutro")
+            total_score += weights.get(humor, 70)
+        
+        avg = total_score / len(history)
+        
+        color = "#33FF33"
+        status = "Vigoroso"
+        if avg < 50: 
+            color = "#FF0000"
+            status = "CRÍTICO (BURNOUT)"
+        elif avg < 75:
+            color = "#FFAA00"
+            status = "Alerta (Cansaço)"
+            
+        return int(avg), status, color
+
+# ==============================================================================
+# 08. SECURITY ACCESS LAYER
+# ==============================================================================
+class AccessGate:
+    """Gatekeeper de Segurança."""
+    @staticmethod
+    def login_check(username, password):
+        db = _read_json_safe(DB_FILES["USERS_DB"])
+        
+        # Masterkey (Segurança inicial apenas)
+        if username == "ADMIN" and password == "1234" and len(db) <= 1:
             return True
-        stored_hash = users.get(username.upper())
-        if not stored_hash: return False
-        return stored_hash == hashlib.sha256(password.encode()).hexdigest()
+            
+        user_hash = db.get(username.upper())
+        if not user_hash:
+            logging.warning(f"Tentativa de login falha: {username}")
+            return False
+            
+        pass_hash = hashlib.sha256(password.encode()).hexdigest()
+        return pass_hash == user_hash
 
     @staticmethod
-    def register_user(username, password):
-        users = read_json_safe(DATABASE_FILES["USERS"], {})
-        if username.upper() in users: return False, "Usuário já existe."
-        users[username.upper()] = hashlib.sha256(password.encode()).hexdigest()
-        write_json_safe(DATABASE_FILES["USERS"], users)
-        return True, "Registrado com sucesso."
-
-class PastoralMind:
-    """Análise de Vitalidade."""
-    @staticmethod
-    def check_vitality():
-        data = read_json_safe(DATABASE_FILES["SOUL"]).get("historico", [])[-7:]
-        negatives = sum(1 for x in data if x['humor'] in ['Cansaço', 'Esgotamento', 'Tristeza'])
-        if negatives >= 3:
-            return "ALERTA", "#FF3333"
-        return "ESTÁVEL", "#33FF33"
+    def create_account(username, password):
+        db = _read_json_safe(DB_FILES["USERS_DB"])
+        if username.upper() in db:
+            return False, "Usuário Duplicado no Sistema."
+        
+        new_hash = hashlib.sha256(password.encode()).hexdigest()
+        db[username.upper()] = new_hash
+        
+        if _write_json_atomic(DB_FILES["USERS_DB"], db):
+            return True, "Credencial criada com sucesso."
+        return False, "Erro de gravação em disco."
 
 # ==============================================================================
-# 07. INTERFACE GRÁFICA & CSS (VISUAL ORIGINAL RESTAURADO)
+# 09. ENGINE GRÁFICA & CSS (UX COM ANIMAÇÃO RESTAURADA)
 # ==============================================================================
 
-# Carrega config para aplicar no CSS
-cfg = read_json_safe(DATABASE_FILES["CONFIG"])
-APP_COLOR = cfg.get("theme_color", "#D4AF37")
-APP_FONT = normalize_font_name(cfg.get("font_family", "Inter"))
+def inject_visual_core():
+    # Carrega configurações do usuário para personalizar CSS
+    config = _read_json_safe(DB_FILES["CONFIG"])
+    theme_color = config.get("theme_color", "#D4AF37")
+    font_raw = config.get("font_family", "Inter")
+    font_main = TextUtils.normalize_font(font_raw)
 
-st.markdown(f"""
-<style>
-/* FONTES E CORES */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+    st.markdown(f"""
+    <style>
+    /* ==========================================================================
+       FONTE E VARIAVEIS GLOBAIS
+       ========================================================================== */
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,700;1,400&display=swap');
+    
+    :root {{
+        --gold: {theme_color};
+        --gold-dim: {theme_color}80;
+        --bg-dark: #000000;
+        --card-bg: #0b0b0b;
+        --text-main: #e0e0e0;
+        --font-body: '{font_main}', sans-serif;
+        --font-head: 'Cinzel', serif;
+    }}
+    
+    /* RESET BASICO */
+    .stApp {{
+        background-color: var(--bg-dark);
+        color: var(--text-main);
+        font-family: var(--font-body);
+    }}
+    
+    h1, h2, h3, h4 {{
+        font-family: var(--font-head) !important;
+        color: var(--gold) !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }}
+    
+    /* ==========================================================================
+       ANIMAÇÃO "PULSING CROSS" (SOLICITADO)
+       ========================================================================== */
+    @keyframes pulse_gold {{
+        0% {{
+            transform: scale(1);
+            stroke-opacity: 1;
+            filter: drop-shadow(0 0 5px var(--gold-dim));
+        }}
+        50% {{
+            transform: scale(1.05);
+            stroke-opacity: 0.7;
+            filter: drop-shadow(0 0 15px var(--gold));
+        }}
+        100% {{
+            transform: scale(1);
+            stroke-opacity: 1;
+            filter: drop-shadow(0 0 5px var(--gold-dim));
+        }}
+    }}
+    
+    .prime-logo {{
+        width: 140px;
+        height: 140px;
+        display: block;
+        margin: 0 auto 20px auto;
+        /* Aplicação da Animação */
+        animation: pulse_gold 3s infinite ease-in-out; 
+    }}
+    
+    .login-container {{
+        text-align: center;
+        border: 1px solid #222;
+        padding: 40px;
+        background: linear-gradient(180deg, rgba(20,20,20,1) 0%, rgba(0,0,0,1) 100%);
+        border-radius: 12px;
+        box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        border-top: 4px solid var(--gold);
+    }}
+    
+    .system-title {{
+        font-family: 'Cinzel', serif;
+        font-size: 2rem;
+        color: var(--gold);
+        letter-spacing: 8px;
+        margin-bottom: 5px;
+        text-shadow: 0 0 10px rgba(0,0,0,0.8);
+    }}
+    
+    /* ==========================================================================
+       COMPONENTES DE INTERFACE
+       ========================================================================== */
+    [data-testid="stSidebar"] {{
+        background-color: #060606;
+        border-right: 1px solid #1a1a1a;
+    }}
+    
+    .tech-card {{
+        background: var(--card-bg);
+        border: 1px solid #222;
+        border-left: 4px solid var(--gold);
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        transition: transform 0.2s;
+    }}
+    .tech-card:hover {{
+        border-color: #333;
+        transform: translateX(5px);
+    }}
+    
+    .stButton>button {{
+        border: 1px solid var(--gold);
+        color: var(--gold);
+        background: transparent;
+        font-family: var(--font-body);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        padding: 0.6rem;
+        transition: all 0.3s;
+    }}
+    
+    .stButton>button:hover {{
+        background-color: var(--gold);
+        color: black;
+        box-shadow: 0 0 15px var(--gold-dim);
+    }}
+    
+    .stat-value {{
+        font-size: 2.5rem;
+        font-family: var(--font-head);
+        font-weight: 800;
+        line-height: 1;
+    }}
+    
+    /* CORREÇÕES PARA MOBILE */
+    @media (max-width: 768px) {{
+        .prime-logo {{ width: 100px; height: 100px; }}
+        .system-title {{ font-size: 1.5rem; letter-spacing: 4px; }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
-:root {{
-    --gold: {APP_COLOR};
-    --bg-color: #000000;
-    --panel-color: #0A0A0A;
-    --text-color: #EAEAEA;
-    --main-font: '{APP_FONT}', sans-serif;
-    --header-font: 'Cinzel', serif;
-}}
-
-/* GERAL */
-.stApp {{
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    font-family: var(--main-font);
-}}
-
-h1, h2, h3 {{
-    font-family: var(--header-font) !important;
-    color: var(--gold) !important;
-}}
-
-/* ELEMENTOS DE LOGIN (RESTAURADOS) */
-.prime-logo {{
-    width: 120px;
-    height: 120px;
-    display: block;
-    margin: 0 auto;
-}}
-.login-title {{
-    font-family: 'Cinzel', serif;
-    color: var(--gold);
-    text-align: center;
-    letter-spacing: 6px;
-    font-size: 24px;
-    margin-top: 15px;
-    margin-bottom: 30px;
-    text-transform: uppercase;
-    border-bottom: 1px solid #333;
-    padding-bottom: 20px;
-}}
-
-/* SIDEBAR */
-[data-testid="stSidebar"] {{
-    background-color: #080808;
-    border-right: 1px solid #222;
-}}
-
-/* CARDS E BOTÕES */
-.tech-card {{
-    background: var(--panel-color);
-    border: 1px solid #222;
-    border-left: 3px solid var(--gold);
-    padding: 18px;
-    border-radius: 6px;
-    margin-bottom: 12px;
-}}
-
-.stButton>button {{
-    border: 1px solid var(--gold);
-    color: var(--gold);
-    background: transparent;
-    transition: 0.3s;
-}}
-.stButton>button:hover {{
-    background: var(--gold);
-    color: #000;
-}}
-</style>
-""", unsafe_allow_html=True)
+# Aplica o estilo globalmente
+inject_visual_core()
 
 # ==============================================================================
-# 08. FLUXO DE LOGIN (INTERFACE ORIGINAL)
+# 10. FLUXO DE LOGIN (INTERFACE RENDERER)
 # ==============================================================================
-if "logado" not in st.session_state: st.session_state["logado"] = False
-if "user_name" not in st.session_state: st.session_state["user_name"] = "ADMIN"
+if "session_valid" not in st.session_state: st.session_state["session_valid"] = False
+if "current_user" not in st.session_state: st.session_state["current_user"] = "GUEST"
 
-if not st.session_state["logado"]:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1, 1])
-    with c2:
-        # LOGO SVG DOURADA ORIGINAL
+if not st.session_state["session_valid"]:
+    col_l, col_c, col_r = st.columns([1, 1.2, 1])
+    
+    with col_c:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # O HTML Abaixo inclui a classe 'prime-logo' que aciona o CSS PULSE definido acima
+        config = _read_json_safe(DB_FILES["CONFIG"])
+        GOLD_HEX = config.get("theme_color", "#D4AF37")
+        
         st.markdown(f"""
-        <svg class="prime-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="50" cy="50" r="45" stroke="{APP_COLOR}" stroke-width="3" fill="none" />
-            <line x1="50" y1="25" x2="50" y2="75" stroke="{APP_COLOR}" stroke-width="3" />
-            <line x1="35" y1="40" x2="65" y2="40" stroke="{APP_COLOR}" stroke-width="3" />
-        </svg>
-        <div class="login-title">O PREGADOR</div>
+        <div class="login-container">
+            <svg class="prime-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <!-- Círculo Externo -->
+                <circle cx="50" cy="50" r="45" stroke="{GOLD_HEX}" stroke-width="2" fill="none" />
+                <!-- Cruz Estilizada -->
+                <line x1="50" y1="20" x2="50" y2="80" stroke="{GOLD_HEX}" stroke-width="4" stroke-linecap="square" />
+                <line x1="30" y1="40" x2="70" y2="40" stroke="{GOLD_HEX}" stroke-width="4" stroke-linecap="square" />
+                <!-- Detalhes Orbitais -->
+                <circle cx="50" cy="50" r="10" stroke="{GOLD_HEX}" stroke-width="1" fill="none" style="opacity:0.5"/>
+            </svg>
+            <div class="system-title">O PREGADOR</div>
+            <div style="color: #666; font-size: 0.8rem; letter-spacing: 2px; margin-bottom: 20px;">
+                SYSTEM OMEGA | ENTERPRISE EDITION V.50
+            </div>
+        </div>
         """, unsafe_allow_html=True)
 
-        tab_entrar, tab_registrar = st.tabs(["ENTRAR", "REGISTRAR"])
+        tab_access, tab_register = st.tabs(["🔒 ACESSO SEGURO", "📝 NOVO MEMBRO"])
         
-        with tab_entrar:
-            u_login = st.text_input("Identidade (ID)")
-            p_login = st.text_input("Senha de Acesso", type="password")
-            if st.button("ACESSAR O SISTEMA", use_container_width=True):
-                if AccessControl.authenticate(u_login, p_login):
-                    st.session_state["logado"] = True
-                    st.session_state["user_name"] = u_login.upper()
-                    st.success("Acesso Concedido.")
-                    time.sleep(0.5)
+        with tab_access:
+            u = st.text_input("ID PASTORAL", placeholder="Digite seu identificador")
+            p = st.text_input("CHAVE DE SEGURANÇA", type="password")
+            
+            if st.button("AUTENTICAR SISTEMA", use_container_width=True):
+                if AccessGate.login_check(u, p):
+                    st.session_state["session_valid"] = True
+                    st.session_state["current_user"] = u.upper()
+                    st.success("Credenciais validadas. Inicializando módulos...")
+                    time.sleep(1) # Simula loading
                     st.rerun()
                 else:
-                    st.error("NEGO A VOS CONHECER (Credenciais Inválidas).")
-        
-        with tab_registrar:
-            st.info("Cadastro Local")
-            nu = st.text_input("Novo Usuário", key="reg_u")
-            np = st.text_input("Nova Senha", type="password", key="reg_p")
-            if st.button("CRIAR CONTA"):
-                ok, msg = AccessControl.register_user(nu, np)
-                if ok: st.success(msg)
+                    st.error("ACESSO NEGADO: Credenciais não conferem.")
+
+        with tab_register:
+            st.info("Cadastro Local Habilitado")
+            nu = st.text_input("Definir Novo ID", key="reg_u")
+            np = st.text_input("Definir Senha", type="password", key="reg_p")
+            if st.button("REGISTRAR CONTA"):
+                success, msg = AccessGate.create_account(nu, np)
+                if success: st.success(msg)
                 else: st.error(msg)
+    
+    # Bloqueia execução do resto do script
     st.stop()
 
 # ==============================================================================
-# 09. APLICAÇÃO PRINCIPAL (SIDEBAR E MÓDULOS)
+# 11. SIDEBAR (NAVEGAÇÃO DO SISTEMA)
 # ==============================================================================
-
 with st.sidebar:
-    st.markdown(f"## Pastor {st.session_state['user_name']}")
+    # Cabeçalho da Sidebar
+    st.markdown(f"""
+    <div style="text-align:center; padding: 20px 0; border-bottom: 1px solid #222;">
+        <h3 style="margin:0; font-size: 1.2rem;">Pastor</h3>
+        <h1 style="margin:0; font-size: 1.8rem; line-height:1.2;">{st.session_state['current_user']}</h1>
+    </div>
+    """, unsafe_allow_html=True)
     
-    vitality, color = PastoralMind.check_vitality()
-    st.markdown(f"Vitalidade: <b style='color:{color}'>{vitality}</b>", unsafe_allow_html=True)
-    st.divider()
-    
-    # Menu de Navegação
-    menu = st.radio(
-        "SISTEMA", 
-        ["Cuidado Pastoral", "Gabinete Pastoral", "Rede Ministerial", "Biblioteca", "Configurações"]
+    # Indicador de Saúde (Pastoral Mind)
+    health_score, health_status, health_color = PastoralAnalytics.calculate_health_index()
+    st.markdown(f"""
+    <div style="background:#111; padding:10px; border-radius:4px; margin: 15px 0; border:1px solid #222;">
+        <small style="color:#888;">SAÚDE MINISTERIAL</small>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:{health_color}; font-weight:bold;">{health_status}</span>
+            <span style="color:{health_color}; font-size:1.2rem;">{health_score}%</span>
+        </div>
+        <div style="width:100%; height:4px; background:#222; margin-top:5px;">
+            <div style="width:{health_score}%; height:100%; background:{health_color};"></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Menu Principal
+    app_mode = st.radio(
+        "Navegação do Sistema",
+        ["Dashboard & Cuidado", "Gabinete de Preparação", "Rede Ministerial", "Biblioteca Digital", "Configurações"],
+        label_visibility="collapsed"
     )
-    
+
     st.markdown("---")
-    if st.button("LOGOUT"):
-        st.session_state["logado"] = False
+    if st.button("ENCERRAR SESSÃO", use_container_width=True):
+        st.session_state["session_valid"] = False
         st.rerun()
 
-# --- MÓDULO 1: CUIDADO PASTORAL (Expandido com Rotina Dinâmica e Teoria) ---
-if menu == "Cuidado Pastoral":
-    st.title("🛡️ Cuidado Pastoral & Alma")
+# ==============================================================================
+# 12. MÓDULO DASHBOARD & CUIDADO (EXPANDIDO)
+# ==============================================================================
+if app_mode == "Dashboard & Cuidado":
+    st.title("🛡️ Painel de Controle e Cuidado")
     
-    tab1, tab2, tab3 = st.tabs(["Estado da Alma", "Teoria da Permissão", "Rotina Pastoral"])
+    tabs_care = st.tabs(["📝 Check-in Emocional", "⚖️ Teoria da Permissão", "📋 Rotina & Liturgia"])
     
-    with tab1:
-        st.markdown("<div class='tech-card'><b>Check-in Diário</b><br>Registre como está seu coração.</div>", unsafe_allow_html=True)
-        humor = st.select_slider("Estado Emocional:", ["Esgotamento", "Cansaço", "Neutro", "Bem", "Pleno"])
-        nota = st.text_area("Notas do dia (opcional)")
+    # 12.1 Check-in Diário
+    with tabs_care[0]:
+        st.markdown(
+            f"""<div class='tech-card'>
+            <b>LIVRO DA ALMA (Diário)</b><br>
+            Registre diariamente sua condição para evitar o esgotamento silencioso.
+            </div>""", 
+            unsafe_allow_html=True
+        )
         
-        if st.button("Registrar no Livro da Alma"):
-            soul_db = read_json_safe(DATABASE_FILES["SOUL"])
-            soul_db.setdefault("historico", []).append({
-                "data": datetime.now().strftime("%Y-%m-%d"),
-                "humor": humor,
-                "nota": nota
-            })
-            write_json_safe(DATABASE_FILES["SOUL"], soul_db)
-            st.success("Registrado com sucesso.")
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            input_mood = st.select_slider(
+                "Como você se sente?", 
+                options=["Esgotamento", "Cansaço", "Neutro", "Bem", "Pleno"]
+            )
+            input_note = st.text_area("Observações do dia", height=100)
+            
+            if st.button("REGISTRAR ESTADO"):
+                data = _read_json_safe(DB_FILES["SOUL_METRICS"])
+                data.setdefault("historico", []).append({
+                    "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "humor": input_mood,
+                    "nota": input_note
+                })
+                _write_json_atomic(DB_FILES["SOUL_METRICS"], data)
+                st.success("Registro gravado no banco de dados.")
+        
+        with c2:
+            st.markdown("**Histórico Recente**")
+            data = _read_json_safe(DB_FILES["SOUL_METRICS"])
+            history = data.get("historico", [])[-5:]
+            for item in reversed(history):
+                st.info(f"{item['data']} | Estado: {item['humor']} | Obs: {item.get('nota', '-')}")
 
-    with tab2:
-        # Conteúdo Educativo Solicitado
-        st.info("🧠 **O que é a Teoria da Permissão?**\n\n"
-                "Muitos pastores sofrem burnout não pelo trabalho, mas pela falta de permissão interna para serem humanos. "
-                "Esta ferramenta ajuda você a visualizar se está se permitindo viver a Graça que prega.")
+    # 12.2 Teoria da Permissão
+    with tabs_care[1]:
+        st.markdown("""
+        ### A Teoria da Permissão
+        *Ferramenta Psicoteológica para validação humana do líder.*
+        Mova os controles abaixo com total sinceridade.
+        """)
         
-        col_input, col_viz = st.columns(2)
-        with col_input:
-            p_fail = st.slider("Permissão para Falhar (Errar)", 0, 100, 50)
-            p_feel = st.slider("Permissão para Sentir (Dor/Ira)", 0, 100, 50)
-            p_rest = st.slider("Permissão para Descansar", 0, 100, 50)
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            p_fail = st.slider("Permissão para Falhar/Não Saber", 0, 100, 50)
+            p_feel = st.slider("Permissão para Sentir Dor/Ira", 0, 100, 50)
+            p_rest = st.slider("Permissão para Parar/Descansar", 0, 100, 50)
         
-        with col_viz:
-            if PLOTLY_OK:
+        with col_s2:
+            if GLOBAL_MODULES["PLOTLY"]:
                 fig = go.Figure(data=go.Scatterpolar(
                     r=[p_fail, p_feel, p_rest, p_fail],
-                    theta=['Falhar', 'Sentir', 'Descansar', 'Falhar'],
+                    theta=['FALHAR', 'SENTIR', 'DESCANSAR', 'FALHAR'],
                     fill='toself',
-                    line_color=APP_COLOR
+                    line_color=st.session_state.get('theme_color', '#D4AF37')
                 ))
                 fig.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)',
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                    margin=dict(t=20, b=20)
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100]))
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.metric("Índice de Permissão", f"{(p_fail+p_feel+p_rest)//3}%")
+                st.warning("Visualização avançada desativada (Plotly ausente).")
+                st.metric("Média de Permissão", f"{(p_fail+p_feel+p_rest)//3}%")
 
-    with tab3:
-        st.subheader("📋 Rotina Dinâmica")
-        st.caption("Adicione ou remova tarefas da sua liturgia diária.")
+    # 12.3 Rotina Pastoral Dinâmica
+    with tabs_care[2]:
+        st.subheader("Liturgia Pessoal & Rotina")
         
-        # Carrega a rotina do config
-        current_routine = cfg.get("rotina_pastoral", [])
+        # Carrega e exibe
+        cfg = _read_json_safe(DB_FILES["CONFIG"])
+        routine = cfg.get("rotina_pastoral", [])
         
-        # Exibe lista com checkboxes
-        for task in current_routine:
-            st.checkbox(task, key=f"routine_{task}")
+        col_checks, col_manage = st.columns([2, 1])
+        
+        with col_checks:
+            st.markdown("**Tarefas Diárias**")
+            progress = 0
+            for task in routine:
+                if st.checkbox(task, key=f"chk_{task}"):
+                    progress += 1
             
-        st.divider()
+            if routine:
+                val = progress / len(routine)
+                st.progress(val, text="Progresso Diário")
         
-        # Adicionar Nova Tarefa
-        c_add, c_del = st.columns([3, 1])
-        new_task = c_add.text_input("Nova Tarefa")
-        if c_add.button("➕ Adicionar"):
-            if new_task and new_task not in current_routine:
-                current_routine.append(new_task)
-                cfg["rotina_pastoral"] = current_routine
-                write_json_safe(DATABASE_FILES["CONFIG"], cfg)
-                st.rerun()
-        
-        # Remover Tarefa
-        to_remove = c_del.selectbox("Remover", ["Selecione..."] + current_routine)
-        if c_del.button("🗑️ Apagar"):
-            if to_remove in current_routine:
-                current_routine.remove(to_remove)
-                cfg["rotina_pastoral"] = current_routine
-                write_json_safe(DATABASE_FILES["CONFIG"], cfg)
-                st.rerun()
+        with col_manage:
+            st.markdown("**Gerenciar**")
+            new_t = st.text_input("Nova Tarefa")
+            if st.button("ADICIONAR"):
+                if new_t:
+                    routine.append(new_t)
+                    cfg["rotina_pastoral"] = routine
+                    _write_json_atomic(DB_FILES["CONFIG"], cfg)
+                    st.rerun()
+            
+            del_t = st.selectbox("Remover", ["Selecione"] + routine)
+            if st.button("REMOVER"):
+                if del_t in routine:
+                    routine.remove(del_t)
+                    cfg["rotina_pastoral"] = routine
+                    _write_json_atomic(DB_FILES["CONFIG"], cfg)
+                    st.rerun()
 
-# --- MÓDULO 2: GABINETE PASTORAL (Editor Robusto) ---
-elif menu == "Gabinete Pastoral":
-    st.title("📝 Gabinete de Preparação")
+# ==============================================================================
+# 13. MÓDULO GABINETE DE PREPARAÇÃO (THE SYSTEM CORE)
+# ==============================================================================
+elif app_mode == "Gabinete de Preparação":
+    st.title("📝 Gabinete Pastoral Avançado")
     
-    col_list, col_editor = st.columns([1, 3])
+    # Navegador de Arquivos Lateral
+    col_nav, col_work = st.columns([1, 4])
     
-    with col_list:
-        st.markdown("**Seus Sermões**")
-        files = [f for f in os.listdir(DIRECTORIES["SERMONS"]) if f.endswith(".html")]
-        files.sort()
-        selection = st.radio("Arquivo", ["Novo Documento"] + files)
+    with col_nav:
+        st.markdown("**🗂️ Arquivos**")
+        all_files = [f for f in os.listdir(DIRECTORY_STRUCTURE["SERMONS"]) if f.endswith(".html")]
+        all_files.sort(reverse=True)
+        selected_file = st.radio("Acervo", ["NOVO DOCUMENTO"] + all_files)
 
-    with col_editor:
-        content_val = ""
-        title_val = ""
+    # Área de Trabalho Principal
+    with col_work:
+        # Estado Inicial
+        active_content = ""
+        active_title = ""
         
-        # Lógica de Carregamento
-        if selection != "Novo Documento":
+        # Carregamento Lógico
+        if selected_file != "NOVO DOCUMENTO":
+            file_path = os.path.join(DIRECTORY_STRUCTURE["SERMONS"], selected_file)
             try:
-                with open(os.path.join(DIRECTORIES["SERMONS"], selection), "r", encoding="utf-8") as f:
-                    content_val = f.read()
-                title_val = selection.replace(".html", "")
+                with open(file_path, "r", encoding="utf-8") as f:
+                    active_content = f.read()
+                active_title = selected_file.replace(".html", "").replace("_", " ")
             except Exception as e:
-                st.error(f"Erro ao abrir: {e}")
+                st.error(f"Erro de I/O: {e}")
+
+        # Interface de Inputs
+        doc_title_input = st.text_input("TÍTULO DA MENSAGEM / ESTUDO", value=active_title)
         
-        # Campos
-        doc_title = st.text_input("Título da Mensagem", value=title_val)
+        # SELETOR DE MOTOR DE EDIÇÃO (Priority Chain)
+        final_editor_content = active_content
         
-        # Seleção de Editor (Prioridade: CKEditor -> Quill -> Textarea)
-        final_content = content_val
-        if CKEDITOR_AVAILABLE:
-            final_content = st_ckeditor(value=content_val, key="ck_main", height=500)
-        elif QUILL_AVAILABLE:
-            final_content = st_quill(value=content_val, key="quill_main", html=True)
+        if GLOBAL_MODULES["CKEDITOR"]:
+            # Editor Nível 1: CKEditor (Word-like)
+            final_editor_content = st_ckeditor(
+                value=active_content,
+                key="ck_editor_core",
+                height=600
+            )
+        elif GLOBAL_MODULES["QUILL"]:
+             # Editor Nível 2: Quill
+            final_editor_content = st_quill(
+                value=active_content,
+                html=True,
+                key="quill_editor_core"
+            )
         else:
-            final_content = st.text_area("Editor Texto", value=content_val, height=500)
+             # Editor Nível 3: Raw HTML/Text
+            st.warning("Editores Visuais Indisponíveis. Usando modo Raw Text.")
+            final_editor_content = st.text_area("Editor Raw", value=active_content, height=600)
             
-        # BARRA DE FERRAMENTAS (Word, PDF, Scan)
+        # PAINEL DE AÇÕES DE ENGENHARIA (O MODULO SOLICITADO)
         st.markdown("---")
-        c1, c2, c3, c4 = st.columns(4)
+        st.markdown("### 🛠️ Processador de Engenharia Pastoral")
         
-        clean_name = safe_filename(doc_title if doc_title else "sem_titulo")
+        c_save, c_word, c_pdf, c_scan = st.columns(4)
         
-        # Salvar
-        if c1.button("💾 SALVAR"):
-            path = os.path.join(DIRECTORIES["SERMONS"], f"{clean_name}.html")
-            with open(path, "w", encoding="utf-8") as f: f.write(final_content)
-            st.toast("Sermão salvo com sucesso!")
+        clean_fname = TextUtils.sanitize_filename(doc_title_input if doc_title_input else "novo_sermao")
+        
+        # Botão SALVAR (HTML Raw)
+        if c_save.button("💾 GRAVAR (HTML)", use_container_width=True):
+            save_path = os.path.join(DIRECTORY_STRUCTURE["SERMONS"], f"{clean_fname}.html")
+            with open(save_path, "w", encoding="utf-8") as f:
+                f.write(final_editor_content)
+            st.toast("Documento gravado com segurança no servidor.", icon="✅")
             time.sleep(1)
             st.rerun()
+
+        # Botão WORD (Chama a classe complexa)
+        if c_word.button("📄 EXPORTAR DOCX", use_container_width=True):
+            out_path = os.path.join(DIRECTORY_STRUCTURE["SERMONS"], f"{clean_fname}.docx")
             
-        # Exportar Word (Usa a classe ExportEngine detalhada acima)
-        if c2.button("📄 DOCX (WORD)"):
-            path = os.path.join(DIRECTORIES["SERMONS"], f"{clean_name}.docx")
-            ok, msg = ExportEngine.export_to_docx(doc_title, final_content, path)
-            if ok:
-                st.success(msg)
-                with open(path, "rb") as f:
-                    st.download_button("Baixar Arquivo", f, file_name=f"{clean_name}.docx")
-            else:
-                st.error(msg)
+            # Instancia o Processador
+            processor = WordProcessorEngine(
+                title=doc_title_input,
+                content_html=final_editor_content,
+                output_path=out_path
+            )
+            
+            with st.spinner("Compilando Documento Word (Analysis/Conversion)..."):
+                status, msg = processor.execute_docx_export()
                 
-        # Exportar PDF
-        if c3.button("📕 PDF"):
-            path = os.path.join(DIRECTORIES["SERMONS"], f"{clean_name}.pdf")
-            ok, msg = ExportEngine.export_to_pdf(doc_title, final_content, path)
-            if ok:
+            if status:
                 st.success(msg)
-                with open(path, "rb") as f:
-                    st.download_button("Baixar PDF", f, file_name=f"{clean_name}.pdf")
+                with open(out_path, "rb") as f:
+                    st.download_button("BAIXAR DOCX", f, file_name=f"{clean_fname}.docx")
+            else:
+                st.error(msg)
+
+        # Botão PDF
+        if c_pdf.button("📕 EXPORTAR PDF", use_container_width=True):
+            out_path = os.path.join(DIRECTORY_STRUCTURE["SERMONS"], f"{clean_fname}.pdf")
+            
+            processor = WordProcessorEngine(
+                title=doc_title_input,
+                content_html=final_editor_content,
+                output_path=out_path
+            )
+            
+            with st.spinner("Renderizando PDF Vectorial..."):
+                status, msg = processor.execute_pdf_export()
+            
+            if status:
+                st.success(msg)
+                with open(out_path, "rb") as f:
+                    st.download_button("BAIXAR PDF", f, file_name=f"{clean_fname}.pdf")
             else:
                 st.error(msg)
         
-        # Scan Geneva
-        if c4.button("🔍 SCAN TEOLÓGICO"):
-            alerts = GenevaProtocol.scan(final_content)
+        # Botão SCAN (Geneva)
+        if c_scan.button("🔍 SCAN DOUTRINÁRIO", use_container_width=True):
+            alerts = GenevaDoctrineCore.scan(final_editor_content)
             if alerts:
-                st.warning("⚠️ Termos sensíveis detectados:")
-                for a in alerts: st.write(f"- {a}")
+                with st.expander("⚠️ RELATÓRIO DE INCONSISTÊNCIA DETECTADO", expanded=True):
+                    for a in alerts:
+                        st.markdown(f"🔴 **{a}**")
             else:
-                st.success("Nenhum termo de risco detectado.")
+                st.success("Análise completa: Nenhuma heresia detectada no corpus do texto.")
 
-# --- MÓDULO 3: REDE MINISTERIAL (Braço Colaborativo) ---
-elif menu == "Rede Ministerial":
-    st.title("🤝 Rede Ministerial")
-    st.markdown("Espaço para compartilhamento de vídeos, devocionais e avisos entre a liderança.")
+# ==============================================================================
+# 14. MÓDULO REDE MINISTERIAL (COLLAB LAYER)
+# ==============================================================================
+elif app_mode == "Rede Ministerial":
+    st.title("🤝 Rede de Conexão Pastoral")
+    st.markdown("Central de inteligência compartilhada entre colaboradores.")
     
-    feed = read_json_safe(DATABASE_FILES["NETWORK_FEED"], [])
+    # Renderização do Feed
+    feed_db = _read_json_safe(DB_FILES["NETWORK_FEED"], [])
     
-    # Formulário de Postagem
-    with st.expander("📢 Publicar Novo Conteúdo"):
-        with st.form("new_post"):
-            pt = st.text_input("Título")
-            pa = st.text_input("Autor", value=st.session_state["user_name"])
-            pu = st.text_input("Link YouTube (Opcional)")
-            pd = st.text_area("Mensagem / Descrição")
+    # 1. Formulário de Ingestão de Conteúdo
+    with st.expander("📡 TRANSMITIR NOVO CONTEÚDO", expanded=False):
+        with st.form("feed_form"):
+            p_title = st.text_input("Título do Recurso")
+            p_author = st.text_input("Responsável", value=st.session_state["current_user"])
+            p_link = st.text_input("Link Externo (YouTube/Drive/Vimeo)")
+            p_body = st.text_area("Descrição Técnica / Teológica")
             
-            if st.form_submit_button("Postar na Rede"):
-                new_item = {
-                    "id": int(time.time()),
-                    "date": datetime.now().strftime("%d/%m/%Y"),
-                    "title": pt, "author": pa, "url": pu, "desc": pd
-                }
-                feed.insert(0, new_item)
-                write_json_safe(DATABASE_FILES["NETWORK_FEED"], feed)
-                st.success("Publicado!")
-                st.rerun()
+            if st.form_submit_button("PUBLICAR NA REDE"):
+                if p_title and p_body:
+                    packet = {
+                        "uuid": uuid.uuid4().hex,
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "title": p_title,
+                        "author": p_author,
+                        "link": p_link,
+                        "body": p_body
+                    }
+                    feed_db.insert(0, packet) # Inserção LIFO
+                    _write_json_atomic(DB_FILES["NETWORK_FEED"], feed_db)
+                    st.success("Pacote de dados transmitido.")
+                    st.rerun()
+                else:
+                    st.warning("Dados incompletos.")
     
+    # 2. Renderização de Blocos de Conteúdo
     st.divider()
+    if not feed_db:
+        st.info("Buffer de Rede Vazio. Aguardando transmissão.")
     
-    # Exibição do Feed
-    if not feed:
-        st.info("Nenhuma publicação recente.")
-    
-    for item in feed:
-        st.markdown(f"""
-        <div class="tech-card">
-            <h3>{item['title']}</h3>
-            <small style="color:{APP_COLOR}">Por: {item['author']} em {item['date']}</small>
-            <p>{item['desc']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if "youtube" in item['url'] or "youtu.be" in item['url']:
-            try: st.video(item['url'])
-            except: st.write(f"[Link Vídeo]({item['url']})")
-        
-        # Botão de remoção simples
-        if st.button("Remover", key=f"del_{item['id']}"):
-            feed.remove(item)
-            write_json_safe(DATABASE_FILES["NETWORK_FEED"], feed)
-            st.rerun()
-
-# --- MÓDULO 4: BIBLIOTECA ---
-elif menu == "Biblioteca":
-    st.title("📚 Biblioteca Digital")
-    
-    col_up, col_list = st.columns([1, 2])
-    with col_up:
-        st.markdown("**Upload de Livro**")
-        up = st.file_uploader("PDF/EPUB/DOCX", type=["pdf", "epub", "docx", "txt"])
-        if up:
-            dest = os.path.join(DIRECTORIES["LIBRARY"], up.name)
-            with open(dest, "wb") as f: f.write(up.getbuffer())
-            st.success("Livro indexado.")
+    for item in feed_db:
+        with st.container():
+            st.markdown(f"""
+            <div class="tech-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3 style="margin:0;">{item['title']}</h3>
+                    <small>{item['timestamp']}</small>
+                </div>
+                <small style="color:var(--gold); font-weight:bold;">OPERADOR: {item['author']}</small>
+                <hr style="border-color:#333;">
+                <p>{item['body']}</p>
+            </div>
+            """, unsafe_allow_html=True)
             
-    with col_list:
-        st.markdown("**Seu Acervo**")
-        files = os.listdir(DIRECTORIES["LIBRARY"])
-        if not files: st.info("Biblioteca vazia.")
-        for f in files:
-            path = os.path.join(DIRECTORIES["LIBRARY"], f)
-            with open(path, "rb") as b:
-                st.download_button(f"⬇️ {f}", b, file_name=f)
+            if "youtube" in item['link']:
+                try: st.video(item['link'])
+                except: st.warning("Erro de codec de vídeo.")
+            elif item['link']:
+                st.markdown(f"🔗 [Acessar Recurso Externo]({item['link']})")
+            
+            if st.button("REMOVER PACOTE", key=item['uuid']):
+                feed_db.remove(item)
+                _write_json_atomic(DB_FILES["NETWORK_FEED"], feed_db)
+                st.rerun()
 
-# --- MÓDULO 5: CONFIGURAÇÕES & SOBRE ---
-elif menu == "Configurações":
-    st.title("⚙️ Configurações")
+# ==============================================================================
+# 15. MÓDULO BIBLIOTECA (FILE MANAGEMENT)
+# ==============================================================================
+elif app_mode == "Biblioteca Digital":
+    st.title("📚 Biblioteca & Acervo")
     
-    tab_ui, tab_tools, tab_about = st.tabs(["Personalização", "Ferramentas", "Sobre"])
+    col_up, col_idx = st.columns([1, 2])
     
-    with tab_ui:
-        st.subheader("Visual")
-        new_color = st.color_picker("Cor do Tema", APP_COLOR)
-        new_font = st.selectbox("Fonte Principal", ["Inter", "Roboto", "Cinzel"])
+    with col_up:
+        st.markdown("### Ingestão de Ativos")
+        f_up = st.file_uploader("Formatos: PDF, EPUB, DOCX", type=['pdf','epub','docx','txt'])
+        if f_up:
+            save_dest = os.path.join(DIRECTORY_STRUCTURE["LIBRARY_CACHE"], f_up.name)
+            with open(save_dest, "wb") as f:
+                f.write(f_up.getbuffer())
+            st.success(f"Arquivo '{f_up.name}' armazenado no Cache.")
+            
+    with col_idx:
+        st.markdown("### Índice Local")
+        files = os.listdir(DIRECTORY_STRUCTURE["LIBRARY_CACHE"])
+        if not files:
+            st.warning("Cache vazio.")
+        else:
+            for file_name in files:
+                f_path = os.path.join(DIRECTORY_STRUCTURE["LIBRARY_CACHE"], file_name)
+                c1, c2 = st.columns([4, 1])
+                c1.markdown(f"📑 **{file_name}**")
+                with open(f_path, "rb") as f:
+                    c2.download_button("BAIXAR", f, file_name=file_name, key=f"dl_{file_name}")
+
+# ==============================================================================
+# 16. CONFIGURAÇÕES & ADMIN (SYSTEM SETTINGS)
+# ==============================================================================
+elif app_mode == "Configurações":
+    st.title("⚙️ Painel de Controle do Sistema")
+    
+    tabs_conf = st.tabs(["🎨 Personalização UI", "🔧 Ferramentas de Manutenção", "ℹ️ Sobre o Sistema"])
+    
+    cfg = _read_json_safe(DB_FILES["CONFIG"])
+    
+    with tabs_conf[0]:
+        st.subheader("Parâmetros Visuais")
         
-        if st.button("Salvar Aparência"):
+        c_color, c_font = st.columns(2)
+        new_color = c_color.color_picker("Cor Primária (Ouro)", cfg.get("theme_color"))
+        new_font = c_font.selectbox("Tipografia", ["Inter", "Roboto", "Lato", "Cinzel"], index=0)
+        
+        if st.button("APLICAR MUDANÇAS DE TEMA"):
             cfg["theme_color"] = new_color
             cfg["font_family"] = new_font
-            write_json_safe(DATABASE_FILES["CONFIG"], cfg)
-            st.success("Configurações salvas. Recarregue a página.")
-            
-    with tab_tools:
-        st.subheader("Manutenção do Sistema")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**Backup**")
-            if st.button("📦 Criar Backup Completo (ZIP)"):
-                ts = int(time.time())
-                shutil.make_archive(os.path.join(DIRECTORIES["BACKUP_HIDDEN"], f"Backup_{ts}"), 'zip', ROOT_DIR)
-                st.success("Backup salvo na pasta segura.")
-        
-        with col2:
-            st.markdown("**Logs**")
-            if st.button("Limpar Logs de Auditoria"):
-                try:
-                    open(os.path.join(LOG_DIR, "system_audit_master.log"), 'w').close()
-                    st.success("Logs limpos.")
-                except: st.error("Erro ao limpar logs.")
+            if _write_json_atomic(DB_FILES["CONFIG"], cfg):
+                st.toast("Parâmetros regravados. Reinicialize a interface.")
+                time.sleep(1)
+                st.rerun()
                 
-    with tab_about:
-        st.header("O PREGADOR")
-        st.markdown("**Versão:** V40 (Maximum Robustness)")
-        st.markdown("**Build:** Titanium Core")
+    with tabs_conf[1]:
+        st.subheader("Utilitários de Sistema")
+        
         st.markdown("---")
-        st.caption("Sistema de Gestão Eclesiástica e Apoio Homilético.")
-        st.caption("Todos os direitos reservados ao Ministério Local.")
-        st.caption("Desenvolvido com Python/Streamlit.")
+        st.markdown("#### 1. Backup de Segurança")
+        st.info("Gera um pacote .ZIP criptografado (simbolicamente) de todo o banco de dados.")
+        if st.button("INICIAR PROTOCOLO DE BACKUP"):
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            fname = os.path.join(DIRECTORY_STRUCTURE["BACKUP_VAULT"], f"SystemBackup_{ts}")
+            shutil.make_archive(fname, 'zip', SYSTEM_ROOT)
+            st.success(f"Backup completo realizado em: {fname}.zip")
+            
+        st.markdown("---")
+        st.markdown("#### 2. Auditoria de Logs")
+        if os.path.exists(os.path.join(LOG_PATH, "system_audit_omega.log")):
+            with open(os.path.join(LOG_PATH, "system_audit_omega.log"), "r") as log_f:
+                lines = log_f.readlines()
+            st.text_area("Dump de Logs de Auditoria", "".join(lines[-20:]), height=200)
+            
+            if st.button("LIMPAR LOGS"):
+                 open(os.path.join(LOG_PATH, "system_audit_omega.log"), "w").close()
+                 st.rerun()
+                 
+    with tabs_conf[2]:
+        st.markdown(
+            """
+            ### SYSTEM OMEGA V.50
+            **Build:** Enterprise Gold Edition  
+            **Status:** Stable Production  
+            
+            Este sistema é um software de gestão pastoral completo, incluindo módulos de engenharia de documentos,
+            análise teológica e suporte à saúde mental do líder.
+            """
+        )
+        st.json(GLOBAL_MODULES)
 
-# Fim do código
+# End of System

@@ -831,9 +831,25 @@ if app_mode == "Dashboard & Cuidado":
         with c2:
             st.markdown("**Histórico Recente**")
             data = _read_json_safe(DB_FILES["SOUL_METRICS"])
-            history = data.get("historico", [])[-5:]
+            # Compatibilidad: el fichero pode ser um dict {"historico": [...]} o uma lista [...]
+            if isinstance(data, dict):
+                history = data.get("historico", [])[-5:]
+            elif isinstance(data, list):
+                history = data[-5:]
+            else:
+                history = []
+
             for item in reversed(history):
-                st.info(f"{item['data']} | Estado: {item['humor']} | Obs: {item.get('nota', '-')}")
+                # Proteção adicional se o registro não é dict
+                if isinstance(item, dict):
+                    date = item.get('data', '-')
+                    humor = item.get('humor', item.get('estado', '-'))
+                    nota = item.get('nota', item.get('obs', '-'))
+                else:
+                    date = str(item)
+                    humor = '-'
+                    nota = '-'
+                st.info(f"{date} | Estado: {humor} | Obs: {nota}")
 
     # 12.2 Teoria da Permissão
     with tabs_care[1]:

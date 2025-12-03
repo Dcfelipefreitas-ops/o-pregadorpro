@@ -7,52 +7,54 @@ import json
 import base64
 import math
 import shutil
-import random
-import calendar
-import pandas as pd
-from datetime import datetime, timedelta
-from io import BytesIO
+import logging
+from datetime import datetime
+from PIL import Image, ImageOps
 
 # ==============================================================================
-# 0. KERNEL DE INICIALIZAÇÃO (BLINDAGEM DO SISTEMA)
+# 0. KERNEL DE INICIALIZAÇÃO E DEPENDÊNCIAS (SRD: SYS-INIT-01)
 # ==============================================================================
 class SystemOmegaKernel:
     """
-    Núcleo 'Raiz': Garante que o sistema rode em qualquer ambiente.
+    [NASA STD: SYSTEM BOOT]
+    Garante integridade do ambiente de execução antes do carregamento da UI.
     """
-    REQUIRED = ["google-generativeai", "streamlit-lottie", "Pillow", "pandas", "fpdf"]
+    REQUIRED = ["google-generativeai", "streamlit-lottie", "Pillow", "pandas"]
     
     @staticmethod
     def _install(pkg):
         try:
             subprocess.check_call([sys.executable, "-m", "pip", "install", pkg, "--quiet"])
-        except: pass
+            return True
+        except subprocess.CalledProcessError:
+            return False
 
     @staticmethod
     def boot_check():
-        queue = []
+        missing = []
         for lib in SystemOmegaKernel.REQUIRED:
             try:
-                mod = lib.replace("google-generativeai", "google.generativeai").replace("Pillow", "PIL")
-                __import__(mod.replace("-", "_"))
+                # Mapeamento de nomes de importação vs nomes de pacote pip
+                module_name = lib.replace("google-generativeai", "google.generativeai").replace("Pillow", "PIL")
+                __import__(module_name.replace("-", "_"))
             except ImportError:
-                queue.append(lib)
+                missing.append(lib)
         
-        if queue:
+        if missing:
             placeholder = st.empty()
-            placeholder.code(f"INITIALIZING THEOLOGY OS... ({len(queue)} MODULES)", language="bash")
-            for lib in queue:
+            placeholder.code(f"[SYSTEM BOOT] INITIALIZING THEOLOGY OS... RESOLVING {len(missing)} MODULES", language="bash")
+            for lib in missing:
                 SystemOmegaKernel._install(lib)
             placeholder.empty()
             st.rerun()
 
+# Executa verificação de integridade
 SystemOmegaKernel.boot_check()
 
 import google.generativeai as genai
-from PIL import Image, ImageOps
 
 # ==============================================================================
-# 1. INFRAESTRUTURA DE DADOS (SAFE I/O)
+# 1. INFRAESTRUTURA DE DADOS E CONFIGURAÇÃO (SRD: DATA-IO-02)
 # ==============================================================================
 st.set_page_config(
     page_title="O PREGADOR | Theology OS", 
@@ -61,6 +63,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Constantes de Diretório (Imutáveis em Runtime)
 ROOT = "Dados_Pregador_V27_Genesis"
 DIRS = {
     "SERMOES": os.path.join(ROOT, "Sermoes"),
@@ -68,7 +71,8 @@ DIRS = {
     "SERIES": os.path.join(ROOT, "Series"),
     "MIDIA": os.path.join(ROOT, "Midia"),
     "USER": os.path.join(ROOT, "User_Data"),
-    "BACKUP": os.path.join(ROOT, "Auto_Backup_Oculto")
+    "BACKUP": os.path.join(ROOT, "Auto_Backup_Oculto"),
+    "LOGS": os.path.join(ROOT, "Flight_Logs")
 }
 
 DBS = {
@@ -76,34 +80,67 @@ DBS = {
     "STATS": os.path.join(DIRS["USER"], "db_stats.json"),
     "CONFIG": os.path.join(DIRS["USER"], "config.json"),
     "SOUL": os.path.join(DIRS["GABINETE"], "soul_data.json"),
-    "USERS": os.path.join(DIRS["USER"], "users_db.json") # NOVO DB DE USUÁRIOS
+    "USERS": os.path.join(DIRS["USER"], "users_db.json")
 }
 
+# Inicialização do File System
 for d in DIRS.values():
     os.makedirs(d, exist_ok=True)
 
+class FlightRecorder:
+    """[NASA STD: TRACEABILITY] Sistema de logs para auditoria."""
+    logging.basicConfig(
+        filename=os.path.join(DIRS["LOGS"], "system_events.log"),
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    
+    @staticmethod
+    def log(event_type, message):
+        print(f"[{event_type}] {message}") # Output console
+        logging.info(f"[{event_type}] {message}")
+
 class SafeIO:
-    """Sistema de Auto-Preservação de Dados."""
+    """
+    [NASA STD: DATA INTEGRITY]
+    Sistema de I/O com tratamento de exceção estrito e backups atômicos.
+    """
     @staticmethod
     def ler_json(caminho, default_return):
-        if not os.path.exists(caminho): return default_return
+        if not os.path.exists(caminho): 
+            return default_return
         try:
             with open(caminho, 'r', encoding='utf-8') as f:
-                c = f.read().strip()
-                return json.loads(c) if c else default_return
-        except: return default_return
+                content = f.read().strip()
+                if not content: return default_return
+                return json.loads(content)
+        except (json.JSONDecodeError, IOError) as e:
+            FlightRecorder.log("IO_ERROR", f"Falha ao ler {caminho}: {str(e)}")
+            return default_return
 
     @staticmethod
     def salvar_json(caminho, dados):
+        """Salva dados e cria backup imediato."""
         try:
-            with open(caminho, 'w', encoding='utf-8') as f:
+            # Atomic Write Pattern
+            temp_path = caminho + ".tmp"
+            with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(dados, f, indent=4, ensure_ascii=False)
-            shutil.copy2(caminho, os.path.join(DIRS["BACKUP"], os.path.basename(caminho) + ".bak"))
-        except: pass
+            
+            os.replace(temp_path, caminho)
+            
+            # Backup
+            bkp_name = os.path.basename(caminho) + ".bak"
+            shutil.copy2(caminho, os.path.join(DIRS["BACKUP"], bkp_name))
+            return True
+        except IOError as e:
+            FlightRecorder.log("CRITICAL", f"Falha de escrita em {caminho}: {str(e)}")
+            return False
 
 # ==============================================================================
-# 2. DESIGN SYSTEM "DARK CATHEDRAL"
+# 2. DESIGN SYSTEM "DARK CATHEDRAL" (UI-SPEC-03)
 # ==============================================================================
+# NOTA: Cores e CSS preservados integralmente conforme solicitação.
 def inject_css(color="#D4AF37", font_sz=18):
     st.markdown(f"""
     <style>
@@ -134,7 +171,7 @@ def inject_css(color="#D4AF37", font_sz=18):
         }}
         [data-testid="stSidebar"] hr {{ margin: 0; border-color: #222; }}
         
-        /* --- AVATAR HOLOGRÁFICO (NÍVEL NASA) --- */
+        /* --- AVATAR HOLOGRÁFICO --- */
         @keyframes holo-reveal {{
             0% {{ opacity: 0; transform: scale(0.8) translateY(20px); filter: blur(10px); }}
             20% {{ opacity: 1; transform: scale(1.1); filter: blur(0px); }}
@@ -239,11 +276,14 @@ def inject_css(color="#D4AF37", font_sz=18):
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. MOTORES DE INTELIGÊNCIA
+# 3. MOTORES DE LÓGICA (LOGIC-LAYER-04)
 # ==============================================================================
 
 class AccessControl:
-    """Sistema de Autenticação e Registro."""
+    """
+    [NASA STD: SECURITY] 
+    Controle de Acesso com Verificação de Entradas.
+    """
     DEFAULT_USERS = {"ADMIN": "1234", "PR": "123"}
     
     @staticmethod
@@ -252,45 +292,32 @@ class AccessControl:
 
     @staticmethod
     def register(username, password):
-        users = AccessControl.get_users()
-        u_upper = username.upper().strip()
-        if u_upper in users:
-            return False, "USUÁRIO JÁ EXISTE."
+        # Validação de Entrada (NASA Rule 7: Check Parameters)
         if not username or not password:
             return False, "PREENCHA TODOS OS CAMPOS."
             
+        users = AccessControl.get_users()
+        u_upper = username.upper().strip()
+        
+        if u_upper in users:
+            return False, "USUÁRIO JÁ EXISTE."
+            
         users[u_upper] = password
-        SafeIO.salvar_json(DBS["USERS"], users)
-        return True, "REGISTRO EFETUADO COM SUCESSO."
+        if SafeIO.salvar_json(DBS["USERS"], users):
+            FlightRecorder.log("SEC", f"Novo usuário registrado: {u_upper}")
+            return True, "REGISTRO EFETUADO COM SUCESSO."
+        else:
+            return False, "ERRO CRÍTICO DE I/O."
 
     @staticmethod
     def login(username, password):
         users = AccessControl.get_users()
         u_upper = username.upper().strip()
         if u_upper in users and users[u_upper] == password:
+            FlightRecorder.log("AUTH", f"Login bem sucedido: {u_upper}")
             return True
+        FlightRecorder.log("AUTH_FAIL", f"Tentativa falha: {u_upper}")
         return False
-
-class LiturgicalCalendar:
-    @staticmethod
-    def get_status():
-        hoje = datetime.now()
-        wd = hoje.weekday()
-        if wd == 6: return "DOMINGO - DIA DO SENHOR"
-        return "DIA FERIAL"
-
-class GenevaProtocol:
-    """O Guardião da Doutrina."""
-    DB = {
-        "prosperidade": "⚠️ ALERTA: Teologia da Prosperidade.",
-        "eu decreto": "⚠️ ALERTA: Quebra de Soberania Divina.",
-        "mérito": "⚠️ ALERTA: Pelagianismo (Sola Gratia).",
-        "energia": "⚠️ ALERTA: Terminologia Nova Era."
-    }
-    @staticmethod
-    def scan(text):
-        if not text: return []
-        return [v for k, v in GenevaProtocol.DB.items() if k in text.lower()]
 
 class PastoralMind:
     """Monitor de Vitalidade."""
@@ -298,16 +325,20 @@ class PastoralMind:
     def check_burnout():
         data = SafeIO.ler_json(DBS["SOUL"], {"historico": []})
         hist = data.get("historico", [])[-10:]
-        bad = sum(1 for h in hist if h['humor'] in ["Cansaço 🌖", "Ira 😠", "Ansiedade 🌪️", "Tristeza 😢"])
+        # Definição clara de estados negativos
+        negative_states = {"Cansaço 🌖", "Ira 😠", "Ansiedade 🌪️", "Tristeza 😢"}
+        bad_count = sum(1 for h in hist if h.get('humor') in negative_states)
         
-        if bad >= 6: return "CRÍTICO", "#FF3333"
-        if bad >= 3: return "ALERTA", "#FFAA00"
+        # Lógica de Limiar
+        if bad_count >= 6: return "CRÍTICO", "#FF3333"
+        if bad_count >= 3: return "ALERTA", "#FFAA00"
         return "OPERACIONAL", "#33FF33"
 
     @staticmethod
     def registrar(humor):
         data = SafeIO.ler_json(DBS["SOUL"], {"historico": [], "diario": []})
-        data["historico"].append({"data": datetime.now().strftime("%Y-%m-%d"), "humor": humor})
+        entry = {"data": datetime.now().strftime("%Y-%m-%d %H:%M"), "humor": humor}
+        data["historico"].append(entry)
         SafeIO.salvar_json(DBS["SOUL"], data)
 
 class Gamification:
@@ -315,30 +346,37 @@ class Gamification:
     def add_xp(amount):
         stats = SafeIO.ler_json(DBS["STATS"], {"xp": 0, "nivel": 1})
         stats["xp"] += amount
+        # Cálculo logarítmico para escala de níveis
         stats["nivel"] = int(math.sqrt(stats["xp"]) * 0.2) + 1
         SafeIO.salvar_json(DBS["STATS"], stats)
 
 # ==============================================================================
-# 4. GESTÃO DE ESTADO
+# 4. GESTÃO DE ESTADO (SESSION MANAGEMENT)
 # ==============================================================================
-if "config" not in st.session_state:
-    st.session_state["config"] = SafeIO.ler_json(DBS["CONFIG"], {"theme_color": "#D4AF37", "font_size": 18})
+# Inicialização segura de variáveis de sessão
+DEFAULT_SESSION = {
+    "logado": False,
+    "user_name": "Pastor",
+    "texto_ativo": "",
+    "titulo_ativo": "",
+    "config": SafeIO.ler_json(DBS["CONFIG"], {"theme_color": "#D4AF37", "font_size": 18, "api_key": ""})
+}
+
+for key, value in DEFAULT_SESSION.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 inject_css(st.session_state["config"]["theme_color"], st.session_state["config"]["font_size"])
 
-if "logado" not in st.session_state: st.session_state["logado"] = False
-if "user_name" not in st.session_state: st.session_state["user_name"] = "Pastor"
-if "texto_ativo" not in st.session_state: st.session_state["texto_ativo"] = ""
-if "titulo_ativo" not in st.session_state: st.session_state["titulo_ativo"] = ""
-
 # ==============================================================================
-# 5. TELA DE LOGIN (COM SISTEMA DE REGISTRO)
+# 5. TELA DE LOGIN (UI-LAYER-05)
 # ==============================================================================
 if not st.session_state["logado"]:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
         gold = st.session_state["config"]["theme_color"]
+        # SVG Preservado Exatamente
         svg_logo = f"""
         <svg class="prime-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <circle cx="50" cy="50" r="45" stroke="{gold}" stroke-width="3" fill="none" />
@@ -352,7 +390,6 @@ if not st.session_state["logado"]:
         <div style="text-align:center; font-size:9px; color:#555; letter-spacing:4px; margin-bottom:30px;">SANCTUM AI V27</div>
         """, unsafe_allow_html=True)
         
-        # ABAS DE LOGIN E REGISTRO
         tab_login, tab_register = st.tabs(["ACESSAR", "REGISTRAR"])
         
         with tab_login:
@@ -391,73 +428,61 @@ if not st.session_state["logado"]:
     st.stop()
 
 # ==============================================================================
-# 6. APP PRINCIPAL
+# 6. APP PRINCIPAL - MÓDULOS DE FUNÇÃO (APP-CORE-06)
 # ==============================================================================
 
-# --- SIDEBAR (MONOLITO COM AVATAR HOLOGRÁFICO) ---
-with st.sidebar:
-    # Lógica de Avatar
-    avatar_path = os.path.join(DIRS["USER"], "avatar.png")
-    
-    if os.path.exists(avatar_path):
-        with open(avatar_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
+# --- SIDEBAR E HEADER ---
+def render_sidebar():
+    with st.sidebar:
+        avatar_path = os.path.join(DIRS["USER"], "avatar.png")
+        if os.path.exists(avatar_path):
+            with open(avatar_path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode()
+            st.markdown(f"""
+            <div class="holo-container">
+                <img src="data:image/png;base64,{encoded_string}" class="holo-img">
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            gold = st.session_state["config"]["theme_color"]
+            st.markdown(f"""
+            <div class="holo-container" style="display:flex; align-items:center; justify-content:center;">
+                <span style="font-size:40px; color:{gold}">✝</span>
+            </div>
+            """, unsafe_allow_html=True)
+
         st.markdown(f"""
-        <div class="holo-container">
-            <img src="data:image/png;base64,{encoded_string}" class="holo-img">
+        <div style="text-align:center; padding-bottom:10px;">
+            <div style="font-family:'Cinzel'; font-size:16px; color:{st.session_state["config"]["theme_color"]}">{st.session_state["user_name"]}</div>
+            <div style="font-size:9px; color:#666; letter-spacing:2px;">MINISTRO DO EVANGELHO</div>
         </div>
         """, unsafe_allow_html=True)
-    else:
-        gold = st.session_state["config"]["theme_color"]
+        
+        st.markdown("---")
+        
+        menu = st.radio(
+            "MÓDULOS", 
+            ["Dashboard", "Gabinete Pastoral", "Studio Expositivo", "Séries Bíblicas", "Media Lab", "Configurações"],
+            label_visibility="collapsed"
+        )
+        
+        st.markdown("---")
+        
+        stats = SafeIO.ler_json(DBS["STATS"], {"nivel": 1, "xp": 0})
         st.markdown(f"""
-        <div class="holo-container" style="display:flex; align-items:center; justify-content:center;">
-            <span style="font-size:40px; color:{gold}">✝</span>
+        <div style="font-family:'JetBrains Mono'; font-size:10px; color:#555; text-align:center;">
+            LVL {stats['nivel']} // XP {stats['xp']}
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <div style="text-align:center; padding-bottom:10px;">
-        <div style="font-family:'Cinzel'; font-size:16px; color:{st.session_state["config"]["theme_color"]}">{st.session_state["user_name"]}</div>
-        <div style="font-size:9px; color:#666; letter-spacing:2px;">MINISTRO DO EVANGELHO</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    menu = st.radio(
-        "MÓDULOS", 
-        ["Dashboard", "Gabinete Pastoral", "Studio Expositivo", "Séries Bíblicas", "Media Lab", "Configurações"],
-        label_visibility="collapsed"
-    )
-    
-    st.markdown("---")
-    
-    stats = SafeIO.ler_json(DBS["STATS"], {"nivel": 1, "xp": 0})
-    st.markdown(f"""
-    <div style="font-family:'JetBrains Mono'; font-size:10px; color:#555; text-align:center;">
-        LVL {stats['nivel']} // XP {stats['xp']}
-    </div>
-    """, unsafe_allow_html=True)
+        if st.button("LOGOUT", use_container_width=True):
+            st.session_state["logado"] = False
+            st.rerun()
+    return menu
 
-    if st.button("LOGOUT", use_container_width=True):
-        st.session_state["logado"] = False
-        st.rerun()
+# --- RENDERIZADORES DE PÁGINA ---
 
-# --- HUD (STATUS HEADER) ---
-status_b, cor_b = PastoralMind.check_burnout()
-dia_liturgico = LiturgicalCalendar.get_status()
-
-# Layout do Header
-col_h1, col_h2 = st.columns([3, 1])
-with col_h1:
-    st.markdown(f"<span style='color:#666; font-size:10px;'>LITURGIA:</span> <span style='font-family:Cinzel'>{dia_liturgico}</span>", unsafe_allow_html=True)
-with col_h2:
-    st.markdown(f"<div style='text-align:right;'><span style='color:#666; font-size:10px;'>VITALIDADE:</span> <span style='color:{cor_b}'>{status_b}</span></div>", unsafe_allow_html=True)
-st.markdown("---")
-
-# --- PÁGINAS ---
-
-if menu == "Dashboard":
+def render_dashboard(status_b):
     st.markdown(f"<h2 style='font-family:Cinzel; margin-bottom:20px;'>Painel de Controle</h2>", unsafe_allow_html=True)
     
     c1, c2 = st.columns([1, 2])
@@ -483,7 +508,10 @@ if menu == "Dashboard":
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.subheader("Arquivos Recentes")
-    files = sorted([f for f in os.listdir(DIRS["SERMOES"]) if f.endswith(".txt")], key=lambda x: os.path.getmtime(os.path.join(DIRS["SERMOES"], x)), reverse=True)[:3]
+    try:
+        files = sorted([f for f in os.listdir(DIRS["SERMOES"]) if f.endswith(".txt")], key=lambda x: os.path.getmtime(os.path.join(DIRS["SERMOES"], x)), reverse=True)[:3]
+    except FileNotFoundError:
+        files = []
     
     cols = st.columns(3)
     for i, f in enumerate(files):
@@ -495,39 +523,28 @@ if menu == "Dashboard":
             </div>
             """, unsafe_allow_html=True)
 
-elif menu == "Gabinete Pastoral":
-    st.title("Gabinete Pastoral")
-    t1, t2 = st.tabs(["DIÁRIO CRIPTOGRAFADO", "TERAPIA DA VERDADE"])
-    
-    with t1:
-        diario = st.text_area("Entrada de Dados", height=300)
-        if st.button("GUARDAR NO COFRE"):
-            soul = SafeIO.ler_json(DBS["SOUL"], {"diario": []})
-            soul.setdefault("diario", []).append({"data": datetime.now().strftime("%Y-%m-%d"), "texto": diario})
-            SafeIO.salvar_json(DBS["SOUL"], soul)
-            st.toast("ARQUIVADO.", icon="🔒")
-            
-    with t2:
-        mentira = st.text_input("Detectar Mentira (Input)")
-        if mentira:
-            st.success("VERDADE BÍBLICA: 'Porque dele, e por ele, e para ele são todas as coisas.' (Romanos 11:36)")
-
-elif menu == "Studio Expositivo":
+def render_studio(status_b):
     if status_b == "CRÍTICO":
-        st.error("⛔ ACESSO BLOQUEADO PELO PROTOCOLO DE SAÚDE.")
-        st.stop()
+        st.error("⛔ ACESSO BLOQUEADO PELO PROTOCOLO DE SAÚDE (NASA SAFETY PROTOCOL).")
+        return
 
     st.title("Studio Expositivo")
     
     c1, c2 = st.columns([3, 1])
     c1.text_input("Título", key="titulo_ativo", placeholder="Ex: Gênesis 1 - O Princípio")
+    
     if c2.button("PERSISTIR DADOS", use_container_width=True, type="primary"):
         if st.session_state["titulo_ativo"]:
             path = os.path.join(DIRS["SERMOES"], f"{st.session_state['titulo_ativo']}.txt")
-            with open(path, 'w', encoding='utf-8') as f: 
-                f.write(st.session_state["texto_ativo"])
-            SafeIO.salvar_json(os.path.join(DIRS["BACKUP"], "log.json"), {"saved": True})
-            st.toast("DADOS SALVOS.", icon="💾")
+            try:
+                with open(path, 'w', encoding='utf-8') as f: 
+                    f.write(st.session_state["texto_ativo"])
+                st.toast("DADOS SALVOS.", icon="💾")
+                Gamification.add_xp(2)
+            except Exception as e:
+                st.error(f"ERRO DE I/O: {e}")
+        else:
+            st.warning("DEFINA UM TÍTULO.")
 
     ce, ca = st.columns([2.5, 1])
     with ce:
@@ -536,25 +553,112 @@ elif menu == "Studio Expositivo":
         st.markdown('</div>', unsafe_allow_html=True)
     
     with ca:
-        st.markdown("#### Geneva Scan")
-        alerts = GenevaProtocol.scan(st.session_state["texto_ativo"])
-        if not alerts: st.markdown("<div style='color:#33FF33; font-size:12px; background:#001100; padding:5px;'>✅ DOUTRINA SÃ</div>", unsafe_allow_html=True)
+        st.markdown("#### Geneva Protocol")
+        # Geneva Scan Logic
+        scan_db = {
+            "prosperidade": "⚠️ ALERTA: Teologia da Prosperidade.",
+            "eu decreto": "⚠️ ALERTA: Quebra de Soberania Divina.",
+            "mérito": "⚠️ ALERTA: Pelagianismo (Sola Gratia).",
+            "energia": "⚠️ ALERTA: Terminologia Nova Era."
+        }
+        alerts = [v for k, v in scan_db.items() if k in st.session_state["texto_ativo"].lower()]
+        
+        if not alerts: 
+            st.markdown("<div style='color:#33FF33; font-size:12px; background:#001100; padding:5px;'>✅ DOUTRINA SÃ</div>", unsafe_allow_html=True)
         else:
             for a in alerts: st.warning(a)
             
         st.divider()
         st.markdown("#### IA Auxiliar")
-        q = st.text_area("Query", height=100)
+        q = st.text_area("Query Teológica", height=100)
         if st.button("PROCESSAR"):
-            if st.session_state["config"].get("api_key"):
+            api_key = st.session_state["config"].get("api_key")
+            if api_key:
                 try:
-                    genai.configure(api_key=st.session_state["config"]["api_key"])
-                    r = genai.GenerativeModel("gemini-pro").generate_content(f"Teologia Reformada: {q}").text
-                    st.info(r)
-                except: st.error("FALHA NA API.")
-            else: st.warning("API KEY NÃO DETECTADA.")
+                    genai.configure(api_key=api_key)
+                    # NASA Rule: Check Return Values & Error Handling
+                    model = genai.GenerativeModel("gemini-pro")
+                    response = model.generate_content(f"Contexto: Teologia Reformada Conservadora. Pergunta: {q}")
+                    if response and response.text:
+                        st.info(response.text)
+                    else:
+                        st.warning("RESPOSTA VAZIA DA API.")
+                except Exception as e: 
+                    st.error(f"FALHA NA API: {str(e)}")
+            else: 
+                st.warning("API KEY NÃO DETECTADA.")
 
-elif menu == "Séries Bíblicas":
+def render_config():
+    st.title("Configurações do Sistema")
+    
+    st.markdown("### Identidade Visual & Credenciais")
+    c1, c2 = st.columns(2)
+    with c1:
+        current_cfg = st.session_state["config"]
+        nc = st.color_picker("Cor Destaque", current_cfg.get("theme_color", "#D4AF37"))
+        nf = st.slider("Tamanho Fonte", 14, 28, current_cfg.get("font_size", 18))
+        nk = st.text_input("API Key (Google)", value=current_cfg.get("api_key", ""), type="password")
+
+    with c2:
+        cam = st.camera_input("ID Ministerial (Foto)")
+        if cam:
+            try:
+                img = Image.open(cam)
+                img = ImageOps.grayscale(img)
+                img = ImageOps.contrast(img, 1.2)
+                img.save(os.path.join(DIRS["USER"], "avatar.png"))
+                st.success("IDENTIDADE ATUALIZADA.")
+            except Exception as e:
+                st.error(f"ERRO DE IMAGEM: {e}")
+
+    if st.button("ATUALIZAR PARÂMETROS", type="primary"):
+        new_cfg = {"theme_color": nc, "font_size": nf, "api_key": nk}
+        st.session_state["config"] = new_cfg
+        SafeIO.salvar_json(DBS["CONFIG"], new_cfg)
+        st.success("CONFIGURAÇÃO PERSISTIDA. REINICIANDO...")
+        time.sleep(1)
+        st.rerun()
+
+# --- EXECUÇÃO PRINCIPAL ---
+
+menu_selection = render_sidebar()
+
+# HUD (Status Header)
+status_b, cor_b = PastoralMind.check_burnout()
+dia_liturgico = "DOMINGO - DIA DO SENHOR" if datetime.now().weekday() == 6 else "DIA FERIAL"
+
+col_h1, col_h2 = st.columns([3, 1])
+with col_h1:
+    st.markdown(f"<span style='color:#666; font-size:10px;'>LITURGIA:</span> <span style='font-family:Cinzel'>{dia_liturgico}</span>", unsafe_allow_html=True)
+with col_h2:
+    st.markdown(f"<div style='text-align:right;'><span style='color:#666; font-size:10px;'>VITALIDADE:</span> <span style='color:{cor_b}'>{status_b}</span></div>", unsafe_allow_html=True)
+st.markdown("---")
+
+# Roteamento de Menu
+if menu_selection == "Dashboard":
+    render_dashboard(status_b)
+
+elif menu_selection == "Gabinete Pastoral":
+    st.title("Gabinete Pastoral")
+    t1, t2 = st.tabs(["DIÁRIO CRIPTOGRAFADO", "TERAPIA DA VERDADE"])
+    
+    with t1:
+        diario = st.text_area("Entrada de Dados", height=300)
+        if st.button("GUARDAR NO COFRE"):
+            soul = SafeIO.ler_json(DBS["SOUL"], {"diario": []})
+            soul.setdefault("diario", []).append({"data": datetime.now().strftime("%Y-%m-%d"), "texto": diario})
+            if SafeIO.salvar_json(DBS["SOUL"], soul):
+                st.toast("ARQUIVADO.", icon="🔒")
+            
+    with t2:
+        mentira = st.text_input("Detectar Mentira (Input)")
+        if mentira:
+            st.success("VERDADE BÍBLICA: 'Porque dele, e por ele, e para ele são todas as coisas.' (Romanos 11:36)")
+
+elif menu_selection == "Studio Expositivo":
+    render_studio(status_b)
+
+elif menu_selection == "Séries Bíblicas":
     st.title("Séries Bíblicas")
     with st.expander("INICIAR NOVA SÉRIE", expanded=True):
         with st.form("serie"):
@@ -573,7 +677,7 @@ elif menu == "Séries Bíblicas":
     for k, v in db.items():
         st.markdown(f"<div class='tech-card'><b>{v['nome']}</b><br><small>{v['descricao']}</small></div>", unsafe_allow_html=True)
 
-elif menu == "Media Lab":
+elif menu_selection == "Media Lab":
     st.title("Media Lab")
     c1, c2 = st.columns(2)
     with c1: st.markdown('<div style="height:300px; border:1px dashed #333; display:flex; align-items:center; justify-content:center; color:#444;">RENDER PREVIEW</div>', unsafe_allow_html=True)
@@ -582,29 +686,5 @@ elif menu == "Media Lab":
         st.selectbox("Template", ["Dark Theology", "Light Grace", "Nature"])
         if st.button("RENDERIZAR (SIMULAÇÃO)"): st.success("PROCESSADO.")
 
-elif menu == "Configurações":
-    st.title("Configurações do Sistema")
-    
-    st.markdown("### Identidade Visual")
-    c1, c2 = st.columns(2)
-    with c1:
-        nc = st.color_picker("Cor Destaque", st.session_state["config"].get("theme_color", "#D4AF37"))
-        nf = st.slider("Tamanho Fonte", 14, 28, st.session_state["config"].get("font_size", 18))
-    with c2:
-        cam = st.camera_input("ID Ministerial (Foto)")
-        if cam:
-            try:
-                img = Image.open(cam)
-                # Processamento Estético do ID
-                img = ImageOps.grayscale(img)
-                img = ImageOps.contrast(img, 1.2)
-                img.save(os.path.join(DIRS["USER"], "avatar.png"))
-                st.success("IDENTIDADE ATUALIZADA.")
-            except: pass
-
-    st.markdown("### Conectividade")
-    nk = st.text_input("API Key (Google)", value=st.session_state["config"].get("api_key", ""), type="password")
-        
-    if st.button("ATUALIZAR PARÂMETROS", type="primary"):
-        cfg = st.session_state["config"]
-        c
+elif menu_selection == "Configurações":
+    render_config()

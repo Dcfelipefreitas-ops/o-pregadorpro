@@ -1,18 +1,16 @@
-# app.py
 # -*- coding: utf-8 -*-
 """
-O PREGADOR - App consolidado (unified single-file)
-Versão: Consolidated (improved)
-Mantenha nomes e casca originais; funcionalidades melhoradas.
+O PREGADOR - App consolidado (Bug Fix & Clean Up)
+Versão: Stable V32
 """
 
 import streamlit as st
-import os, sys, time, json, base64, math, shutil, random, logging, hashlib, re
+import os, sys, time, json, base64, math, shutil, random, logging, hashlib, re, subprocess
 from datetime import datetime
 from io import BytesIO
 
 # ---------------------------------------------------------------------
-# 0. PAGE CONFIG - MUST BE FIRST STREAMLIT CALL
+# 0. PAGE CONFIG - OBRIGATÓRIO SER A PRIMEIRA LINHA
 # ---------------------------------------------------------------------
 st.set_page_config(page_title="O PREGADOR", layout="wide", page_icon="✝️", initial_sidebar_state="expanded")
 
@@ -48,6 +46,58 @@ except Exception:
         HTML2DOCX = None
 
 # ---------------------------------------------------------------------
+# SYSTEM KERNEL (Gerenciador de Dependências)
+# ---------------------------------------------------------------------
+class SystemOmegaKernel:
+    REQUIRED = [
+        "google-generativeai", "streamlit-lottie", "Pillow", "pandas",
+        "streamlit-quill", "python-docx", "reportlab", "mammoth", "plotly", "cryptography"
+    ]
+
+    @staticmethod
+    def _install_quiet(pkg):
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg, "--quiet"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def boot_check():
+        missing = []
+        for lib in SystemOmegaKernel.REQUIRED:
+            mod = lib.replace("google-generativeai", "google.generativeai").replace("Pillow", "PIL").replace("python-docx", "docx").replace("streamlit-quill", "streamlit_quill")
+            try:
+                __import__(mod.split(".")[0])
+            except Exception:
+                missing.append(lib)
+        if missing:
+            placeholder = st.empty()
+            placeholder.info(f"⚙️ System Omega: Atualizando dependências... ({len(missing)} pacotes)")
+            for pkg in missing:
+                SystemOmegaKernel._install_quiet(pkg)
+            placeholder.empty()
+
+    @staticmethod
+    def inject_pwa_headers():
+        st.markdown("""
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+        """, unsafe_allow_html=True)
+
+try:
+    SystemOmegaKernel.boot_check()
+    SystemOmegaKernel.inject_pwa_headers()
+except Exception:
+    pass
+
+# Imports Tardios (após verificação)
+try:
+    import pandas as pd
+    from PIL import Image, ImageOps
+except: pass
+
+# ---------------------------------------------------------------------
 # ROOT / GENESIS PROTOCOL
 # ---------------------------------------------------------------------
 ROOT = "Dados_Pregador_V31"
@@ -72,70 +122,64 @@ def _genesis():
     base_dirs = list(DIRS.values())
     for p in base_dirs:
         os.makedirs(p, exist_ok=True)
-    # defaults
-    cfg_path = DBS["CONFIG"]
-    if not os.path.exists(cfg_path):
+    
+    # Arquivos Base
+    if not os.path.exists(DBS["CONFIG"]):
         default_cfg = {
-            "theme_color": "#D4AF37",
-            "font_size": 18,
-            "enc_password": "OMEGA_KEY_DEFAULT",
-            "api_key": "",
-            "backup_interval_seconds": 24*3600,
-            "last_backup": None,
-            "theme_mode": "Dark Cathedral",
-            "font_family": "Inter",
-            "work_mode": "Completo"
+            "theme_color": "#D4AF37", "font_size": 18, "enc_password": "OMEGA_KEY_DEFAULT",
+            "api_key": "", "backup_interval_seconds": 24*3600, "last_backup": None,
+            "theme_mode": "Dark Cathedral", "font_family": "Inter", "work_mode": "Completo"
         }
-        with open(cfg_path, "w", encoding="utf-8") as f:
+        with open(DBS["CONFIG"], "w", encoding="utf-8") as f:
             json.dump(default_cfg, f, indent=2, ensure_ascii=False)
-    users_path = DBS["USERS"]
-    if not os.path.exists(users_path):
-        with open(users_path, "w", encoding="utf-8") as f:
+            
+    if not os.path.exists(DBS["USERS"]):
+        with open(DBS["USERS"], "w", encoding="utf-8") as f:
             admin_hash = hashlib.sha256("admin".encode()).hexdigest()
             json.dump({"ADMIN": admin_hash}, f, indent=2, ensure_ascii=False)
+            
     if not os.path.exists(DBS["MEMBERS_DB"]):
-        with open(DBS["MEMBERS_DB"], "w", encoding="utf-8") as f:
-            json.dump([], f, indent=2, ensure_ascii=False)
+        with open(DBS["MEMBERS_DB"], "w", encoding="utf-8") as f: json.dump([], f)
+        
     if not os.path.exists(os.path.join(DIRS["SERMOES"], "metadata.json")):
         with open(os.path.join(DIRS["SERMOES"], "metadata.json"), "w", encoding="utf-8") as f:
-            json.dump({"sermons": []}, f, indent=2, ensure_ascii=False)
+            json.dump({"sermons": []}, f)
 
 _genesis()
 
-# ---------------------------------------------------------------------
-# LOGGING
-# ---------------------------------------------------------------------
 logging.basicConfig(filename=os.path.join(DIRS["LOGS"], "system.log"), level=logging.INFO, format='%(asctime)s|%(levelname)s|%(message)s')
 
 # ---------------------------------------------------------------------
 # SAFE IO helpers
 # ---------------------------------------------------------------------
-def read_json(path, default):
-    try:
-        if not os.path.exists(path): return default
-        with open(path, "r", encoding="utf-8") as f:
-            c = f.read().strip()
-            return json.loads(c) if c else default
-    except Exception:
-        return default
-
-def write_json(path, data):
-    try:
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-        os.replace(tmp, path)
+class SafeIO:
+    @staticmethod
+    def ler_json(path, default):
         try:
-            shutil.copy2(path, os.path.join(DIRS["BACKUP"], os.path.basename(path) + ".bak"))
+            if not os.path.exists(path): return default
+            with open(path, "r", encoding="utf-8") as f:
+                c = f.read().strip()
+                return json.loads(c) if c else default
         except Exception:
-            pass
-        return True
-    except Exception as e:
-        logging.error(f"write_json error {e}")
-        return False
+            return default
+
+    @staticmethod
+    def salvar_json(path, data):
+        try:
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            os.replace(tmp, path)
+            try:
+                shutil.copy2(path, os.path.join(DIRS["BACKUP"], os.path.basename(path) + ".bak"))
+            except: pass
+            return True
+        except Exception as e:
+            logging.error(f"write_json error {e}")
+            return False
 
 # ---------------------------------------------------------------------
-# UTILITIES
+# UTILITIES & CRYPTO
 # ---------------------------------------------------------------------
 def safe_filename(name):
     s = (name or "").strip()
@@ -143,15 +187,6 @@ def safe_filename(name):
     s = re.sub(r"[^0-9A-Za-z_\-\.]", "", s)
     return s or "file"
 
-def normalize_font_name(fname):
-    if not fname: return "Inter"
-    base = fname.split(",")[0]
-    base = base.strip().strip("'\"")
-    return base
-
-# ---------------------------------------------------------------------
-# ENCRYPTION
-# ---------------------------------------------------------------------
 def encrypt_aes(password, plaintext):
     if not CRYPTO_OK: return None
     key = hashlib.sha256(password.encode()).digest()
@@ -161,77 +196,61 @@ def encrypt_aes(password, plaintext):
     return base64.b64encode(nonce + ct).decode("utf-8")
 
 # ---------------------------------------------------------------------
-# EXPORT (DOCX / PDF)
+# EXPORT HELPERS
 # ---------------------------------------------------------------------
-def export_html_to_docx(title, html, out_path):
+def export_html_to_docx_better(title, html_content, out_path):
     if HTML2DOCX == "mammoth":
         with open(out_path, "wb") as f:
-            results = mammoth.convert_to_docx(html)
+            results = mammoth.convert_to_docx(html_content)
             f.write(results.value)
-        return True
     elif HTML2DOCX == "html2docx":
         from html2docx import html2docx
-        with open(out_path, "wb") as f:
-            f.write(html2docx(html))
-        return True
+        with open(out_path, "wb") as f: f.write(html2docx(html_content))
     else:
+        # Fallback simples
         try:
             from docx import Document
             doc = Document()
             doc.add_heading(title, 1)
-            plain = re.sub(r"<.*?>", "", html)
+            plain = re.sub(r"<.*?>", "", html_content)
             doc.add_paragraph(plain)
             doc.save(out_path)
-            return True
-        except Exception:
+        except:
             with open(out_path.replace(".docx", ".txt"), "w", encoding="utf-8") as f:
-                f.write(html)
-            return False
+                f.write(html_content)
 
-def export_to_pdf(title, text, out_path):
+def export_text_to_pdf(title, text, out_path):
     try:
         from reportlab.lib.pagesizes import letter
         from reportlab.pdfgen import canvas
         c = canvas.Canvas(out_path, pagesize=letter)
-        width, height = letter
         c.setFont("Helvetica-Bold", 14)
-        c.drawString(40, height - 60, title)
+        c.drawString(40, 750, title)
         c.setFont("Helvetica", 10)
-        y = height - 90
+        y = 730
         for line in text.splitlines():
             if y < 60:
                 c.showPage()
-                y = height - 60
-            c.drawString(40, y, line[:120])
+                y = 750
+            c.drawString(40, y, line[:100])
             y -= 14
         c.save()
         return True
-    except Exception:
-        try:
-            from fpdf import FPDF
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, txt=title, ln=1)
-            for line in text.splitlines():
-                pdf.multi_cell(0, 7, line)
-            pdf.output(out_path)
-            return True
-        except Exception:
-            return False
+    except:
+        return False
 
 # ---------------------------------------------------------------------
-# PLOTTING helpers (protected if plotly missing)
+# PLOTTING
 # ---------------------------------------------------------------------
 def plot_radar(categories, values, title):
     try:
         theme = st.session_state["config"].get("theme_color", "#D4AF37")
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(r=values, theta=categories, fill='toself', line_color=theme))
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', polar=dict(radialaxis=dict(range=[0,100], gridcolor="#222")), margin=dict(t=20,b=10))
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', polar=dict(radialaxis=dict(range=[0,100], gridcolor="#333")), margin=dict(t=20,b=10))
         st.plotly_chart(fig, use_container_width=True)
-    except Exception:
-        st.write(title + " - " + ", ".join(f"{c}:{v}" for c,v in zip(categories, values)))
+    except:
+        st.write("Gráfico indisponível (Bibliotecas faltando)")
 
 def plot_gauge_chart(value, title):
     try:
@@ -239,15 +258,12 @@ def plot_gauge_chart(value, title):
         fig = go.Figure(go.Indicator(mode="gauge+number", value=value, title={'text': title}, gauge={'axis': {'range': [0,100]}, 'bar': {'color': theme}}))
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=10,b=10))
         st.plotly_chart(fig, use_container_width=True)
-    except Exception:
+    except:
         st.write(f"{title}: {value}%")
 
 # ---------------------------------------------------------------------
-# PARSERS / BIBLE STUBS / LIBRARY INDEX
+# BIBLE & BOOKS
 # ---------------------------------------------------------------------
-def get_bible_verse(ref):
-    return {"source": "local", "text": f"(simulado) Texto para {ref}"}
-
 def index_books(folder=None):
     folder = folder or DIRS["BIB_CACHE"]
     books = []
@@ -255,473 +271,116 @@ def index_books(folder=None):
         for f in os.listdir(folder):
             if f.lower().endswith((".pdf", ".docx", ".txt", ".epub")):
                 books.append(f)
-    except Exception:
-        pass
+    except: pass
     return books
-    # ==============================================================================
-# 13. MÓDULO: GABINETE PASTORAL (EDITOR WYSIWYG - ESTILO WORD)
-# ==============================================================================
-elif menu == "Gabinete Pastoral":
-    st.title("📝 Gabinete Pastoral")
-    
-    # Importações específicas para este módulo (garantindo que não quebre se faltar)
-    try:
-        from streamlit_quill import st_quill
-        from bs4 import BeautifulSoup
-        from docx import Document
-        from docx.shared import Pt, RGBColor
-    except ImportError:
-        st.error("Erro: Bibliotecas 'streamlit-quill', 'beautifulsoup4' ou 'python-docx' não instaladas.")
-        st.stop()
-
-    # --- FUNÇÃO AUXILIAR: CONVERTER HTML (DO EDITOR) PARA WORD (.DOCX) ---
-    def html_to_word_classic(html_content):
-        """Converte o HTML rico do Quill para um arquivo Word limpo."""
-        doc = Document()
-        soup = BeautifulSoup(html_content, "html.parser")
-        
-        # Título
-        doc.add_heading(st.session_state.get("titulo_ativo", "Sermão Sem Título"), 0)
-        
-        # Processa parágrafos
-        for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'li']):
-            if element.name in ['h1', 'h2', 'h3']:
-                # Cabeçalhos
-                level = int(element.name[1])
-                doc.add_heading(element.get_text(), level)
-            elif element.name == 'li':
-                # Listas
-                doc.add_paragraph(element.get_text(), style='List Bullet')
-            else:
-                # Texto normal (p)
-                p = doc.add_paragraph()
-                # Tenta manter formatação básica (Negrito/Itálico) se houver tags internas
-                if element.find('strong') or element.find('b'):
-                    run = p.add_run(element.get_text())
-                    run.bold = True
-                elif element.find('em') or element.find('i'):
-                    run = p.add_run(element.get_text())
-                    run.italic = True
-                else:
-                    p.add_run(element.get_text())
-        
-        # Salva em memória
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        return buffer
-
-    # --- SETUP DE ARQUIVOS ---
-    METADATA_PATH = os.path.join(DIRS["SERMOES"], "metadata.json")
-    if not os.path.exists(METADATA_PATH):
-        SafeIO.salvar_json(METADATA_PATH, {"sermons": []})
-    
-    # --- BARRA LATERAL DO EDITOR (SELEÇÃO DE ARQUIVOS) ---
-    c_lista, c_editor = st.columns([1, 4])
-    
-    with c_lista:
-        st.markdown("### 📂 Arquivos")
-        # Lista arquivos .html (formato rico) e .txt (antigos)
-        files = [f for f in os.listdir(DIRS["SERMOES"]) if f.endswith((".html", ".txt"))]
-        sel_file = st.selectbox("Abrir Sermão:", ["- Novo Documento -"] + files)
-        
-        st.info("💡 Dica: Use Ctrl+B para Negrito e Ctrl+I para Itálico.")
-
-    # --- LÓGICA DE CARREGAMENTO ---
-    if sel_file != "- Novo Documento -" and sel_file != st.session_state.get("arquivo_carregado"):
-        path = os.path.join(DIRS["SERMOES"], sel_file)
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                st.session_state["texto_ativo"] = f.read()
-            st.session_state["titulo_ativo"] = sel_file.replace(".html", "").replace(".txt", "")
-            st.session_state["arquivo_carregado"] = sel_file
-        except:
-            st.error("Erro ao abrir arquivo.")
-            # ==============================================================================
-# 13. MÓDULO: GABINETE PASTORAL (CORREÇÃO DE BUG "REMOVECHILD")
-# ==============================================================================
-elif menu == "Gabinete Pastoral":
-    st.title("📝 Gabinete Pastoral")
-    
-    # 1. SETUP DE METADADOS
-    METADATA_PATH = os.path.join(DIRS["SERMOES"], "metadata.json")
-    if not os.path.exists(METADATA_PATH):
-        SafeIO.salvar_json(METADATA_PATH, {"sermons": []})
-    
-    with st.expander("⚙️ Configurações do Editor"):
-        fs = st.slider("Tamanho da Fonte", 12, 30, 18)
-        # Removi o autosave automático agressivo para evitar o erro de 'removeChild' durante a digitação
-        st.caption("Dica: Salve manualmente para garantir a segurança dos dados.")
-
-    # 2. SELETOR DE ARQUIVOS
-    c_tit, c_tags = st.columns([3, 1])
-    
-    # Lista arquivos
-    files = [f for f in os.listdir(DIRS["SERMOES"]) if f.endswith(".txt")]
-    
-    # IMPORTANTE: Seletor com chave única para não bugar o estado
-    sel_file = c_tit.selectbox("📂 Abrir Sermão / Arquivo:", ["- Novo Documento -"] + files)
-    
-    tags = c_tags.text_input("Tags", "Domingo, Série")
-
-    # 3. LÓGICA DE CARREGAMENTO (ESTÁVEL)
-    # Se mudou de arquivo, carregamos o conteúdo novo.
-    # Se é o mesmo arquivo, mantemos o que está na memória (session_state)
-    
-    if "ultimo_arquivo_aberto" not in st.session_state:
-        st.session_state["ultimo_arquivo_aberto"] = None
-
-    content_inicial = ""
-
-    # Se o usuário trocou o arquivo no selectbox, forçamos a leitura do disco
-    if sel_file != st.session_state["ultimo_arquivo_aberto"]:
-        if sel_file != "- Novo Documento -":
-            try:
-                with open(os.path.join(DIRS["SERMOES"], sel_file), 'r', encoding='utf-8') as f:
-                    content_inicial = f.read()
-            except:
-                content_inicial = ""
-        else:
-            content_inicial = ""
-        # Atualiza o rastreador
-        st.session_state["ultimo_arquivo_aberto"] = sel_file
-        # Limpa o buffer do editor para receber o novo texto
-        st.session_state[f"editor_{sel_file}"] = content_inicial
-    else:
-        # Se não trocou de arquivo, usamos o estado atual do texto (caso ele já tenha digitado algo não salvo)
-        # Isso previne que o texto suma se a tela piscar
-        pass
-
-    # Título editável (Baseado no arquivo selecionado, mas permitindo mudança)
-    titulo_doc = st.text_input("Título do Documento", value=sel_file.replace(".txt", "") if sel_file != "- Novo Documento -" else "")
-
-    # 4. O EDITOR (CORRIGIDO)
-    if QUILL_AVAILABLE:
-        # AQUI ESTÁ A CORREÇÃO DO ERRO:
-        # A 'key' agora é dinâmica. Cada arquivo tem sua própria chave.
-        # Isso impede o Streamlit de tentar reaproveitar o HTML antigo e causar o erro 'removeChild'.
-        
-        unique_key = f"editor_{sel_file}" 
-        
-        # Barra de ferramentas Word Style
-        toolbar = [
-            ['bold', 'italic', 'underline', 'strike'],
-            [{'header': 1}, {'header': 2}],
-            [{'list': 'ordered'}, {'list': 'bullet'}],
-            [{'align': []}], [{'color': []}, {'background': []}],
-            ['clean']
-        ]
-        
-        content = st_quill(
-            value=content_inicial, 
-            key=unique_key,  # <--- ESSA É A CURA DO BUG
-            height=500,
-            toolbar=toolbar,
-            html=True
-        )
-    else:
-        content = st.text_area("Editor Texto Simples", content_inicial, height=500)
-
-    # 5. BOTÕES DE AÇÃO
-    st.markdown("---")
-    c_save, c_tools = st.columns([1, 2])
-    
-    with c_save:
-        if st.button("💾 SALVAR AGORA", type="primary", use_container_width=True):
-            if titulo_doc:
-                fn = f"{titulo_doc}.txt"
-                with open(os.path.join(DIRS["SERMOES"], fn), 'w', encoding="utf-8") as f:
-                    f.write(content)
-                st.toast("Sermão salvo com sucesso!", icon="✅")
-                time.sleep(1) # Dá tempo de ler a mensagem
-                st.rerun() # Atualiza a lista de arquivos
-            else:
-                st.error("Digite um título para salvar.")
-
-    with c_tools:
-        c_enc, c_docx, c_pdf = st.columns(3)
-        
-        if c_enc.button("🔒 Encriptar"):
-            pw = st.session_state["config"].get("enc_password")
-            if pw and content:
-                enc = encrypt_sermon_aes(pw, content)
-                if enc:
-                    with open(os.path.join(DIRS["GABINETE"], f"{titulo_doc}.enc"), 'w', encoding="utf-8") as f:
-                        f.write(enc)
-                    st.success("Arquivo blindado.")
-                else:
-                    st.error("Erro na encriptação (Biblioteca ausente).")
-            else:
-                st.error("Senha mestra não configurada ou texto vazio.")
-                
-        if c_docx.button("📄 Word"):
-            fn = f"{titulo_doc}.docx"
-            path = os.path.join(DIRS["SERMOES"], fn)
-            export_html_to_docx_better(titulo_doc, content, path)
-            with open(path, "rb") as f:
-                st.download_button("Baixar .docx", f, file_name=fn)
-                
-        if c_pdf.button("📄 PDF"):
-            fn = f"{titulo_doc}.pdf"
-            path = os.path.join(DIRS["SERMOES"], fn)
-            export_text_to_pdf(titulo_doc, content, path)
-            try:
-                with open(path, "rb") as f:
-                    st.download_button("Baixar .pdf", f, file_name=fn)
-            except:
-                st.error("PDF indisponível no momento.")
-
-    # --- ÁREA DO EDITOR (VISUAL WORD) ---
-    with c_editor:
-        # Título do Documento
-        titulo = st.text_input("Título do Sermão / Estudo", value=st.session_state.get("titulo_ativo", ""))
-        
-        # CONFIGURAÇÃO DA BARRA DE FERRAMENTAS (ESTILO WORD)
-        # Isso define quais botões aparecem no topo do editor
-        toolbar_config = [
-            ['bold', 'italic', 'underline', 'strike'],        # Negrito, Itálico, Sublinhado, Riscado
-            ['blockquote', 'code-block'],                     # Citação, Código
-            [{'header': 1}, {'header': 2}],                   # Títulos H1, H2
-            [{'list': 'ordered'}, {'list': 'bullet'}],        # Listas Numéricas e Pontos
-            [{'script': 'sub'}, {'script': 'super'}],         # Sobrescrito
-            [{'indent': '-1'}, {'indent': '+1'}],             # Identação
-            [{'direction': 'rtl'}],                           # Direção do texto
-            [{'size': ['small', False, 'large', 'huge']}],    # Tamanho da fonte
-            [{'header': [1, 2, 3, 4, 5, 6, False]}],          # Cabeçalhos
-            [{'color': []}, {'background': []}],              # Cores de texto e fundo
-            [{'font': []}],                                   # Fontes
-            [{'align': []}],                                  # Alinhamento (Esq, Centro, Dir, Justificar)
-            ['clean']                                         # Limpar formatação
-        ]
-
-        # O COMPONENTE EDITOR RICO
-        # Retorna o conteúdo em HTML
-        content_html = st_quill(
-            value=st.session_state.get("texto_ativo", ""),
-            placeholder="Comece a escrever a sua pregação aqui...",
-            html=True,
-            toolbar=toolbar_config,
-            key="quill_editor_word",
-            height=500  # Altura da folha
-        )
-        
-        # Atualiza estado
-        st.session_state["texto_ativo"] = content_html
-        st.session_state["titulo_ativo"] = titulo
-
-        # --- BOTÕES DE AÇÃO ---
-        st.markdown("---")
-        c_salvar, c_export, c_crypto = st.columns(3)
-        
-        # 1. SALVAR (Salva como HTML para manter as cores e formatos)
-        with c_salvar:
-            if st.button("💾 Salvar na Nuvem Local", type="primary", use_container_width=True):
-                if titulo:
-                    # Salva como HTML para preservar formatação visual (Word style)
-                    fn = f"{titulo}.html"
-                    path = os.path.join(DIRS["SERMOES"], fn)
-                    with open(path, 'w', encoding='utf-8') as f:
-                        f.write(content_html)
-                    st.toast("Documento salvo com formatação completa!", icon="✅")
-                else:
-                    st.warning("Dê um título antes de salvar.")
-
-        # 2. EXPORTAR PARA WORD (.DOCX)
-        with c_export:
-            if st.button("📄 Baixar como Word (.docx)", use_container_width=True):
-                if titulo and content_html:
-                    docx_buffer = html_to_word_classic(content_html)
-                    st.download_button(
-                        label="⬇️ Download Arquivo Word",
-                        data=docx_buffer,
-                        file_name=f"{titulo}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-                else:
-                    st.warning("Escreva algo e dê um título para baixar.")
-
-        # 3. CRIPTOGRAFIA (AES)
-        with c_crypto:
-            if st.button("🔒 Encriptar (AES-256)", use_container_width=True):
-                pw = st.session_state["config"].get("enc_password")
-                if pw and content_html:
-                    if CRYPTO_OK:
-                        enc = encrypt_sermon_aes(pw, content_html)
-                        path = os.path.join(DIRS["GABINETE"], f"{titulo}.enc")
-                        with open(path, 'w', encoding='utf-8') as f: f.write(enc)
-                        st.success("Arquivo blindado no cofre.")
-                    else:
-                        st.error("Módulo de criptografia indisponível.")
-                else:
-                    st.error("Configure uma Senha Mestra nas Configurações primeiro.")
 
 # ---------------------------------------------------------------------
 # ACCESS CONTROL
 # ---------------------------------------------------------------------
 class AccessControl:
-    DEFAULT = {"ADMIN": hashlib.sha256("admin".encode()).hexdigest()}
-
     @staticmethod
     def _hash(txt): return hashlib.sha256(txt.encode()).hexdigest()
 
     @staticmethod
-    def get_all():
-        return read_json(DBS["USERS"], AccessControl.DEFAULT)
-
-    @staticmethod
     def register(username, password, method="local"):
-        if not username:
-            return False, "Nome de usuário vazio."
-        users = read_json(DBS["USERS"], {})
-        if username.upper() in users:
-            return False, "USUÁRIO JÁ EXISTE."
+        if not username: return False, "Nome vazio."
+        users = SafeIO.ler_json(DBS["USERS"], {})
+        if username.upper() in users: return False, "USUÁRIO JÁ EXISTE."
+        
         if method == "local":
             users[username.upper()] = AccessControl._hash(password)
         else:
             users[username.upper()] = {"method": method, "value": password}
-        write_json(DBS["USERS"], users)
-        logging.info(f"Novo registro: {username} via {method}")
+        SafeIO.salvar_json(DBS["USERS"], users)
         return True, "REGISTRO OK."
 
     @staticmethod
     def login(username, password):
-        users = read_json(DBS["USERS"], {})
-        if not users and username.upper() == "ADMIN" and password == "1234":
-            return True
+        users = SafeIO.ler_json(DBS["USERS"], {})
+        if not users and username.upper() == "ADMIN" and password == "1234": return True
+        
         stored = users.get(username.upper())
-        if stored is None:
-            return False
-        if isinstance(stored, str):
-            if len(stored) == 64:
-                return stored == AccessControl._hash(password)
-            else:
-                return stored == password
-        elif isinstance(stored, dict):
-            if stored.get("method") in ("google", "apple", "email"):
-                return stored.get("value") == password
-            return False
+        if stored is None: return False
+        
+        if isinstance(stored, str): # Hash antigo ou senha
+            return stored == AccessControl._hash(password) or stored == password
+        elif isinstance(stored, dict): # OAuth
+            return stored.get("value") == password
         return False
 
 # ---------------------------------------------------------------------
-# LOGIC: pastoral helpers
+# PASTORAL LOGIC
 # ---------------------------------------------------------------------
-class Geneva:
-    DB = {
-        "prosperidade": "⚠️ ALERTA: Teologia da Prosperidade.",
-        "eu decreto": "⚠️ ALERTA: Quebra de Soberania Divina."
-    }
-    @staticmethod
-    def scan(text):
-        if not text: return []
-        return [v for k,v in Geneva.DB.items() if k in text.lower()]
-
 class PastoralMind:
     @staticmethod
     def check_burnout():
-        data = read_json(DBS["SOUL"], {"historico": []})
+        data = SafeIO.ler_json(DBS["SOUL"], {"historico": []})
         hist = data.get("historico", [])[-10:]
         bad = sum(1 for h in hist if h.get("humor") in ["Cansaço", "Ira", "Ansiedade", "Tristeza"])
         if bad >= 6: return "CRÍTICO", "#FF3333"
         if bad >= 3: return "ALERTA", "#FFAA00"
         return "OPERACIONAL", "#33FF33"
 
-    @staticmethod
-    def register(humor):
-        data = read_json(DBS["SOUL"], {"historico": []})
-        data.setdefault("historico", []).append({"data": datetime.now().strftime("%Y-%m-%d"), "humor": humor})
-        write_json(DBS["SOUL"], data)
-
-class Gamification:
-    @staticmethod
-    def add_xp(amount):
-        stats = read_json(DBS["STATS"], {"xp": 0, "nivel": 1})
-        stats["xp"] = stats.get("xp", 0) + amount
-        stats["nivel"] = int(math.sqrt(stats["xp"]) * 0.2) + 1
-        write_json(DBS["STATS"], stats)
-
 # ---------------------------------------------------------------------
-# BACKUP & SYNC placeholders
+# BACKUP
 # ---------------------------------------------------------------------
 def backup_local():
     try:
         now = datetime.now().strftime("%Y%m%d_%H%M%S")
         base = os.path.join(DIRS["BACKUP"], f"backup_{now}")
         shutil.make_archive(base, 'zip', ROOT)
-        bk = base + ".zip"
-        logging.info(f"Backup criado: {bk}")
-        return bk
-    except Exception as e:
-        logging.error(f"backup error {e}")
-        return None
-
-def sync_google(file_path):
-    # Placeholder - requires Google API credentials
-    return False
-
-def sync_icloud(file_path):
-    # Placeholder - requires iCloud configuration
-    return False
+        return base + ".zip"
+    except: return None
 
 def auto_backup_if_due():
-    cfg = read_json(DBS["CONFIG"], {})
+    cfg = SafeIO.ler_json(DBS["CONFIG"], {})
     last = cfg.get("last_backup")
     now = time.time()
     interval = cfg.get("backup_interval_seconds", 24*3600)
     if not last or (now - last) > interval:
-        bk = backup_local()
+        backup_local()
         cfg["last_backup"] = now
-        write_json(DBS["CONFIG"], cfg)
-        return bk
-    return None
+        SafeIO.salvar_json(DBS["CONFIG"], cfg)
 
 # ---------------------------------------------------------------------
-# STARTUP state
+# STARTUP STATE
 # ---------------------------------------------------------------------
 if "config" not in st.session_state:
-    st.session_state["config"] = read_json(DBS["CONFIG"], {"theme_color":"#D4AF37","font_size":18,"enc_password":"","api_key":"","backup_interval_seconds":24*3600,"theme_mode":"Dark Cathedral","font_family":"Inter","work_mode":"Completo"})
+    st.session_state["config"] = SafeIO.ler_json(DBS["CONFIG"], {"theme_color":"#D4AF37","font_size":18,"enc_password":"","api_key":"","backup_interval_seconds":86400,"theme_mode":"Dark Cathedral"})
 if "logado" not in st.session_state: st.session_state["logado"] = False
 if "user_name" not in st.session_state: st.session_state["user_name"] = "ADMIN"
-if "texto_ativo" not in st.session_state: st.session_state["texto_ativo"] = ""
-if "titulo_ativo" not in st.session_state: st.session_state["titulo_ativo"] = ""
-try:
-    auto_backup_if_due()
-except Exception:
-    pass
+
+try: auto_backup_if_due()
+except: pass
 
 # ---------------------------------------------------------------------
-# CSS / THEME injection (responsive)
+# CSS / THEME
 # ---------------------------------------------------------------------
 def inject_css(cfg):
     color = cfg.get("theme_color", "#D4AF37")
     font_sz = cfg.get("font_size", 18)
-    font_family = normalize_font_name(cfg.get("font_family", "Inter"))
     st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&family=Cinzel:wght@500;800&display=swap');
-    :root{{--gold:{color};--bg:#000;--panel:#0A0A0A;--txt:#EAEAEA;--font:{font_family};}}
-    .stApp{{background:var(--bg); color:var(--txt); font-family:var(--font), Inter, sans-serif; font-size:{font_sz}px;}}
+    :root{{--gold:{color};--bg:#000;--panel:#0A0A0A;--txt:#EAEAEA;}}
+    .stApp{{background:var(--bg); color:var(--txt); font-family:'Inter',sans-serif; font-size:{font_sz}px;}}
     [data-testid="stSidebar"]{{background:#070707; border-right:1px solid #111;}}
     .prime-logo{{width:120px;height:120px;display:block;margin:0 auto;}}
     .login-title{{font-family:Cinzel, serif; color:var(--gold); text-align:center; letter-spacing:6px; font-size:20px;}}
     .tech-card{{background:#090909;border:1px solid #111;border-left:3px solid var(--gold);padding:18px;border-radius:6px;margin-bottom:12px;}}
-    .member-card{{background:#080808;border:1px solid #222;padding:12px;border-radius:6px;margin-bottom:8px;color:var(--txt);}}
-    .action-btn{{
-        display:inline-block;padding:6px 10px;border-radius:4px;border:1px solid var(--gold);color:var(--gold);text-decoration:none;margin-right:6px;font-size:12px;
-    }}
-    @media (max-width:800px) {{
-        .stApp{{font-size:{max(14,int(font_sz-4))}px;}}
-        .prime-logo{{width:90px;height:90px;}}
-    }}
+    .member-card{{background:#080808;border:1px solid #222;padding:12px;border-radius:6px;margin-bottom:8px;}}
+    .action-btn{{display:inline-block;padding:4px 8px;border:1px solid var(--gold);color:var(--gold);text-decoration:none;font-size:12px;margin-right:5px;}}
+    @media (max-width:800px) {{ .stApp{{font-size:{max(14,int(font_sz-4))}px;}} .prime-logo{{width:90px;height:90px;}} }}
     </style>
     """, unsafe_allow_html=True)
 
 inject_css(st.session_state["config"])
 
 # ---------------------------------------------------------------------
-# LOGIN UI (keeps same names/panel)
+# LOGIN UI
 # ---------------------------------------------------------------------
 if not st.session_state["logado"]:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     c1,c2,c3 = st.columns([1,1,1])
     with c2:
         gold = st.session_state["config"].get("theme_color", "#D4AF37")
@@ -743,382 +402,200 @@ if not st.session_state["logado"]:
                 if AccessControl.login(u,p):
                     st.session_state["logado"] = True
                     st.session_state["user_name"] = u.upper()
-                    st.experimental_rerun()
-                else:
-                    st.error("NEGO A VOS CONHECER.")
+                    st.rerun()
+                else: st.error("NEGO A VOS CONHECER.")
         with t2:
-            st.markdown("Registre uma nova conta — **Google / Apple / Email / Senha** (simulado)")
+            st.markdown("Registre uma nova conta")
             nu = st.text_input("Novo ID", key="reg_nu")
-            reg_method = st.radio("Método de registro", ["Senha (local)","Google (OAuth)","Apple (OAuth)","Email (verificação)"], index=0)
+            reg_method = st.radio("Método", ["Senha (local)","Google (OAuth)","Apple (OAuth)","Email"], index=0)
             if reg_method == "Senha (local)":
                 np = st.text_input("Nova Senha", type="password", key="reg_np")
-                if st.button("CRIAR USUÁRIO (Local)", use_container_width=True):
+                if st.button("CRIAR USUÁRIO", use_container_width=True):
                     ok,msg = AccessControl.register(nu,np,method="local")
                     if ok: st.success(msg)
                     else: st.error(msg)
-            elif reg_method == "Google (OAuth)":
-                if st.button("Registrar via Google"):
-                    token = f"google_{nu}_{int(time.time())}"
-                    ok,msg = AccessControl.register(nu,token,method="google")
-                    if ok: st.success("Registrado via Google (simulado).")
-                    else: st.error(msg)
-            elif reg_method == "Apple (OAuth)":
-                if st.button("Registrar via Apple"):
-                    token = f"apple_{nu}_{int(time.time())}"
-                    ok,msg = AccessControl.register(nu,token,method="apple")
-                    if ok: st.success("Registrado via Apple (simulado).")
-                    else: st.error(msg)
             else:
-                email_addr = st.text_input("Email (para confirmação)", key="reg_email")
-                if st.button("Registrar via Email"):
-                    token = f"email_{email_addr}_{int(time.time())}"
-                    ok,msg = AccessControl.register(nu,token,method="email")
-                    if ok: st.success("Registrado via Email (simulado).")
+                if st.button(f"Registrar via {reg_method}"):
+                    token = f"{reg_method}_{nu}_{int(time.time())}"
+                    ok,msg = AccessControl.register(nu,token,method=reg_method)
+                    if ok: st.success(f"Registrado via {reg_method} (simulado).")
                     else: st.error(msg)
     st.stop()
 
 # ---------------------------------------------------------------------
-# MAIN APP shell (sidebar menu)
+# MAIN APP SHELL
 # ---------------------------------------------------------------------
-if "hide_menu" not in st.session_state:
-    st.session_state["hide_menu"] = False
+if "hide_menu" not in st.session_state: st.session_state["hide_menu"] = False
 c_main, c_tog = st.columns([0.9,0.1])
 with c_tog:
-    if st.button("☰"):
-        st.session_state["hide_menu"] = not st.session_state["hide_menu"]
+    if st.button("☰"): st.session_state["hide_menu"] = not st.session_state["hide_menu"]
 
 if not st.session_state["hide_menu"]:
     menu = st.sidebar.radio("SISTEMA", ["Cuidado Pastoral","Gabinete Pastoral","Biblioteca","Configurações"], index=0)
     st.sidebar.divider()
     if st.sidebar.button("LOGOUT"):
         st.session_state["logado"] = False
-        st.experimental_rerun()
+        st.rerun()
 else:
     menu = "Cuidado Pastoral"
 
-# HUD top
+# HUD
 status_text, status_color = PastoralMind.check_burnout()
-dia_lit = "DOMINGO - DIA DO SENHOR" if datetime.now().weekday()==6 else "DIA FERIAL"
+dia_lit = "DOMINGO" if datetime.now().weekday()==6 else "FERIAL"
 col_h1, col_h2 = st.columns([3,1])
-with col_h1:
-    st.markdown(f"<span style='color:#888; font-size:10px;'>LITURGIA:</span> <span style='font-family:Cinzel'>{dia_lit}</span>", unsafe_allow_html=True)
-with col_h2:
-    st.markdown(f"<div style='text-align:right;'><span style='color:#888; font-size:10px;'>VITALIDADE:</span> <span style='color:{status_color}'>{status_text}</span></div>", unsafe_allow_html=True)
+with col_h1: st.markdown(f"<span style='color:#888;font-size:10px;'>LITURGIA:</span> <span style='font-family:Cinzel'>{dia_lit}</span>", unsafe_allow_html=True)
+with col_h2: st.markdown(f"<div style='text-align:right;'><span style='color:#888;font-size:10px;'>VITALIDADE:</span> <span style='color:{status_color}'>{status_text}</span></div>", unsafe_allow_html=True)
 st.markdown("---")
 
 # ---------------------------------------------------------------------
-# Module: CUIDADO PASTORAL
+# MÓDULO: CUIDADO PASTORAL
 # ---------------------------------------------------------------------
 if menu == "Cuidado Pastoral":
     st.title("🛡️ Cuidado Pastoral Dinâmico")
-    tab_painel, tab_rebanho, tab_teoria, tab_tools = st.tabs(["📊 Painel do Pastor","🐑 Meu Rebanho","⚖️ Teoria da Permissão","🛠️ Ferramentas"])
+    tab_painel, tab_rebanho, tab_teoria, tab_tools = st.tabs(["📊 Painel","🐑 Rebanho","⚖️ Teoria","🛠️ Ferramentas"])
 
-    # Painel do Pastor
     with tab_painel:
         c1,c2 = st.columns([2,1])
         with c1:
             st.markdown('<div class="tech-card">', unsafe_allow_html=True)
-            st.subheader("Estado Geral da Igreja")
+            st.subheader("Estado Geral")
             cats = ['Espiritual','Emocional','Físico','Financeiro','Relacional']
             vals = [random.randint(40,90) for _ in cats]
-            plot_radar(cats, vals, "Saúde do Corpo")
+            plot_radar(cats, vals, "Saúde")
             st.markdown('</div>', unsafe_allow_html=True)
-            st.warning("⚠️ **Alerta Preventivo:** Irmão João não acessa o devocional há 5 dias.")
-            # modern quick stats
-            stats = read_json(DBS["STATS"], {"nivel":1,"xp":0,"members_count":0})
-            members = read_json(DBS["MEMBERS_DB"], [])
-            stats["members_count"] = len(members)
-            write_json(DBS["STATS"], stats)
+            
+            # Stats rápidas
+            stats = SafeIO.ler_json(DBS["STATS"], {"nivel":1,"xp":0})
+            members = SafeIO.ler_json(DBS["MEMBERS_DB"], [])
+            st.info(f"Membros: {len(members)} | Nível Pastoral: {stats.get('nivel',1)}")
+            
         with c2:
             st.markdown('<div class="tech-card">', unsafe_allow_html=True)
-            st.subheader("Rotina Pastoral Semanal")
-            tasks = ["Revisar pedidos de oração","Planejar semana","Visitas","Estudo bíblico"]
+            st.subheader("Rotina")
+            tasks = ["Oração","Visitas","Estudo"]
             for t in tasks: st.checkbox(t)
             st.markdown('</div>', unsafe_allow_html=True)
-        st.subheader("📊 Estatísticas Pastorais")
-        st.metric("Nível", stats.get("nivel",1))
-        st.metric("XP", stats.get("xp",0))
-        st.metric("Membros registrados", stats.get("members_count",0))
 
-    # Rebanho
     with tab_rebanho:
-        st.markdown("### Gestão de Ovelhas Baseada em Necessidades")
-        members = read_json(DBS["MEMBERS_DB"], [])
-        with st.expander("➕ Nova Ovelha / Contato"):
-            with st.form("add_member", clear_on_submit=True):
+        st.markdown("### Gestão de Ovelhas")
+        members = SafeIO.ler_json(DBS["MEMBERS_DB"], [])
+        with st.expander("➕ Nova Ovelha"):
+            with st.form("add_mem"):
                 nm = st.text_input("Nome")
-                idade = st.number_input("Idade", 0, 120, 0)
                 stt = st.selectbox("Status", ["Comungante","Não-Comungante"])
-                phone = st.text_input("Telefone (somente números)", placeholder="5511999998888")
-                whatsapp = st.text_input("WhatsApp (número com código)", placeholder="5511999998888")
-                email = st.text_input("E-mail")
-                endereco = st.text_input("Endereço")
-                note = st.text_area("Observação / Histórico")
-                foto = st.file_uploader("Foto (opcional)", type=["png","jpg","jpeg"])
+                tel = st.text_input("Telefone")
                 if st.form_submit_button("Salvar"):
-                    member = {"Nome": nm, "Idade": int(idade), "Status": stt, "Telefone": phone, "WhatsApp": whatsapp, "Email": email, "Endereco": endereco, "Nota": note, "Data": datetime.now().strftime("%Y-%m-%d")}
-                    if foto:
-                        fn = f"{safe_filename(nm)}_{int(time.time())}.{foto.name.split('.')[-1]}"
-                        fp = os.path.join(DIRS["MEMBROS"], fn)
-                        with open(fp, "wb") as f: f.write(foto.getbuffer())
-                        member["Foto"] = fp
-                    members.append(member)
-                    write_json(DBS["MEMBERS_DB"], members)
-                    st.success("Ovelha adicionada.")
-                    st.experimental_rerun()
+                    members.append({"Nome":nm,"Status":stt,"Telefone":tel,"Data":datetime.now().strftime("%d/%m")})
+                    SafeIO.salvar_json(DBS["MEMBERS_DB"], members)
+                    st.success("Adicionado.")
+                    st.rerun()
+        
         if members:
             for i,m in enumerate(members):
-                with st.expander(f"{m.get('Nome','-')} — {m.get('Status','')} ({m.get('Data','')})"):
-                    st.markdown(f"<div class='member-card'><b>Nome:</b> {m.get('Nome')}<br><b>Idade:</b> {m.get('Idade')}<br><b>Email:</b> {m.get('Email')}<br><b>Telefone:</b> {m.get('Telefone')}<br><b>Endereço:</b> {m.get('Endereco')}<br><b>Nota:</b> {m.get('Nota')}</div>", unsafe_allow_html=True)
-                    cols = st.columns([1,1,1,1])
-                    tel = m.get("Telefone","")
-                    wa = m.get("WhatsApp","")
-                    if tel:
-                        cols[0].markdown(f'<a class="action-btn" href="tel:+{tel}">Ligar</a>', unsafe_allow_html=True)
-                    else:
-                        cols[0].button("Sem tel", disabled=True)
-                    if wa:
-                        wa_num = wa.replace("+","").replace(" ","").replace("-","")
-                        cols[1].markdown(f'<a class="action-btn" href="https://wa.me/{wa_num}" target="_blank">WhatsApp</a>', unsafe_allow_html=True)
-                    else:
-                        cols[1].button("Sem Whats", disabled=True)
-                    if m.get("Email"):
-                        cols[2].markdown(f'<a class="action-btn" href="mailto:{m.get("Email")}">Enviar Email</a>', unsafe_allow_html=True)
-                    else:
-                        cols[2].button("Sem Email", disabled=True)
-                    if cols[3].button("Remover", key=f"rm_{i}"):
+                with st.expander(f"{m.get('Nome')} ({m.get('Status')})"):
+                    st.write(f"Tel: {m.get('Telefone')}")
+                    if st.button("Remover", key=f"rm_{i}"):
                         members.pop(i)
-                        write_json(DBS["MEMBERS_DB"], members)
-                        st.success("Removido.")
-                        st.experimental_rerun()
+                        SafeIO.salvar_json(DBS["MEMBERS_DB"], members)
+                        st.rerun()
         else:
-            st.info("Nenhum membro cadastrado ainda. Use '➕ Nova Ovelha' para começar.")
+            st.info("Nenhum membro cadastrado.")
 
-        st.markdown("### Caminhos de Crescimento")
-        c1,c2,c3 = st.columns(3)
-        if c1.button("🌱 Trilha: Novo Convertido"): st.success("Trilha ativada.")
-        if c2.button("🛡️ Trilha: Vencendo a Ansiedade"): st.success("Trilha ativada.")
-        if c3.button("📚 Trilha: Teologia Reformada"): st.success("Trilha ativada.")
-
-    # Teoria da Permissão (Interativa)
     with tab_teoria:
-        st.markdown("### ⚖️ Teoria da Permissão — Interativo")
-        col_input, col_viz = st.columns([1,1])
-        with col_input:
-            p_fail = st.slider("Permissão para FALHAR (Graça)",0,100,50)
-            p_feel = st.slider("Permissão para SENTIR (Humanidade)",0,100,50)
-            p_rest = st.slider("Permissão para DESCANSAR (Limite)",0,100,50)
-            p_succ = st.slider("Permissão para SUCESSO (Dignidade)",0,100,50)
-            if st.button("RODAR SCAN DIAGNÓSTICO"):
-                score = (p_fail+p_feel+p_rest+p_succ)/4
-                st.session_state['perm_score'] = score
-                if score < 40:
-                    st.warning("Sugestão: Agende 3 contatos de suporte e diminua carga de pregacões por 2 semanas.")
-                elif score < 70:
-                    st.info("Sugestão: Delegue 1 tarefa administrativa e intensifique práticas devocionais.")
-                else:
-                    st.success("Nível saudável. Mantenha rotina.")
-        with col_viz:
-            score = st.session_state.get('perm_score',50)
-            plot_gauge_chart(score, "Índice de Permissão Interna")
+        st.markdown("### ⚖️ Teoria da Permissão")
+        c1,c2 = st.columns(2)
+        with c1:
+            pf = st.slider("FALHAR",0,100,50)
+            ps = st.slider("SENTIR",0,100,50)
+            pr = st.slider("DESCANSAR",0,100,50)
+            pi = st.slider("SUCESSO",0,100,50)
+        with c2:
+            avg = (pf+ps+pr+pi)/4
+            plot_gauge_chart(avg, "Permissão Interna")
 
-    # Tools
     with tab_tools:
-        st.markdown("### Ferramentas de Discipulado")
-        e1 = st.expander("💬 Chat Pastoral & Pedidos")
-        e2 = st.expander("🧩 Devocionais Interativos")
-        with e1:
-            st.text_area("Enviar mensagem...", key="broadcast")
-            st.button("Enviar Broadcast")
-        with e2:
-            st.markdown("**Desafio da Semana:** Ler Salmo 23 e enviar áudio de 1 min.")
-            st.radio("Quiz Bíblico", ["Isaías","Ezequiel","Jeremias"])
+        st.markdown("### Ferramentas")
+        st.text_area("Chat Broadcast")
+        if st.button("Enviar"): st.success("Enviado.")
         st.divider()
-        if st.button("Criar Backup Manual"):
+        if st.button("Backup Manual"):
             bk = backup_local()
-            if bk: st.success(f"Backup salvo: {bk}")
-            else: st.error("Falha ao criar backup.")
-        if st.button("Sincronizar com Google Drive (se configurado)"):
-            st.info("Sincronização simulada. Configure credenciais para ativar.")
-        if st.button("Sincronizar com iCloud (se configurado)"):
-            st.info("Sincronização simulada. Configure credenciais para ativar.")
+            if bk: st.success(f"Salvo: {bk}")
 
 # ---------------------------------------------------------------------
-# Module: GABINETE PASTORAL (com Biblioteca integrada)
+# MÓDULO: GABINETE PASTORAL (Correção Bug RemoveChild + Editor Word)
 # ---------------------------------------------------------------------
 elif menu == "Gabinete Pastoral":
     st.title("📝 Gabinete Pastoral")
-    METADATA_PATH = os.path.join(DIRS["SERMOES"], "metadata.json")
-    if not os.path.exists(METADATA_PATH):
-        write_json(METADATA_PATH, {"sermons": []})
+    
+    if not os.path.exists(os.path.join(DIRS["SERMOES"], "metadata.json")):
+        SafeIO.salvar_json(os.path.join(DIRS["SERMOES"], "metadata.json"), {"sermons": []})
 
-    c_left, c_right = st.columns([1,3])
-    with c_left:
-        st.markdown("### Biblioteca / Recursos")
-        if st.button("Indexar livros locais"):
-            st.success("Indexado.")
-        books = index_books(DIRS["BIB_CACHE"])
-        st.markdown("**Livros locais**")
-        if books:
-            for b in books:
-                st.markdown(f"- {b}")
-        else:
-            st.info("Nenhum livro local indexado.")
-        st.markdown("---")
-        up_book = st.file_uploader("Importar livro (PDF/DOCX/TXT/EPUB)", type=["pdf","docx","txt","epub"], key="up_book")
-        if up_book:
-            dest = os.path.join(DIRS["BIB_CACHE"], up_book.name)
-            with open(dest, "wb") as f: f.write(up_book.getbuffer())
-            st.success("Livro importado.")
+    with st.expander("⚙️ Configurações do Editor"):
+        fs = st.slider("Fonte", 12, 30, 18)
 
-    with c_right:
-        with st.expander("Configurações do Editor"):
-            fs = st.slider("Fonte", 12, 30, st.session_state["config"].get("font_size",18))
-            autosave = st.checkbox("Autosave", True)
-        c_tit, c_tags = st.columns([3,1])
-        st.session_state["titulo_ativo"] = c_tit.text_input("Título", st.session_state.get("titulo_ativo",""))
-        st.session_state["last_tags"] = c_tags.text_input("Tags", ",".join(st.session_state.get("last_tags", []))).split(",")
-
-        st.markdown("Importar (TheWord/Logos/PDF/DOCX):")
-        up = st.file_uploader("Arquivo do sermão / estudo", label_visibility="collapsed", accept_multiple_files=False, key="up_sermon")
-
-        # Editor area: use st_quill if available, else textarea
-        if QUILL_AVAILABLE:
+    c_tit, c_list = st.columns([3, 1])
+    files = [f for f in os.listdir(DIRS["SERMOES"]) if f.endswith(".txt")]
+    sel_file = c_list.selectbox("Arquivo:", ["- Novo -"] + files)
+    
+    # Lógica de Carregamento Estável (Correção Key)
+    if "last_file" not in st.session_state: st.session_state["last_file"] = None
+    
+    content_init = ""
+    if sel_file != st.session_state["last_file"]:
+        if sel_file != "- Novo -":
             try:
-                content = st_quill(value=st.session_state.get("texto_ativo",""), key="editor_quill", height=420)
-            except Exception:
-                QUILL_AVAILABLE = False
-                content = st.text_area("Editor", st.session_state.get("texto_ativo",""), height=420)
-        else:
-            content = st.text_area("Editor", st.session_state.get("texto_ativo",""), height=420)
+                with open(os.path.join(DIRS["SERMOES"], sel_file), 'r', encoding='utf-8') as f:
+                    content_init = f.read()
+            except: content_init = ""
+        st.session_state["last_file"] = sel_file
+        # Reseta o conteúdo do editor para o novo arquivo usando session_state dinâmico
+        st.session_state[f"quill_{sel_file}"] = content_init
+    
+    # Nome do documento
+    doc_title = c_tit.text_input("Título", value=sel_file.replace(".txt","") if sel_file != "- Novo -" else "")
 
-        if content != st.session_state.get("texto_ativo",""):
-            st.session_state["texto_ativo"] = content
-            if autosave and st.session_state["titulo_ativo"]:
-                try:
-                    fn = f"{st.session_state['titulo_ativo']}.txt"
-                    with open(os.path.join(DIRS["SERMOES"], fn), "w", encoding="utf-8") as f:
-                        f.write(content)
-                    st.toast("Autosave realizado.", icon="💾")
-                except Exception:
-                    pass
-
-        c_save, c_exp = st.columns(2)
-        with c_save:
-            if st.button("Salvar"):
-                fn = f"{st.session_state['titulo_ativo']}.txt"
-                with open(os.path.join(DIRS["SERMOES"], fn), "w", encoding="utf-8") as f: f.write(content)
-                st.success("Salvo.")
-            if st.button("Encriptar (Senha na Config)"):
-                pw = st.session_state["config"].get("enc_password")
-                if pw:
-                    enc = encrypt_aes(pw, content) if CRYPTO_OK else None
-                    with open(os.path.join(DIRS["GABINETE"], f"{safe_filename(st.session_state['titulo_ativo'])}.enc"), "w", encoding="utf-8") as f:
-                        f.write(enc if enc else "")
-                    st.success("Encriptado.")
-                else:
-                    st.error("Defina senha na config.")
-        with c_exp:
-            if st.button("Exportar DOCX"):
-                fn = f"{safe_filename(st.session_state['titulo_ativo'])}.docx"
-                path = os.path.join(DIRS["SERMOES"], fn)
-                ok = export_html_to_docx(st.session_state['titulo_ativo'], content, path)
-                if ok:
-                    with open(path, "rb") as f:
-                        st.download_button("Baixar DOCX", f, file_name=fn)
-                else:
-                    st.error("Falha export DOCX.")
-            if st.button("Exportar PDF"):
-                fn = f"{safe_filename(st.session_state['titulo_ativo'])}.pdf"
-                path = os.path.join(DIRS["SERMOES"], fn)
-                ok = export_to_pdf(st.session_state['titulo_ativo'], content, path)
-                if ok:
-                    with open(path, "rb") as f:
-                        st.download_button("Baixar PDF", f, file_name=fn)
-                else:
-                    st.error("Falha export PDF (libs ausentes).")
-
-# ---------------------------------------------------------------------
-# Module: BIBLIOTECA (direct access)
-# ---------------------------------------------------------------------
-elif menu == "Biblioteca":
-    st.title("📚 Biblioteca Reformada")
-    col1,col2 = st.columns(2)
-    with col1:
-        st.subheader("Busca Online (Google Books) - simulada")
-        q = st.text_input("Termo (ex: Teologia Pactual)")
-        if st.button("Buscar"):
-            st.info("Conexão simulada. Insira API Key em Configurações para ativar.")
-    with col2:
-        st.subheader("Arquivos Locais (Gabinete)")
-        books = index_books(DIRS["BIB_CACHE"])
-        if books:
-            for b in books:
-                st.write(b)
-        else:
-            st.info("Nenhum livro local indexado (use importar).")
-    c1,c2,c3,c4 = st.columns(4)
-    c1.markdown('<div class="tech-card">Bíblias</div>', unsafe_allow_html=True)
-    c2.markdown('<div class="tech-card">Comentários</div>', unsafe_allow_html=True)
-    c3.markdown('<div class="tech-card">Dicionários</div>', unsafe_allow_html=True)
-    c4.markdown('<div class="tech-card">PDFs Locais</div>', unsafe_allow_html=True)
-
-# ---------------------------------------------------------------------
-# Module: CONFIGURAÇÕES (with manual)
-# ---------------------------------------------------------------------
-elif menu == "Configurações":
-    st.title("⚙️ Configurações")
-    cfg = st.session_state["config"]
-    c1,c2 = st.columns(2)
-    with c1:
-        st.markdown("### Visual")
-        nc = st.color_picker("Cor do Tema", cfg.get("theme_color","#D4AF37"))
-        nf = st.number_input("Tamanho Fonte", 12, 30, cfg.get("font_size",18))
-        nm = st.selectbox("Modo (apenas informativo)", ["Dark Cathedral","Pergaminho (Sepia)","Holy Light (Claro)"], index=0)
-        st.markdown("### Preferências de Trabalho")
-        work_mode = st.selectbox("Meu modo de trabalho", ["Completo","Minimalista","Mobile-first"], index=0)
-        st.checkbox("Mostrar dicas rápidas na tela inicial", value=True)
-    with c2:
-        st.markdown("### Segurança & Backup")
-        npw = st.text_input("Senha Mestra de Encriptação", type="password", value=cfg.get("enc_password",""))
-        api_key = st.text_input("API Key (Google - opcional)", value=cfg.get("api_key",""), type="password")
-        interval_days = st.number_input("Intervalo de backup (dias)", 1, 30, int(cfg.get("backup_interval_seconds",24*3600)//86400))
-        st.markdown("---")
-        if st.button("Executar Backup Agora"):
-            bk = backup_local()
-            if bk: st.success(f"Backup criado: {bk}")
-            else: st.error("Erro no backup.")
-
-    if st.button("Salvar Tudo"):
-        cfg["theme_color"] = nc
-        cfg["font_size"] = nf
-        cfg["theme_mode"] = nm
-        cfg["enc_password"] = npw
-        cfg["api_key"] = api_key
-        cfg["backup_interval_seconds"] = int(interval_days*24*3600)
-        cfg["work_mode"] = work_mode
-        write_json(DBS["CONFIG"], cfg)
-        st.success("Configurações salvas. Reinicie o app para aplicar totalmente quando necessário.")
+    # Editor com Toolbar Completa (Word Style)
+    if QUILL_AVAILABLE:
+        toolbar = [
+            ['bold', 'italic', 'underline', 'strike'],
+            [{'header': 1}, {'header': 2}],
+            [{'list': 'ordered'}, {'list': 'bullet'}],
+            [{'align': []}], [{'color': []}, {'background': []}],
+            ['clean']
+        ]
+        # KEY DINÂMICA: Previne o erro 'Node not found' / 'removeChild'
+        unique_key = f"quill_{sel_file}"
+        
+        content = st_quill(
+            value=content_init,
+            key=unique_key,
+            toolbar=toolbar,
+            height=500,
+            html=True
+        )
+    else:
+        content = st.text_area("Editor Texto", content_init, height=500)
 
     st.markdown("---")
-    with st.expander("📘 Manual do Aplicativo (Guias & Boas Práticas)"):
-        st.markdown("**Como usar o Gabinete Pastoral**")
-        st.markdown("- Use o editor para compor sermões. Você pode importar PDFs/DOCX/EPUB na Biblioteca integrada.")
-        st.markdown("- Salve frequentemente; configure Autosave nas preferências do editor.")
-        st.markdown("**Como usar o Rebanho**")
-        st.markdown("- Adicione membros com dados de contato; utilize os botões Ligar/WhatsApp/Email para contato rápido.")
-        st.markdown("- Mantenha notas e histórico para acompanhar o crescimento espiritual.")
-        st.markdown("**Cuidado Pastoral (boas práticas resumidas)**")
-        st.markdown("- Mantenha confidencialidade. Registre encontros e siga um plano de visitas.")
-        st.markdown("- Estruture um time de suporte e delegue contatos quando necessário.")
-        st.markdown("**Backups e sincronização**")
-        st.markdown("- Faça backup manual antes de grandes atualizações. Configure sincronização externa caso tenha credenciais.")
-        st.markdown("**Fontes & Layout**")
-        st.markdown("- Você pode selecionar fonte e tamanho na seção Visual. Os nomes de fontes são normalizados automaticamente.")
-        st.caption("Posso expandir cada tópico com passo-a-passo e checklists (busco fontes oficiais se desejar).")
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        if st.button("💾 SALVAR", type="primary", use_container_width=True):
+            if doc_title:
+                fn = f"{doc_title}.txt"
+                with open(os.path.join(DIRS["SERMOES"], fn), 'w', encoding='utf-8') as f:
+                    f.write(content)
+                st.toast("Salvo!", icon="✅")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("Título vazio.")
 
-# ---------------------------------------------------------------------
-# Footer
-# ---------------------------------------------------------------------
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.caption("Sistema O PREGADOR — Versão consolidada. Recursos de sincronização requerem configuração externa. Desenvolvido com carinho — preserve dados sensíveis com responsabilidade.")
+    with c2:
+        cc1, cc2, cc3 = st.columns(3)
+        if cc1.button("🔒 Encriptar"):
+            pw = st.session_state["config"].get("enc_password")
+            if pw:
+                enc = encrypt_aes(pw, content)
+                if enc:
+                    with ope

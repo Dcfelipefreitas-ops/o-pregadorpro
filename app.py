@@ -162,7 +162,8 @@ except Exception:
 # ==============================================================================
 # 1. INFRAESTRUTURA (pastas, DB paths)
 # ==============================================================================
-st.set_page_config(page_title="O PREGADOR", layout="wide", page_icon="✝️", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="O PREGADOR", layout="wide", page_icon="✝️", initial_sidebar_state="expanded")
 SystemOmegaKernel.inject_pwa_headers()
 
 ROOT = "Dados_Pregador_V31"

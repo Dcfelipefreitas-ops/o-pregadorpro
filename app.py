@@ -258,6 +258,169 @@ def index_books(folder=None):
     except Exception:
         pass
     return books
+    # ==============================================================================
+# 13. MÓDULO: GABINETE PASTORAL (EDITOR WYSIWYG - ESTILO WORD)
+# ==============================================================================
+elif menu == "Gabinete Pastoral":
+    st.title("📝 Gabinete Pastoral")
+    
+    # Importações específicas para este módulo (garantindo que não quebre se faltar)
+    try:
+        from streamlit_quill import st_quill
+        from bs4 import BeautifulSoup
+        from docx import Document
+        from docx.shared import Pt, RGBColor
+    except ImportError:
+        st.error("Erro: Bibliotecas 'streamlit-quill', 'beautifulsoup4' ou 'python-docx' não instaladas.")
+        st.stop()
+
+    # --- FUNÇÃO AUXILIAR: CONVERTER HTML (DO EDITOR) PARA WORD (.DOCX) ---
+    def html_to_word_classic(html_content):
+        """Converte o HTML rico do Quill para um arquivo Word limpo."""
+        doc = Document()
+        soup = BeautifulSoup(html_content, "html.parser")
+        
+        # Título
+        doc.add_heading(st.session_state.get("titulo_ativo", "Sermão Sem Título"), 0)
+        
+        # Processa parágrafos
+        for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'li']):
+            if element.name in ['h1', 'h2', 'h3']:
+                # Cabeçalhos
+                level = int(element.name[1])
+                doc.add_heading(element.get_text(), level)
+            elif element.name == 'li':
+                # Listas
+                doc.add_paragraph(element.get_text(), style='List Bullet')
+            else:
+                # Texto normal (p)
+                p = doc.add_paragraph()
+                # Tenta manter formatação básica (Negrito/Itálico) se houver tags internas
+                if element.find('strong') or element.find('b'):
+                    run = p.add_run(element.get_text())
+                    run.bold = True
+                elif element.find('em') or element.find('i'):
+                    run = p.add_run(element.get_text())
+                    run.italic = True
+                else:
+                    p.add_run(element.get_text())
+        
+        # Salva em memória
+        buffer = BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return buffer
+
+    # --- SETUP DE ARQUIVOS ---
+    METADATA_PATH = os.path.join(DIRS["SERMOES"], "metadata.json")
+    if not os.path.exists(METADATA_PATH):
+        SafeIO.salvar_json(METADATA_PATH, {"sermons": []})
+    
+    # --- BARRA LATERAL DO EDITOR (SELEÇÃO DE ARQUIVOS) ---
+    c_lista, c_editor = st.columns([1, 4])
+    
+    with c_lista:
+        st.markdown("### 📂 Arquivos")
+        # Lista arquivos .html (formato rico) e .txt (antigos)
+        files = [f for f in os.listdir(DIRS["SERMOES"]) if f.endswith((".html", ".txt"))]
+        sel_file = st.selectbox("Abrir Sermão:", ["- Novo Documento -"] + files)
+        
+        st.info("💡 Dica: Use Ctrl+B para Negrito e Ctrl+I para Itálico.")
+
+    # --- LÓGICA DE CARREGAMENTO ---
+    if sel_file != "- Novo Documento -" and sel_file != st.session_state.get("arquivo_carregado"):
+        path = os.path.join(DIRS["SERMOES"], sel_file)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                st.session_state["texto_ativo"] = f.read()
+            st.session_state["titulo_ativo"] = sel_file.replace(".html", "").replace(".txt", "")
+            st.session_state["arquivo_carregado"] = sel_file
+        except:
+            st.error("Erro ao abrir arquivo.")
+
+    # --- ÁREA DO EDITOR (VISUAL WORD) ---
+    with c_editor:
+        # Título do Documento
+        titulo = st.text_input("Título do Sermão / Estudo", value=st.session_state.get("titulo_ativo", ""))
+        
+        # CONFIGURAÇÃO DA BARRA DE FERRAMENTAS (ESTILO WORD)
+        # Isso define quais botões aparecem no topo do editor
+        toolbar_config = [
+            ['bold', 'italic', 'underline', 'strike'],        # Negrito, Itálico, Sublinhado, Riscado
+            ['blockquote', 'code-block'],                     # Citação, Código
+            [{'header': 1}, {'header': 2}],                   # Títulos H1, H2
+            [{'list': 'ordered'}, {'list': 'bullet'}],        # Listas Numéricas e Pontos
+            [{'script': 'sub'}, {'script': 'super'}],         # Sobrescrito
+            [{'indent': '-1'}, {'indent': '+1'}],             # Identação
+            [{'direction': 'rtl'}],                           # Direção do texto
+            [{'size': ['small', False, 'large', 'huge']}],    # Tamanho da fonte
+            [{'header': [1, 2, 3, 4, 5, 6, False]}],          # Cabeçalhos
+            [{'color': []}, {'background': []}],              # Cores de texto e fundo
+            [{'font': []}],                                   # Fontes
+            [{'align': []}],                                  # Alinhamento (Esq, Centro, Dir, Justificar)
+            ['clean']                                         # Limpar formatação
+        ]
+
+        # O COMPONENTE EDITOR RICO
+        # Retorna o conteúdo em HTML
+        content_html = st_quill(
+            value=st.session_state.get("texto_ativo", ""),
+            placeholder="Comece a escrever a sua pregação aqui...",
+            html=True,
+            toolbar=toolbar_config,
+            key="quill_editor_word",
+            height=500  # Altura da folha
+        )
+        
+        # Atualiza estado
+        st.session_state["texto_ativo"] = content_html
+        st.session_state["titulo_ativo"] = titulo
+
+        # --- BOTÕES DE AÇÃO ---
+        st.markdown("---")
+        c_salvar, c_export, c_crypto = st.columns(3)
+        
+        # 1. SALVAR (Salva como HTML para manter as cores e formatos)
+        with c_salvar:
+            if st.button("💾 Salvar na Nuvem Local", type="primary", use_container_width=True):
+                if titulo:
+                    # Salva como HTML para preservar formatação visual (Word style)
+                    fn = f"{titulo}.html"
+                    path = os.path.join(DIRS["SERMOES"], fn)
+                    with open(path, 'w', encoding='utf-8') as f:
+                        f.write(content_html)
+                    st.toast("Documento salvo com formatação completa!", icon="✅")
+                else:
+                    st.warning("Dê um título antes de salvar.")
+
+        # 2. EXPORTAR PARA WORD (.DOCX)
+        with c_export:
+            if st.button("📄 Baixar como Word (.docx)", use_container_width=True):
+                if titulo and content_html:
+                    docx_buffer = html_to_word_classic(content_html)
+                    st.download_button(
+                        label="⬇️ Download Arquivo Word",
+                        data=docx_buffer,
+                        file_name=f"{titulo}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                else:
+                    st.warning("Escreva algo e dê um título para baixar.")
+
+        # 3. CRIPTOGRAFIA (AES)
+        with c_crypto:
+            if st.button("🔒 Encriptar (AES-256)", use_container_width=True):
+                pw = st.session_state["config"].get("enc_password")
+                if pw and content_html:
+                    if CRYPTO_OK:
+                        enc = encrypt_sermon_aes(pw, content_html)
+                        path = os.path.join(DIRS["GABINETE"], f"{titulo}.enc")
+                        with open(path, 'w', encoding='utf-8') as f: f.write(enc)
+                        st.success("Arquivo blindado no cofre.")
+                    else:
+                        st.error("Módulo de criptografia indisponível.")
+                else:
+                    st.error("Configure uma Senha Mestra nas Configurações primeiro.")
 
 # ---------------------------------------------------------------------
 # ACCESS CONTROL

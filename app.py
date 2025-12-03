@@ -14,11 +14,11 @@ from datetime import datetime, timedelta
 from io import BytesIO
 
 # ==============================================================================
-# 0. KERNEL ORTODOXO (INICIALIZAÇÃO BLINDADA)
+# 0. KERNEL DE INICIALIZAÇÃO (BLINDAGEM DO SISTEMA)
 # ==============================================================================
 class SystemOmegaKernel:
     """
-    O Coração da Máquina: Instalação silenciosa e boot de alta performance.
+    Núcleo 'Raiz': Garante que o sistema rode em qualquer ambiente.
     """
     REQUIRED = ["google-generativeai", "streamlit-lottie", "Pillow", "pandas", "fpdf"]
     
@@ -40,7 +40,7 @@ class SystemOmegaKernel:
         
         if queue:
             placeholder = st.empty()
-            placeholder.code(f"SYSTEM OMEGA: Atualizando Protocolos... ({len(queue)} pacotes)", language="bash")
+            placeholder.code(f"INITIALIZING THEOLOGY OS... ({len(queue)} MODULES)", language="bash")
             for lib in queue:
                 SystemOmegaKernel._install(lib)
             placeholder.empty()
@@ -55,13 +55,13 @@ from PIL import Image, ImageOps
 # 1. INFRAESTRUTURA DE DADOS (SAFE I/O)
 # ==============================================================================
 st.set_page_config(
-    page_title="O PREGADOR | Orthodox Prime", 
+    page_title="O PREGADOR | Theology OS", 
     layout="wide", 
     page_icon="✝️", 
     initial_sidebar_state="expanded"
 )
 
-ROOT = "Dados_Pregador_V23_Prime"
+ROOT = "Dados_Pregador_V24_TheologyOS"
 DIRS = {
     "SERMOES": os.path.join(ROOT, "Sermoes"),
     "GABINETE": os.path.join(ROOT, "Gabinete_Pastoral"),
@@ -101,7 +101,7 @@ class SafeIO:
         except: pass
 
 # ==============================================================================
-# 2. DESIGN SYSTEM "ORTHODOX TRANSFORMER"
+# 2. DESIGN SYSTEM "DARK CATHEDRAL"
 # ==============================================================================
 def inject_css(color="#D4AF37", font_sz=18):
     st.markdown(f"""
@@ -110,103 +110,91 @@ def inject_css(color="#D4AF37", font_sz=18):
         
         :root {{ 
             --gold: {color}; 
-            --gold-glow: rgba(212, 175, 55, 0.3);
-            --bg: #020202; 
+            --gold-glow: rgba(212, 175, 55, 0.2);
+            --bg: #000000; 
             --panel: #0A0A0A; 
-            --border: #222; 
+            --border: #1F1F1F; 
             --text: #EAEAEA; 
         }}
         
         /* BASE */
         .stApp {{ 
             background-color: var(--bg); 
-            background-image: linear-gradient(180deg, #050505 0%, #000 100%);
+            background-image: radial-gradient(circle at 50% -20%, #1a1200 0%, #000 60%);
             color: var(--text); 
             font-family: 'Inter', sans-serif; 
         }}
         
-        /* SIDEBAR MONOLÍTICA */
+        /* SIDEBAR */
         [data-testid="stSidebar"] {{
-            background-color: #040404;
-            border-right: 1px solid #1a1a1a;
+            background-color: #050505;
+            border-right: 1px solid var(--border);
         }}
         [data-testid="stSidebar"] hr {{ margin: 0; border-color: #222; }}
         
-        /* LOGIN ORTODOXO (O RETORNO DO 'O') */
-        @keyframes pulse-gold-prime {{
-            0% {{ box-shadow: 0 0 0 0 var(--gold-glow); border-color: #554400; }}
-            50% {{ box-shadow: 0 0 30px 5px var(--gold-glow); border-color: var(--gold); }}
-            100% {{ box-shadow: 0 0 0 0 var(--gold-glow); border-color: #554400; }}
+        /* LOGIN LOGO (SVG ANIMATION) */
+        @keyframes holy-pulse {{
+            0% {{ filter: drop-shadow(0 0 5px var(--gold-glow)); transform: scale(1); }}
+            50% {{ filter: drop-shadow(0 0 20px var(--gold)); transform: scale(1.02); }}
+            100% {{ filter: drop-shadow(0 0 5px var(--gold-glow)); transform: scale(1); }}
         }}
         
-        .omega-circle {{
-            width: 140px; height: 140px; border-radius: 50%;
-            border: 2px solid var(--gold); background: #000;
-            display: flex; align-items: center; justify-content: center;
-            margin: 0 auto 25px auto;
-            animation: pulse-gold-prime 4s infinite;
-        }}
-        
-        .omega-letter {{
-            font-family: 'Cinzel', serif;
-            font-size: 80px;
-            color: var(--gold);
-            font-weight: 800;
-            text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+        .prime-logo {{
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px auto;
+            animation: holy-pulse 4s infinite ease-in-out;
+            display: block;
         }}
         
         .login-title {{
-            font-family: 'Cinzel'; letter-spacing: 6px; 
-            color: #fff; font-size: 28px; margin-top: 10px;
-            text-transform: uppercase;
+            font-family: 'Cinzel'; letter-spacing: 8px; 
+            color: #fff; font-size: 24px; margin-top: 10px;
+            text-transform: uppercase; text-align: center;
         }}
 
-        /* CARDS CYBER-TEOLÓGICOS */
+        /* CARDS MODERNOS */
         .tech-card {{
-            background: linear-gradient(145deg, #0E0E0E, #090909);
-            border: 1px solid #1f1f1f;
+            background: #090909;
+            border: 1px solid var(--border);
+            border-left: 2px solid var(--gold);
             border-radius: 4px; padding: 25px; margin-bottom: 20px;
-            position: relative;
-            overflow: hidden;
+            transition: 0.3s;
         }}
-        .tech-card::before {{
-            content: ''; position: absolute; top: 0; left: 0; 
-            width: 3px; height: 100%; background: var(--gold);
-        }}
-        .tech-card:hover {{ border-color: #333; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }}
+        .tech-card:hover {{ border-color: #333; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.8); }}
 
         /* EDITOR SAGRADO */
         .editor-wrapper textarea {{
             font-family: 'Playfair Display', serif !important;
             font-size: {font_sz}px !important;
             line-height: 1.8;
-            background-color: #060606 !important;
+            background-color: #050505 !important;
             border: 1px solid #1a1a1a !important;
             color: #ccc !important;
-            padding: 30px !important;
-            border-radius: 4px !important;
+            padding: 40px !important;
+            border-radius: 0px !important;
         }}
-        .editor-wrapper textarea:focus {{ border-color: var(--gold) !important; }}
+        .editor-wrapper textarea:focus {{ border-color: var(--gold) !important; outline: none; }}
         
         /* STATUS HUD */
         .hud-bar {{
             display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 20px; background: #080808; border-bottom: 1px solid #222;
-            margin-bottom: 25px; border-radius: 4px;
-            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            padding: 12px 20px; background: rgba(255,255,255,0.03);
+            border: 1px solid #1a1a1a; margin-bottom: 30px;
+            border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px;
         }}
         
         /* INPUTS */
         .stTextInput input, .stSelectbox div, .stTextArea textarea {{
-            background-color: #0C0C0C !important; 
+            background-color: #0A0A0A !important; 
             border: 1px solid #222 !important; 
             color: #eee !important;
-            border-radius: 2px !important;
         }}
         .stButton button {{
-            border-radius: 2px !important; text-transform: uppercase; letter-spacing: 1px;
-            font-weight: 600;
+            border-radius: 2px !important; text-transform: uppercase; letter-spacing: 2px;
+            font-size: 11px; font-weight: 700; background: #111; color: #888; border: 1px solid #333;
         }}
+        .stButton button:hover {{ border-color: var(--gold); color: var(--gold); }}
         
     </style>
     """, unsafe_allow_html=True)
@@ -219,8 +207,8 @@ class LiturgicalCalendar:
     @staticmethod
     def get_status():
         hoje = datetime.now()
-        # Lógica simplificada para display HUD
-        if hoje.weekday() == 6: return "DOMINGO - DIA DO SENHOR"
+        wd = hoje.weekday()
+        if wd == 6: return "DOMINGO - DIA DO SENHOR"
         return "DIA FERIAL"
 
 class GenevaProtocol:
@@ -276,22 +264,28 @@ if "texto_ativo" not in st.session_state: st.session_state["texto_ativo"] = ""
 if "titulo_ativo" not in st.session_state: st.session_state["titulo_ativo"] = ""
 
 # ==============================================================================
-# 5. TELA DE LOGIN (SOLICITAÇÃO ESPECÍFICA ATENDIDA)
+# 5. TELA DE LOGIN (O GRANDE 'O' COM A CRUZ)
 # ==============================================================================
 if not st.session_state["logado"]:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
-        # O CÍRCULO COM O "O" MAJESTOSO
+        # SVG PERSONALIZADO: O GRANDE O COM CRUZ DENTRO
+        gold = st.session_state["config"]["theme_color"]
+        svg_logo = f"""
+        <svg class="prime-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- O Grande O -->
+            <circle cx="50" cy="50" r="45" stroke="{gold}" stroke-width="3" fill="none" />
+            <!-- A Cruz Centralizada -->
+            <line x1="50" y1="25" x2="50" y2="75" stroke="{gold}" stroke-width="3" />
+            <line x1="35" y1="40" x2="65" y2="40" stroke="{gold}" stroke-width="3" />
+        </svg>
+        """
+        
+        st.markdown(svg_logo, unsafe_allow_html=True)
         st.markdown(f"""
-        <div class="omega-circle">
-            <span class="omega-letter">O</span>
-        </div>
-        <div style="text-align:center;">
-            <div class="login-title">O PREGADOR</div>
-            <div style="font-size:10px; color:#555; letter-spacing:4px; margin-top:5px;">ORTHODOX PRIME V23</div>
-            <div style="width:40px; height:2px; background:{st.session_state["config"]["theme_color"]}; margin: 20px auto;"></div>
-        </div>
+        <div class="login-title">O PREGADOR</div>
+        <div style="text-align:center; font-size:9px; color:#555; letter-spacing:4px; margin-bottom:30px;">THEOLOGY OS V24</div>
         """, unsafe_allow_html=True)
         
         with st.form("gate_keeper"):
@@ -313,30 +307,35 @@ if not st.session_state["logado"]:
 # 6. APP PRINCIPAL
 # ==============================================================================
 
-# --- SIDEBAR (PAINEL DE CONTROLE) ---
+# --- SIDEBAR (MONOLITO) ---
 with st.sidebar:
+    # Logo simplificado na sidebar
+    gold = st.session_state["config"]["theme_color"]
     st.markdown(f"""
-    <div style="text-align:center; padding:20px 0 10px 0;">
-        <span style="font-family:'Cinzel'; font-size:40px; color:{st.session_state["config"]["theme_color"]};">O</span>
-        <br><span style="font-size:10px; color:#666; letter-spacing:2px;">SOLA SCRIPTURA</span>
+    <div style="text-align:center; padding:20px 0;">
+        <svg width="40" height="40" viewBox="0 0 100 100">
+             <circle cx="50" cy="50" r="45" stroke="{gold}" stroke-width="5" fill="none" />
+             <line x1="50" y1="20" x2="50" y2="80" stroke="{gold}" stroke-width="5" />
+             <line x1="30" y1="40" x2="70" y2="40" stroke="{gold}" stroke-width="5" />
+        </svg>
+        <div style="font-family:'Cinzel'; margin-top:10px; font-size:14px; color:{gold}">THEOLOGY OS</div>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("---")
     
     menu = st.radio(
-        "COMANDOS", 
+        "MÓDULOS", 
         ["Dashboard", "Gabinete Pastoral", "Studio Expositivo", "Séries Bíblicas", "Media Lab", "Configurações"],
         label_visibility="collapsed"
     )
     
     st.markdown("---")
     
-    # Stats Compactos
     stats = SafeIO.ler_json(DBS["STATS"], {"nivel": 1, "xp": 0})
     st.markdown(f"""
     <div style="font-family:'JetBrains Mono'; font-size:10px; color:#555; text-align:center;">
-        NÍVEL {stats['nivel']} // XP {stats['xp']}
+        LVL {stats['nivel']} // XP {stats['xp']}
     </div>
     """, unsafe_allow_html=True)
 
@@ -351,12 +350,11 @@ dia_liturgico = LiturgicalCalendar.get_status()
 st.markdown(f"""
 <div class="hud-bar">
     <div>
-        <span style="color:#666;">DATA:</span> {datetime.now().strftime("%d/%m/%Y")}
-        <span style="color:#666; margin-left:15px;">LITURGIA:</span> {dia_liturgico}
+        <span style="color:#444;">DATA:</span> {datetime.now().strftime("%d.%m.%Y")}
+        <span style="color:#444; margin-left:15px;">LITURGIA:</span> {dia_liturgico}
     </div>
     <div>
-        <span style="color:#666;">SISTEMA:</span> <span style="color:{cor_b}">{status_b}</span>
-        <span style="color:#666; margin-left:15px;">USER:</span> {st.session_state['user_name']}
+        <span style="color:#444;">STATUS:</span> <span style="color:{cor_b}">{status_b}</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -369,9 +367,9 @@ if menu == "Dashboard":
     c1, c2 = st.columns([1, 2])
     with c1:
         st.markdown('<div class="tech-card">', unsafe_allow_html=True)
-        st.caption("MONITOR DA ALMA")
-        humor = st.selectbox("Estado Atual", ["Plenitude 🕊️", "Gratidão 🙏", "Cansaço 🌖", "Ira 😠", "Tristeza 😢", "Ansiedade 🌪️"], label_visibility="collapsed")
-        if st.button("REGISTRAR", use_container_width=True):
+        st.caption("CHECK-IN ESPIRITUAL")
+        humor = st.selectbox("Estado da Alma", ["Plenitude 🕊️", "Gratidão 🙏", "Cansaço 🌖", "Ira 😠", "Tristeza 😢", "Ansiedade 🌪️"], label_visibility="collapsed")
+        if st.button("REGISTRAR ESTADO", use_container_width=True):
             PastoralMind.registrar(humor)
             Gamification.add_xp(10)
             st.success("DADOS COMPUTADOS.")
@@ -395,9 +393,9 @@ if menu == "Dashboard":
     for i, f in enumerate(files):
         with cols[i]:
             st.markdown(f"""
-            <div style="border:1px solid #222; background:#080808; padding:15px; border-radius:2px;">
-                <div style="color:#666; font-size:10px;">TXT FILE</div>
-                <div style="font-weight:bold;">{f.replace('.txt','')}</div>
+            <div style="border:1px solid #222; background:#090909; padding:20px; border-radius:4px;">
+                <div style="color:#444; font-size:9px; letter-spacing:1px;">TXT FILE</div>
+                <div style="font-family:'Cinzel'; font-size:14px; margin-top:5px;">{f.replace('.txt','')}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -427,12 +425,12 @@ elif menu == "Studio Expositivo":
     
     c1, c2 = st.columns([3, 1])
     c1.text_input("Título", key="titulo_ativo", placeholder="Ex: Gênesis 1 - O Princípio")
-    if c2.button("SALVAR DADOS", use_container_width=True, type="primary"):
+    if c2.button("PERSISTIR DADOS", use_container_width=True, type="primary"):
         if st.session_state["titulo_ativo"]:
             path = os.path.join(DIRS["SERMOES"], f"{st.session_state['titulo_ativo']}.txt")
             with open(path, 'w', encoding='utf-8') as f: f.write(st.session_state["texto_ativo"])
             SafeIO.salvar_json(os.path.join(DIRS["BACKUP"], "log.json"), {"saved": True})
-            st.toast("DADOS PERSISTIDOS.", icon="💾")
+            st.toast("DADOS SALVOS.", icon="💾")
 
     ce, ca = st.columns([2.5, 1])
     with ce:
@@ -443,7 +441,7 @@ elif menu == "Studio Expositivo":
     with ca:
         st.markdown("#### Geneva Scan")
         alerts = GenevaProtocol.scan(st.session_state["texto_ativo"])
-        if not alerts: st.markdown("<div style='color:#33FF33; font-size:12px;'>✅ DOUTRINA VERIFICADA</div>", unsafe_allow_html=True)
+        if not alerts: st.markdown("<div style='color:#33FF33; font-size:12px; background:#001100; padding:5px;'>✅ DOUTRINA SÃ</div>", unsafe_allow_html=True)
         else:
             for a in alerts: st.warning(a)
             
@@ -478,27 +476,4 @@ elif menu == "Séries Bíblicas":
         st.markdown(f"<div class='tech-card'><b>{v['nome']}</b><br><small>{v['descricao']}</small></div>", unsafe_allow_html=True)
 
 elif menu == "Media Lab":
-    st.title("Media Lab")
-    c1, c2 = st.columns(2)
-    with c1: st.markdown('<div style="height:300px; border:1px dashed #333; display:flex; align-items:center; justify-content:center; color:#444;">RENDER PREVIEW</div>', unsafe_allow_html=True)
-    with c2:
-        st.text_input("Texto Overlay")
-        st.selectbox("Template", ["Dark Theology", "Light Grace", "Nature"])
-        if st.button("RENDERIZAR (SIMULAÇÃO)"): st.success("PROCESSADO.")
-
-elif menu == "Configurações":
-    st.title("Configurações do Sistema")
-    c1, c2 = st.columns(2)
-    with c1:
-        nc = st.color_picker("Cor Destaque", st.session_state["config"].get("theme_color", "#D4AF37"))
-        nf = st.slider("Tamanho Fonte", 14, 28, st.session_state["config"].get("font_size", 18))
-    with c2:
-        nk = st.text_input("API Key (Google)", value=st.session_state["config"].get("api_key", ""), type="password")
-        
-    if st.button("ATUALIZAR PARÂMETROS", type="primary"):
-        cfg = st.session_state["config"]
-        cfg.update({"theme_color": nc, "font_size": nf, "api_key": nk})
-        SafeIO.salvar_json(DBS["CONFIG"], cfg)
-        st.success("SISTEMA REINICIANDO...")
-        time.sleep(1)
-        st.rerun()
+    st.title("Med

@@ -64,14 +64,14 @@ from PIL import Image, ImageOps, ImageFilter, ImageDraw, ImageFont
 # 1. CONFIGURAÇÃO E INFRAESTRUTURA
 # ==============================================================================
 st.set_page_config(
-    page_title="O PREGADOR | System Omega", 
+    page_title="O PREGADOR ", 
     layout="wide", 
     page_icon="✝️", 
     initial_sidebar_state="collapsed"
 )
 
 # Caminhos Absolutos (Estrutura Completa)
-PASTA_RAIZ = "Dados_Pregador_Ultimate"
+PASTA_RAIZ = "Dados_Pregador_Ultimate_V20"
 PASTA_SERMOES = os.path.join(PASTA_RAIZ, "Sermoes_Expositivos")
 PASTA_CARE = os.path.join(PASTA_RAIZ, "Gabinete_Pastoral")
 PASTA_SERIES = os.path.join(PASTA_RAIZ, "Series_Database")
@@ -183,7 +183,7 @@ class OmegaIcons:
         return f'data:image/svg+xml;base64,{base64.b64encode(icons.get(name, "").encode()).decode()}'
 
 # ==============================================================================
-# 4. ENGINES AVANÇADAS (TODOS OS MOTORES REUNIDOS)
+# 4. ENGINES AVANÇADAS (TODOS OS MOTORES REUNIDOS E CORRIGIDOS)
 # ==============================================================================
 
 class LiturgicalEngine:
@@ -276,45 +276,70 @@ class PastoralPsychologyEngine:
         except: return "Estável"
 
 class LeviteGamification:
-    """Gamificação e Assiduidade."""
+    """Gamificação e Assiduidade (CORRIGIDO PARA EVITAR ERRO DE SINTAXE)."""
     @staticmethod
     def add_xp(amount):
         stats = {"xp": 0, "nivel": 1, "badges": []}
+        
+        # Correção: O 'try' agora envolve o bloco indentado corretamente
         if os.path.exists(DB_STATS):
-            try: with open(DB_STATS, 'r') as f: stats = json.load(f)
-            except: pass
+            try: 
+                with open(DB_STATS, 'r') as f: 
+                    stats = json.load(f)
+            except: 
+                pass
         
         stats['xp'] += amount
         stats['nivel'] = int(math.sqrt(stats['xp']) * 0.2) + 1
         
         # Badge Logic
-        if stats['xp'] > 100 and "escriba" not in stats['badges']: stats['badges'].append("escriba")
-        if stats['xp'] > 500 and "teologo" not in stats['badges']: stats['badges'].append("teologo")
+        if stats['xp'] > 100 and "escriba" not in stats.get('badges', []): 
+            stats.setdefault('badges', []).append("escriba")
         
-        with open(DB_STATS, 'w') as f: json.dump(stats, f)
+        try:
+            with open(DB_STATS, 'w') as f: 
+                json.dump(stats, f)
+        except:
+            pass
 
 class SermonSeriesManager:
     @staticmethod
     def carregar():
         if os.path.exists(DB_SERIES):
-            try: with open(DB_SERIES, 'r') as f: return json.load(f)
-            except: pass
+            try: 
+                with open(DB_SERIES, 'r') as f: 
+                    return json.load(f)
+            except: 
+                pass
         return {}
+    
     @staticmethod
     def salvar(data):
-        with open(DB_SERIES, 'w') as f: json.dump(data, f)
+        try:
+            with open(DB_SERIES, 'w') as f: 
+                json.dump(data, f)
+        except:
+            pass
 
 class ConfigManager:
     @staticmethod
     def get_config():
         defaults = {"font_size": 18, "theme_color": "#D4AF37", "ai_temp": 0.7}
         if os.path.exists(DB_CONFIG):
-            try: with open(DB_CONFIG, 'r') as f: return {**defaults, **json.load(f)}
-            except: pass
+            try: 
+                with open(DB_CONFIG, 'r') as f: 
+                    return {**defaults, **json.load(f)}
+            except: 
+                pass
         return defaults
+    
     @staticmethod
     def save_config(cfg):
-        with open(DB_CONFIG, 'w') as f: json.dump(cfg, f)
+        try:
+            with open(DB_CONFIG, 'w') as f: 
+                json.dump(cfg, f)
+        except:
+            pass
 
 # ==============================================================================
 # 5. GESTÃO DE ESTADO (SESSION)
@@ -413,12 +438,18 @@ if page == "Dashboard":
         st.caption("CHECK-IN ESPIRITUAL")
         humor = st.selectbox("Status", ["Plenitude 🕊️", "Gratidão 🙏", "Cansaço 🌖", "Ira 😠", "Tristeza 😢", "Soberba 👑", "Ansiedade 🌪️"], label_visibility="collapsed")
         if st.button("Registrar Estado"):
-            # Salvar no JSON
+            # Salvar no JSON com proteção
             db = {"historico_humor": []}
             if os.path.exists(DB_SOUL):
-                with open(DB_SOUL, 'r') as f: db = json.load(f)
-            db["historico_humor"].append({"data": datetime.now().strftime("%Y-%m-%d"), "humor": humor})
-            with open(DB_SOUL, 'w') as f: json.dump(db, f)
+                try:
+                    with open(DB_SOUL, 'r') as f: db = json.load(f)
+                except: pass
+            
+            db.setdefault("historico_humor", []).append({"data": datetime.now().strftime("%Y-%m-%d"), "humor": humor})
+            
+            try:
+                with open(DB_SOUL, 'w') as f: json.dump(db, f)
+            except: pass
             
             st.session_state['humor'] = humor
             LeviteGamification.add_xp(10)
@@ -468,10 +499,12 @@ elif page == "Gabinete":
             st.error("⚠️ PARE TUDO. Seu ministério está em perigo. Busque descanso imediatamente.")
             
         if os.path.exists(DB_SOUL):
-            with open(DB_SOUL, 'r') as f:
-                d = json.load(f)
-                if d.get("historico_humor"):
-                    st.dataframe(pd.DataFrame(d["historico_humor"]), use_container_width=True)
+            try:
+                with open(DB_SOUL, 'r') as f:
+                    d = json.load(f)
+                    if d.get("historico_humor"):
+                        st.dataframe(pd.DataFrame(d["historico_humor"]), use_container_width=True)
+            except: pass
 
     with tab2:
         st.subheader("Identificador de Mentiras")
@@ -525,9 +558,12 @@ elif page == "Studio":
         q = st.text_area("Consultar")
         if st.button("Pesquisar"):
             if st.session_state['api_key']:
-                genai.configure(api_key=st.session_state['api_key'])
-                r = genai.GenerativeModel("gemini-pro").generate_content(f"Aja como Calvino. Responda: {q}").text
-                st.info(r)
+                try:
+                    genai.configure(api_key=st.session_state['api_key'])
+                    r = genai.GenerativeModel("gemini-pro").generate_content(f"Aja como Calvino. Responda: {q}").text
+                    st.info(r)
+                except Exception as e:
+                    st.error(f"Erro IA: {e}")
 
 # --- SÉRIES ---
 elif page == "Séries":
@@ -573,10 +609,12 @@ elif page == "Config":
         s = st.slider("Fonte", 14, 28, st.session_state['config']['font_size'])
         cam = st.camera_input("Foto ID")
         if cam:
-            img = Image.open(cam)
-            img = ImageOps.grayscale(img)
-            img.save(os.path.join(PASTA_USER, "avatar.png"))
-            st.success("ID Atualizado.")
+            try:
+                img = Image.open(cam)
+                img = ImageOps.grayscale(img)
+                img.save(os.path.join(PASTA_USER, "avatar.png"))
+                st.success("ID Atualizado.")
+            except: pass
             
     with c2:
         st.markdown("#### Sistema")

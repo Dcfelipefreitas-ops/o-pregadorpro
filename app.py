@@ -444,33 +444,69 @@ class GenevaDoctrineCore:
         return findings
 
 class PastoralAnalytics:
-    """Cálculo de Saúde Ministerial."""
     @staticmethod
     def calculate_health_index():
-        db = _read_json_safe(DB_FILES["SOUL_METRICS"])
-        history = db.get("historico", [])[-10:] # Últimos 10 registros
-        
-        if not history: return 100, "Sem Dados", "#CCCCCC"
-        
-        # Pesos
-        weights = {"Esgotamento": 0, "Cansaço": 40, "Neutro": 70, "Bem": 90, "Pleno": 100}
-        total_score = 0
-        for entry in history:
-            humor = entry.get("humor", "Neutro")
-            total_score += weights.get(humor, 70)
-        
-        avg = total_score / len(history)
-        
-        color = "#33FF33"
-        status = "Vigoroso"
-        if avg < 50: 
-            color = "#FF0000"
-            status = "CRÍTICO (BURNOUT)"
-        elif avg < 75:
-            color = "#FFAA00"
-            status = "Alerta (Cansaço)"
-            
-        return int(avg), status, color
+        """
+        Lee el registro histórico (puede venir de DB_FILES['HEALTH_DB'] o de un fallback)
+        y calcula un índice de salud pastoral (0-100), devolviendo tupla:
+        (health_score: float, health_status: str, health_color: str)
+        """
+        try:
+            # Obtém ruta desde DB_FILES se existe, sino usa fallback dentro de SYSTEM_ROOT
+            health_db_path = None
+            if isinstance(globals().get("DB_FILES"), dict):
+                health_db_path = DB_FILES.get("HEALTH_DB")
+            if not health_db_path:
+                health_db_path = os.path.join(globals().get("SYSTEM_ROOT", "."), "pastoral_health.json")
+
+            # _read_json_safe já se usa em outras partes do código; se não existe, tentar leitura manual
+            if "_read_json_safe" in globals():
+                db = _read_json_safe(health_db_path)
+            else:
+                try:
+                    with open(health_db_path, "r", encoding="utf-8") as fh:
+                        import json
+                        db = json.load(fh)
+                except Exception:
+                    db = {}
+        except Exception:
+            db = {}
+
+        # Asegurar que db sea dict e extraer histórico
+        history = db.get("historico", []) if isinstance(db, dict) else []
+
+        # Tomar últimos 10 registros
+        last = history[-10:] if history else []
+
+        # Si no hay datos, devolver valores por defecto
+        if not last:
+            return 0.0, "Sem dados", "gray"
+
+        # Normalizar y extraer scores (aceita lista de números ou dicts com 'score')
+        scores = []
+        for item in last:
+            try:
+                if isinstance(item, dict):
+                    val = item.get("score", item.get("pontuacao", 0))
+                else:
+                    val = item
+                scores.append(float(val))
+            except Exception:
+                scores.append(0.0)
+
+        avg = (sum(scores) / len(scores)) if scores else 0.0
+        avg = max(0.0, min(100.0, round(avg, 2)))
+
+        if avg >= 80:
+            status, color = "Excelente", "green"
+        elif avg >= 60:
+            status, color = "Bom", "lime"
+        elif avg >= 40:
+            status, color = "Precisa atenção", "orange"
+        else:
+            status, color = "Crítico", "red"
+
+        return avg, status, color
 
 # ==============================================================================
 # 08. SECURITY ACCESS LAYER

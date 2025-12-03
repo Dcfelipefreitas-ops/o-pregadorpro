@@ -598,4 +598,71 @@ elif menu == "Gabinete Pastoral":
             if pw:
                 enc = encrypt_aes(pw, content)
                 if enc:
-                    with ope
+                    with open(os.path.join(DIRS["GABINETE"], f"{doc_title}.enc"), 'w', encoding='utf-8') as f: f.write(enc)
+                    st.success("Encriptado.")
+            else: st.error("Defina senha na config.")
+            
+        if cc2.button("📄 Word (.docx)"):
+            fn = f"{doc_title}.docx"
+            path = os.path.join(DIRS["SERMOES"], fn)
+            export_html_to_docx_better(doc_title, content, path)
+            with open(path, "rb") as f:
+                st.download_button("Baixar DOCX", f, file_name=fn)
+        
+        if cc3.button("📄 PDF"):
+            fn = f"{doc_title}.pdf"
+            path = os.path.join(DIRS["SERMOES"], fn)
+            if export_text_to_pdf(doc_title, content, path):
+                with open(path, "rb") as f:
+                    st.download_button("Baixar PDF", f, file_name=fn)
+            else: st.error("Erro PDF.")
+
+# ---------------------------------------------------------------------
+# MÓDULO: BIBLIOTECA
+# ---------------------------------------------------------------------
+elif menu == "Biblioteca":
+    st.title("📚 Biblioteca")
+    c1,c2 = st.columns(2)
+    with c1:
+        st.subheader("Busca")
+        st.text_input("Pesquisar Google Books...")
+    with c2:
+        st.subheader("Arquivos")
+        books = index_books()
+        if books: 
+            for b in books: st.write(b)
+        else: st.info("Vazio.")
+    
+    c1,c2,c3,c4 = st.columns(4)
+    c1.markdown('<div class="tech-card">Bíblias</div>', unsafe_allow_html=True)
+    c2.markdown('<div class="tech-card">Comentários</div>', unsafe_allow_html=True)
+    c3.markdown('<div class="tech-card">Dicionários</div>', unsafe_allow_html=True)
+    c4.markdown('<div class="tech-card">PDFs Locais</div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------
+# MÓDULO: CONFIGURAÇÕES
+# ---------------------------------------------------------------------
+elif menu == "Configurações":
+    st.title("⚙️ Configurações")
+    cfg = st.session_state["config"]
+    c1,c2 = st.columns(2)
+    with c1:
+        st.markdown("### Visual")
+        nc = st.color_picker("Cor Tema", cfg.get("theme_color"))
+        nf = st.number_input("Fonte Size", 12, 30, cfg.get("font_size"))
+        nm = st.selectbox("Modo", ["Dark Cathedral","Pergaminho","Holy Light"])
+    with c2:
+        st.markdown("### Segurança")
+        npw = st.text_input("Senha Mestra", type="password", value=cfg.get("enc_password"))
+        intv = st.number_input("Backup Dias", 1, 30, 1)
+
+    if st.button("Salvar Tudo"):
+        cfg.update({"theme_color":nc, "font_size":nf, "theme_mode":nm, "enc_password":npw, "backup_interval_seconds":intv*86400})
+        SafeIO.salvar_json(DBS["CONFIG"], cfg)
+        st.success("Salvo.")
+
+# ---------------------------------------------------------------------
+# FOOTER
+# ---------------------------------------------------------------------
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.caption("Sistema O PREGADOR — V32 Stable.")

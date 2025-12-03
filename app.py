@@ -55,13 +55,13 @@ from PIL import Image, ImageOps
 # 1. INFRAESTRUTURA DE DADOS (SAFE I/O)
 # ==============================================================================
 st.set_page_config(
-    page_title="O PREGADOR | Sanctum AI", 
+    page_title="O PREGADOR | Theology OS", 
     layout="wide", 
     page_icon="✝️", 
     initial_sidebar_state="expanded"
 )
 
-ROOT = "Dados_Pregador_V26_Sanctum"
+ROOT = "Dados_Pregador_V27_Genesis"
 DIRS = {
     "SERMOES": os.path.join(ROOT, "Sermoes"),
     "GABINETE": os.path.join(ROOT, "Gabinete_Pastoral"),
@@ -75,7 +75,8 @@ DBS = {
     "SERIES": os.path.join(DIRS["SERIES"], "db_series.json"),
     "STATS": os.path.join(DIRS["USER"], "db_stats.json"),
     "CONFIG": os.path.join(DIRS["USER"], "config.json"),
-    "SOUL": os.path.join(DIRS["GABINETE"], "soul_data.json")
+    "SOUL": os.path.join(DIRS["GABINETE"], "soul_data.json"),
+    "USERS": os.path.join(DIRS["USER"], "users_db.json") # NOVO DB DE USUÁRIOS
 }
 
 for d in DIRS.values():
@@ -101,7 +102,7 @@ class SafeIO:
         except: pass
 
 # ==============================================================================
-# 2. DESIGN SYSTEM "HOLOGRAPHIC CATHEDRAL"
+# 2. DESIGN SYSTEM "DARK CATHEDRAL"
 # ==============================================================================
 def inject_css(color="#D4AF37", font_sz=18):
     st.markdown(f"""
@@ -166,7 +167,6 @@ def inject_css(color="#D4AF37", font_sz=18):
             filter: sepia(50%) contrast(1.2);
         }}
         
-        /* Linha de Scanner Laser */
         .holo-container::after {{
             content: '';
             position: absolute;
@@ -230,12 +230,46 @@ def inject_css(color="#D4AF37", font_sz=18):
         }}
         .stButton button:hover {{ border-color: var(--gold); color: var(--gold); }}
         
+        /* TABS Custom */
+        .stTabs [data-baseweb="tab-list"] {{ gap: 2px; }}
+        .stTabs [data-baseweb="tab"] {{ background-color: transparent; border-radius: 4px 4px 0px 0px; color: #666; }}
+        .stTabs [aria-selected="true"] {{ background-color: #111; color: var(--gold); border: 1px solid #222; border-bottom: none; }}
+        
     </style>
     """, unsafe_allow_html=True)
 
 # ==============================================================================
 # 3. MOTORES DE INTELIGÊNCIA
 # ==============================================================================
+
+class AccessControl:
+    """Sistema de Autenticação e Registro."""
+    DEFAULT_USERS = {"ADMIN": "1234", "PR": "123"}
+    
+    @staticmethod
+    def get_users():
+        return SafeIO.ler_json(DBS["USERS"], AccessControl.DEFAULT_USERS)
+
+    @staticmethod
+    def register(username, password):
+        users = AccessControl.get_users()
+        u_upper = username.upper().strip()
+        if u_upper in users:
+            return False, "USUÁRIO JÁ EXISTE."
+        if not username or not password:
+            return False, "PREENCHA TODOS OS CAMPOS."
+            
+        users[u_upper] = password
+        SafeIO.salvar_json(DBS["USERS"], users)
+        return True, "REGISTRO EFETUADO COM SUCESSO."
+
+    @staticmethod
+    def login(username, password):
+        users = AccessControl.get_users()
+        u_upper = username.upper().strip()
+        if u_upper in users and users[u_upper] == password:
+            return True
+        return False
 
 class LiturgicalCalendar:
     @staticmethod
@@ -298,7 +332,7 @@ if "texto_ativo" not in st.session_state: st.session_state["texto_ativo"] = ""
 if "titulo_ativo" not in st.session_state: st.session_state["titulo_ativo"] = ""
 
 # ==============================================================================
-# 5. TELA DE LOGIN (O GRANDE 'O' COM A CRUZ)
+# 5. TELA DE LOGIN (COM SISTEMA DE REGISTRO)
 # ==============================================================================
 if not st.session_state["logado"]:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -312,26 +346,48 @@ if not st.session_state["logado"]:
             <line x1="35" y1="40" x2="65" y2="40" stroke="{gold}" stroke-width="3" />
         </svg>
         """
-        
         st.markdown(svg_logo, unsafe_allow_html=True)
         st.markdown(f"""
         <div class="login-title">O PREGADOR</div>
-        <div style="text-align:center; font-size:9px; color:#555; letter-spacing:4px; margin-bottom:30px;">SANCTUM AI V26</div>
+        <div style="text-align:center; font-size:9px; color:#555; letter-spacing:4px; margin-bottom:30px;">SANCTUM AI V27</div>
         """, unsafe_allow_html=True)
         
-        with st.form("gate_keeper"):
-            user = st.text_input("ID", label_visibility="collapsed", placeholder="IDENTIFICAÇÃO")
-            pw = st.text_input("KEY", type="password", label_visibility="collapsed", placeholder="SENHA")
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            if st.form_submit_button("INICIAR SISTEMA", type="primary", use_container_width=True):
-                if (user == "admin" and pw == "1234") or (user == "pr" and pw == "123"):
-                    st.session_state["logado"] = True
-                    st.session_state["user_name"] = user.upper()
-                    Gamification.add_xp(5)
-                    st.rerun()
-                else:
-                    st.error("ACESSO NEGADO.")
+        # ABAS DE LOGIN E REGISTRO
+        tab_login, tab_register = st.tabs(["ACESSAR", "REGISTRAR"])
+        
+        with tab_login:
+            with st.form("gate_keeper"):
+                user = st.text_input("ID", label_visibility="collapsed", placeholder="IDENTIFICAÇÃO")
+                pw = st.text_input("KEY", type="password", label_visibility="collapsed", placeholder="SENHA")
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                if st.form_submit_button("INICIAR SISTEMA", type="primary", use_container_width=True):
+                    if AccessControl.login(user, pw):
+                        st.session_state["logado"] = True
+                        st.session_state["user_name"] = user.upper()
+                        Gamification.add_xp(5)
+                        st.rerun()
+                    else:
+                        st.error("ACESSO NEGADO.")
+        
+        with tab_register:
+            with st.form("new_user_gate"):
+                new_u = st.text_input("Novo ID", placeholder="USUÁRIO")
+                new_p = st.text_input("Nova Senha", type="password", placeholder="SENHA")
+                confirm_p = st.text_input("Confirmar Senha", type="password", placeholder="CONFIRME A SENHA")
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                if st.form_submit_button("CRIAR CREDENCIAL", use_container_width=True):
+                    if new_p != confirm_p:
+                        st.error("AS SENHAS NÃO CONFEREM.")
+                    else:
+                        success, msg = AccessControl.register(new_u, new_p)
+                        if success:
+                            st.success(msg)
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(msg)
     st.stop()
 
 # ==============================================================================
@@ -344,17 +400,14 @@ with st.sidebar:
     avatar_path = os.path.join(DIRS["USER"], "avatar.png")
     
     if os.path.exists(avatar_path):
-        # Lê a imagem e converte para base64 para injetar no HTML
         with open(avatar_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
-        
         st.markdown(f"""
         <div class="holo-container">
             <img src="data:image/png;base64,{encoded_string}" class="holo-img">
         </div>
         """, unsafe_allow_html=True)
     else:
-        # Placeholder se não tiver foto
         gold = st.session_state["config"]["theme_color"]
         st.markdown(f"""
         <div class="holo-container" style="display:flex; align-items:center; justify-content:center;">
@@ -554,8 +607,4 @@ elif menu == "Configurações":
         
     if st.button("ATUALIZAR PARÂMETROS", type="primary"):
         cfg = st.session_state["config"]
-        cfg.update({"theme_color": nc, "font_size": nf, "api_key": nk})
-        SafeIO.salvar_json(DBS["CONFIG"], cfg)
-        st.success("SISTEMA REINICIANDO...")
-        time.sleep(1)
-        st.rerun()
+        c

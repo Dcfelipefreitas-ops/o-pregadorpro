@@ -12,7 +12,70 @@ import logging
 import hashlib
 from datetime import datetime, timedelta
 from io import BytesIO
+# ==============================================================================
+# [-] SYSTEM OMEGA: GENESIS PROTOCOL (AUTO-REPARO DE AMBIENTE)
+# ESTE BLOCO GARANTE QUE TODOS OS ARQUIVOS QUE SEU CÓDIGO COMPLEXO EXIGE
+# SEJAM CRIADOS AUTOMATICAMENTE SEM VOCÊ PRECISAR FAZER ISSO MANUALMENTE.
+# ==============================================================================
+import os
+import json
+import hashlib
 
+def _genesis_boot_protocol():
+    # Definição das Rotas do Seu Sistema
+    ROOT = "Dados_Pregador_V31"
+    STRUTURA = [
+        os.path.join(ROOT, "Sermoes"),
+        os.path.join(ROOT, "Gabinete_Pastoral"),
+        os.path.join(ROOT, "User_Data"),
+        os.path.join(ROOT, "Auto_Backup_Oculto"),
+        os.path.join(ROOT, "System_Logs"),
+        os.path.join(ROOT, "BibliaCache"),
+        os.path.join(ROOT, "Membresia")
+    ]
+    
+    # 1. Criação das Pastas
+    for pasta in STRUTURA:
+        os.makedirs(pasta, exist_ok=True)
+
+    # 2. Geração dos Arquivos MESTRES (Se não existirem)
+    
+    # Arquivo: config.json (Necessário para cor do tema e fontes)
+    p_config = os.path.join(ROOT, "User_Data", "config.json")
+    if not os.path.exists(p_config):
+        with open(p_config, "w") as f:
+            json.dump({
+                "theme_color": "#D4AF37", 
+                "font_size": 18, 
+                "enc_password": "OMEGA_KEY_DEFAULT" # Chave padrão para criptografia não falhar
+            }, f)
+
+    # Arquivo: users_db.json (Necessário para o login funcionar)
+    p_users = os.path.join(ROOT, "User_Data", "users_db.json")
+    if not os.path.exists(p_users):
+        # Gera o hash SHA256 da senha 'admin' automaticamente
+        senha_hash = hashlib.sha256("admin".encode()).hexdigest() # Senha padrão: admin
+        with open(p_users, "w") as f:
+            json.dump({"ADMIN": senha_hash}, f)
+
+    # Arquivo: members.json (Necessário para o módulo Meu Rebanho)
+    p_members = os.path.join(ROOT, "Membresia", "members.json")
+    if not os.path.exists(p_members):
+        with open(p_members, "w") as f:
+            # Dados iniciais vazios ou exemplo para gráficos funcionarem
+            json.dump([], f) 
+
+    # Arquivo: metadata.json (Necessário para metadados de sermões)
+    p_meta = os.path.join(ROOT, "Sermoes", "metadata.json")
+    if not os.path.exists(p_meta):
+        with open(p_meta, "w") as f:
+            json.dump({"sermons": []}, f)
+
+# EXECUTA O PROTOCOLO DE GÊNESIS ANTES DE QUALQUER COISA
+_genesis_boot_protocol()
+# ==============================================================================
+# FIM DO PROTOCOLO GENESIS - O CÓDIGO SYSTEM OMEGA CONTINUA ABAIXO
+# ==============================================================================
 # ==============================================================================
 # 0. KERNEL DE INICIALIZAÇÃO (System Omega V31)
 # ==============================================================================

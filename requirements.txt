@@ -5,3 +5,13 @@ duckduckgo-search==3.9.10
 streamlit-lottie==0.0.5
 requests==2.31.0
  fpdf
+plotly
+pandas
+Pillow
+streamlit-quill
+python-docx
+reportlab
+mammoth
+cryptography
+html2docx
+beautifulsoup4

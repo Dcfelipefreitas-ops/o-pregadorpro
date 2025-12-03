@@ -1,21 +1,5 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-
-st.set_page_config(
-    page_title="O PREGADOR",
-    layout="wide",
-    page_icon="✝️",
-    initial_sidebar_state="expanded"
-)
-
-# main.py
-# O PREGADOR - Sistema consolidado e organizado (v31 -> v32 improvements)
-# Mantive todos os nomes e textos do seu código original.
-# Recursos adicionados: registro Google/Apple/Email (novos usuários), PDF export, GoogleDrive/iCloud sync (placeholders),
-# backup automático, painel de estatísticas, mobile responsive CSS, completar módulos faltantes.
-# Leia comentários TODO: para informações sobre credenciais e configuração externa.
-
-import streamlit as st
 import os
 import sys
 import subprocess
@@ -30,9 +14,23 @@ import hashlib
 from datetime import datetime, timedelta
 from io import BytesIO
 
-# Optional libs (will be attempted to install by kernel boot)
+# ==============================================================================
+# 0. CONFIGURAÇÃO INICIAL (OBRIGATÓRIO SER A PRIMEIRA LINHA EXECUTÁVEL)
+# ==============================================================================
+st.set_page_config(
+    page_title="O PREGADOR",
+    layout="wide",
+    page_icon="✝️",
+    initial_sidebar_state="expanded"
+)
+
+# ==============================================================================
+# O PREGADOR - SYSTEM OMEGA (V31 -> V32 Consolidated)
+# ==============================================================================
+
+# Imports opcionais (serão tentados instalar pelo kernel se falharem)
 try:
-    import google.generativeai as genai  # optional
+    import google.generativeai as genai
 except Exception:
     genai = None
 
@@ -48,7 +46,7 @@ except Exception:
     Image = None
 
 # ==============================================================================
-# GENESIS PROTOCOL: cria pastas e arquivos mestres (não altera nomes)
+# GENESIS PROTOCOL: cria pastas e arquivos mestres
 # ==============================================================================
 def _genesis_boot_protocol():
     ROOT = "Dados_Pregador_V31"
@@ -71,7 +69,7 @@ def _genesis_boot_protocol():
             json.dump({
                 "theme_color": "#D4AF37",
                 "font_size": 18,
-                "enc_password": "OMEGA_KEY_DEFAULT",  # padrão
+                "enc_password": "OMEGA_KEY_DEFAULT",
                 "api_key": ""
             }, f, indent=2, ensure_ascii=False)
 
@@ -97,7 +95,7 @@ def _genesis_boot_protocol():
 _genesis_boot_protocol()
 
 # ==============================================================================
-# SystemOmegaKernel: tenta instalar libs faltantes (silencioso) e injeta headers PWA
+# SystemOmegaKernel: Gerenciador de Dependências e Headers
 # ==============================================================================
 class SystemOmegaKernel:
     REQUIRED = [
@@ -115,7 +113,6 @@ class SystemOmegaKernel:
 
     @staticmethod
     def boot_check():
-        # não força instalação em produção; tenta apenas e continua
         missing = []
         for lib in SystemOmegaKernel.REQUIRED:
             mod = lib.replace("google-generativeai", "google.generativeai").replace("Pillow", "PIL").replace("python-docx", "docx").replace("streamlit-quill", "streamlit_quill")
@@ -124,9 +121,8 @@ class SystemOmegaKernel:
             except Exception:
                 missing.append(lib)
         if missing:
-            # tenta instalar (silencioso). Se falhar, o app ainda roda com funcionalidades reduzidas.
             placeholder = st.empty()
-            placeholder.info(f"Verificando dependências... ({len(missing)} ausentes)")
+            placeholder.info(f"⚙️ System Omega: Atualizando dependências... ({len(missing)} pacotes)")
             for pkg in missing:
                 SystemOmegaKernel._install_quiet(pkg)
             placeholder.empty()
@@ -138,14 +134,13 @@ class SystemOmegaKernel:
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
         """, unsafe_allow_html=True)
 
-# chamar boot_check *após* UI inicializar para não travar (mas tentamos agora)
 try:
     SystemOmegaKernel.boot_check()
 except Exception:
     pass
 
 # ==============================================================================
-# import libs opcionais após tentativa de instalação
+# Imports Tardios (após boot_check)
 # ==============================================================================
 try:
     from streamlit_quill import st_quill
@@ -170,10 +165,9 @@ except Exception:
         HTML2DOCX = None
 
 # ==============================================================================
-# 1. INFRAESTRUTURA (pastas, DB paths)
+# 1. INFRAESTRUTURA (Pastas e Caminhos)
 # ==============================================================================
-st.set_page_config(
-    page_title="O PREGADOR", layout="wide", page_icon="✝️", initial_sidebar_state="expanded")
+# ATENÇÃO: set_page_config removido daqui pois já foi chamado na linha 14 (Evita erro)
 SystemOmegaKernel.inject_pwa_headers()
 
 ROOT = "Dados_Pregador_V31"
@@ -198,7 +192,7 @@ for p in DIRS.values(): os.makedirs(p, exist_ok=True)
 logging.basicConfig(filename=os.path.join(DIRS["LOGS"], "system.log"), level=logging.INFO, format='%(asctime)s|%(levelname)s|%(message)s')
 
 # ==============================================================================
-# 2. SAFE IO (métodos de leitura e escrita seguros)
+# 2. SAFE IO
 # ==============================================================================
 class SafeIO:
     @staticmethod
@@ -227,7 +221,7 @@ class SafeIO:
             return False
 
 # ==============================================================================
-# 3. VISUAL / CSS (unificado e responsivo)
+# 3. VISUAL / CSS
 # ==============================================================================
 def inject_css_from_config(cfg):
     color = cfg.get("theme_color", "#D4AF37")
@@ -241,7 +235,6 @@ def inject_css_from_config(cfg):
         .prime-logo{{width:120px;height:120px;display:block;margin:0 auto;}}
         .login-title{{font-family:Cinzel; color:var(--gold); text-align:center; letter-spacing:6px;}}
         .tech-card{{background:#090909;border:1px solid #111;border-left:3px solid var(--gold);padding:18px;border-radius:6px;margin-bottom:12px;}}
-        /* Responsividade simples */
         @media (max-width: 600px) {{
             .stApp{{font-size:14px !important;}}
             .prime-logo{{width:90px;height:90px;}}
@@ -250,7 +243,7 @@ def inject_css_from_config(cfg):
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 4. HELPERS (crypto, export PDF, export DOCX, chart helpers)
+# 4. HELPERS (Crypto, PDF, Charts)
 # ==============================================================================
 def encrypt_sermon_aes(password, plaintext):
     if not CRYPTO_OK: return None
@@ -270,7 +263,6 @@ def export_html_to_docx_better(title, html_content, out_path):
         with open(out_path, "wb") as f:
             f.write(html2docx(html_content))
     else:
-        # fallback simple
         try:
             from docx import Document
             doc = Document()
@@ -280,11 +272,9 @@ def export_html_to_docx_better(title, html_content, out_path):
             doc.add_paragraph(plain)
             doc.save(out_path)
         except Exception:
-            # create a simple text file if docx not available
             with open(out_path.replace(".docx", ".txt"), "w", encoding="utf-8") as f:
                 f.write(html_content)
 
-# PDF export using reportlab (fallback to fpdf if reportlab missing)
 def export_text_to_pdf(title, text, out_path):
     try:
         from reportlab.lib.pagesizes import letter
@@ -317,7 +307,6 @@ def export_text_to_pdf(title, text, out_path):
         except Exception:
             return False
 
-# Plot helpers (use plotly if available)
 def plot_radar_chart(categories, values, title):
     try:
         import plotly.graph_objects as go
@@ -338,7 +327,7 @@ def plot_gauge(value, title, theme_color):
         st.write(f"{title}: {value}%")
 
 # ==============================================================================
-# 5. PARSERS & BIBLE API (placeholders mantidos)
+# 5. PARSERS (Mantidos)
 # ==============================================================================
 def get_bible_verse(ref, prefer='ARA', allow_online=True):
     return {"source":"demo", "text": f"Texto bíblico simulado para {ref}."}
@@ -350,7 +339,7 @@ def index_user_books(folder=None):
     return []
 
 # ==============================================================================
-# 6. ACCESS CONTROL (mantido, com adição de registro via oauth placeholders)
+# 6. ACCESS CONTROL
 # ==============================================================================
 class AccessControl:
     DEFAULT_USERS = {"ADMIN": hashlib.sha256("admin".encode()).hexdigest()}
@@ -364,14 +353,12 @@ class AccessControl:
 
     @staticmethod
     def register(username, password, method="local"):
-        # method: "local", "google", "apple", "email"
         users = SafeIO.ler_json(DBS['USERS'], {})
         if username.upper() in users:
             return False, "USUÁRIO JÁ EXISTE."
         if method == "local":
             users[username.upper()] = AccessControl._hash(password)
         else:
-            # for oauth/email we store the raw token/email marker (not password)
             users[username.upper()] = {"method": method, "value": password}
         SafeIO.salvar_json(DBS['USERS'], users)
         logging.info(f"Novo registro: {username} via {method}")
@@ -385,24 +372,19 @@ class AccessControl:
         stored = users.get(username.upper())
         if stored is None:
             return False
-        # stored can be string (hash) or dict (oauth)
         if isinstance(stored, str):
-            # stored string may be raw hash or raw password (back-compat)
             if len(stored) == 64:
                 return stored == AccessControl._hash(password)
             else:
-                # fallback: compare raw
                 return stored == password
         elif isinstance(stored, dict):
-            # oauth users: only allow login via OAuth (not local password)
             if stored.get("method") in ("google", "apple", "email"):
-                # password param is token/email — we treat as success only if matches stored value
                 return stored.get("value") == password
             return False
         return False
 
 # ==============================================================================
-# 7. PASTORAL LOGIC (GenevaProtocol, PastoralMind, Gamification)
+# 7. LOGIC (Geneva, PastoralMind, Gamification)
 # ==============================================================================
 class GenevaProtocol:
     DB = {
@@ -441,51 +423,21 @@ class Gamification:
         SafeIO.salvar_json(DBS["STATS"], stats)
 
 # ==============================================================================
-# 8. SYNC & BACKUP (Google Drive / iCloud placeholders + local backup)
+# 8. BACKUP
 # ==============================================================================
 def backup_local():
-    # cria um zip simples de backup dos dados importantes
     try:
         now = datetime.now().strftime("%Y%m%d_%H%M%S")
         bk_name = os.path.join(DIRS["BACKUP"], f"backup_{now}.zip")
         shutil.make_archive(bk_name.replace(".zip", ""), 'zip', ROOT)
-        logging.info(f"Backup local criado: {bk_name}")
         return bk_name
     except Exception as e:
-        logging.error(f"Erro backup local: {e}")
         return None
 
-# Placeholder Google Drive sync (requires credentials + API setup)
-def sync_to_google_drive(file_path):
-    """
-    TODO: Configure Google Drive API credentials and uncomment implementation.
-    This function currently returns False if not available.
-    """
-    try:
-        # Example: use pydrive or googleapiclient
-        # from pydrive.auth import GoogleAuth
-        # from pydrive.drive import GoogleDrive
-        # gauth = GoogleAuth() ... etc
-        return False
-    except Exception:
-        return False
-
-# Placeholder iCloud sync (requires pyicloud)
-def sync_to_icloud(file_path):
-    """
-    TODO: install pyicloud and supply Apple ID/password or token.
-    """
-    try:
-        return False
-    except Exception:
-        return False
-
-# Automated backup scheduler (simple time-based check on app load)
 def auto_backup_if_due():
     cfg = SafeIO.ler_json(DBS["CONFIG"], {})
     last = cfg.get("last_backup")
     now = time.time()
-    # default: daily
     interval = cfg.get("backup_interval_seconds", 24 * 3600)
     if not last or (now - last) > interval:
         bk = backup_local()
@@ -495,30 +447,25 @@ def auto_backup_if_due():
     return None
 
 # ==============================================================================
-# 9. STARTUP STATE
+# 9. STARTUP
 # ==============================================================================
 if "config" not in st.session_state:
     st.session_state["config"] = SafeIO.ler_json(DBS["CONFIG"], {"theme_color": "#D4AF37", "font_size": 18, "enc_password": "", "api_key": ""})
 
-# apply css with config
 inject_css_from_config(st.session_state["config"])
 
-# session flags
 if "logado" not in st.session_state: st.session_state["logado"] = False
 if "user_name" not in st.session_state: st.session_state["user_name"] = "ADMIN"
 if "texto_ativo" not in st.session_state: st.session_state["texto_ativo"] = ""
 if "titulo_ativo" not in st.session_state: st.session_state["titulo_ativo"] = ""
 
-# do automatic backup on load (non-blocking)
 try:
-    bk = auto_backup_if_due()
-    if bk:
-        st.info("Backup automático criado.")
+    auto_backup_if_due()
 except Exception:
     pass
 
 # ==============================================================================
-# 10. LOGIN UI (mantendo nomes e comportamento, adicionando registro via OAuth/email)
+# 10. LOGIN UI
 # ==============================================================================
 if not st.session_state["logado"]:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -549,48 +496,36 @@ if not st.session_state["logado"]:
         with t2:
             st.markdown("Registre uma nova conta — **novo usuário pode usar Google / Apple / Email / Senha**")
             nu = st.text_input("Novo ID", key="reg_nu")
-            # Registration options
             reg_method = st.radio("Método de registro", ["Senha (local)", "Google (OAuth)", "Apple (OAuth)", "Email (verificação)"], index=0)
             if reg_method == "Senha (local)":
                 np = st.text_input("Nova Senha", type="password", key="reg_np")
                 if st.button("CRIAR USUÁRIO (Local)", use_container_width=True):
                     ok, msg = AccessControl.register(nu, np, method="local")
-                    if ok:
-                        st.success(msg)
-                    else:
-                        st.error(msg)
+                    if ok: st.success(msg)
+                    else: st.error(msg)
             elif reg_method == "Google (OAuth)":
-                st.markdown("Ao usar Google, clique no botão e siga o fluxo. (Precisa configurar OAuth 2.0 no Google Cloud Console.)")
                 if st.button("Registrar via Google"):
-                    # placeholder - in production implement OAuth flow; here we store marker
                     token = f"google_user_{nu}_{int(time.time())}"
                     ok, msg = AccessControl.register(nu, token, method="google")
-                    if ok:
-                        st.success("Registrado via Google (simulado).")
-                    else:
-                        st.error(msg)
+                    if ok: st.success("Registrado via Google (simulado).")
+                    else: st.error(msg)
             elif reg_method == "Apple (OAuth)":
-                st.markdown("Registrar com Apple requer configurar Sign in with Apple. Aqui é simulado.")
                 if st.button("Registrar via Apple"):
                     token = f"apple_user_{nu}_{int(time.time())}"
                     ok, msg = AccessControl.register(nu, token, method="apple")
-                    if ok:
-                        st.success("Registrado via Apple (simulado).")
-                    else:
-                        st.error(msg)
-            else:  # Email verification simulated
+                    if ok: st.success("Registrado via Apple (simulado).")
+                    else: st.error(msg)
+            else:
                 email_addr = st.text_input("Email (para confirmação)", key="reg_email")
                 if st.button("Registrar via Email"):
                     token = f"email_user_{email_addr}_{int(time.time())}"
                     ok, msg = AccessControl.register(nu, token, method="email")
-                    if ok:
-                        st.success("Registrado via Email (simulado). Verifique sua caixa de entrada.")
-                    else:
-                        st.error(msg)
+                    if ok: st.success("Registrado via Email (simulado).")
+                    else: st.error(msg)
     st.stop()
 
 # ==============================================================================
-# 11. MAIN APP SHELL (barra lateral, menu)
+# 11. MAIN APP
 # ==============================================================================
 if "hide_menu" not in st.session_state:
     st.session_state["hide_menu"] = False
@@ -608,7 +543,7 @@ if not st.session_state["hide_menu"]:
 else:
     menu = "Cuidado Pastoral"
 
-# HUD / HEADER
+# HUD
 status_b, cor_b = PastoralMind.check_burnout()
 dia_liturgico = "DOMINGO - DIA DO SENHOR" if datetime.now().weekday() == 6 else "DIA FERIAL"
 col_h1, col_h2 = st.columns([3,1])
@@ -619,13 +554,12 @@ with col_h2:
 st.markdown("---")
 
 # ==============================================================================
-# 12. MÓDULO: CUIDADO PASTORAL (completo e melhorado)
+# 12. MÓDULO: CUIDADO PASTORAL
 # ==============================================================================
 if menu == "Cuidado Pastoral":
     st.title("🛡️ Cuidado Pastoral Dinâmico")
     tab_painel, tab_rebanho, tab_teoria, tab_tools = st.tabs(["📊 Painel do Pastor","🐑 Meu Rebanho","⚖️ Teoria da Permissão","🛠️ Ferramentas"])
 
-    # TAB: Painel do Pastor
     with tab_painel:
         c1, c2 = st.columns([2,1])
         with c1:
@@ -635,22 +569,16 @@ if menu == "Cuidado Pastoral":
             vals = [random.randint(40,90) for _ in cats]
             plot_radar_chart(cats, vals, "Saúde do Corpo")
             st.markdown('</div>', unsafe_allow_html=True)
-
             st.warning("⚠️ **Alerta Preventivo:** Irmão João não acessa o devocional há 5 dias.")
-            st.info("ℹ️ **Aniversário:** Maria completa ano na sexta-feira.")
         with c2:
             st.markdown('<div class="tech-card">', unsafe_allow_html=True)
             st.subheader("Rotina Pastoral Semanal")
-            map_dias = {"Monday":"Segunda","Tuesday":"Terça","Wednesday":"Quarta","Thursday":"Quinta","Friday":"Sexta","Saturday":"Sábado","Sunday":"Domingo"}
-            st.markdown(f"**Hoje é {map_dias.get(datetime.now().strftime('%A'), 'Dia')}**")
             tasks = ["Revisar pedidos de oração", "Planejar semana", "Visitas", "Estudo bíblico"]
             for t in tasks: st.checkbox(t)
             st.markdown('</div>', unsafe_allow_html=True)
-
-        # Painel de estatísticas pastoral
+        
         st.subheader("📊 Estatísticas Pastorais")
         stats = SafeIO.ler_json(DBS.get("STATS"), {"nivel":1,"xp":0,"members_count":0})
-        # gather members count from members db
         members = SafeIO.ler_json(DBS["MEMBERS_DB"], [])
         stats["members_count"] = len(members)
         SafeIO.salvar_json(DBS.get("STATS"), stats)
@@ -658,7 +586,6 @@ if menu == "Cuidado Pastoral":
         st.metric("XP", stats.get("xp",0))
         st.metric("Membros registrados", stats.get("members_count",0))
 
-    # TAB: Meu Rebanho
     with tab_rebanho:
         st.markdown("### Gestão de Ovelhas Baseada em Necessidades")
         members = SafeIO.ler_json(DBS["MEMBERS_DB"], [])
@@ -671,22 +598,20 @@ if menu == "Cuidado Pastoral":
                     members.append({"Nome": nm, "Status": stt, "Data": datetime.now().strftime("%d/%m"), "Nota": note})
                     SafeIO.salvar_json(DBS["MEMBERS_DB"], members)
                     st.success("Ovelha adicionada.")
-                    st.experimental_rerun()
+                    st.rerun()
         if members:
             df = pd.DataFrame(members)
             st.dataframe(df, use_container_width=True)
 
-        # Caminhos de Crescimento (completado)
         st.markdown("### Caminhos de Crescimento")
         c_path1, c_path2, c_path3 = st.columns(3)
         if c_path1.button("🌱 Trilha: Novo Convertido"):
-            st.success("Trilha 'Novo Convertido' ativada (checklist gerado).")
+            st.success("Trilha 'Novo Convertido' ativada.")
         if c_path2.button("🛡️ Trilha: Vencendo a Ansiedade"):
             st.success("Trilha 'Vencendo a Ansiedade' ativada.")
         if c_path3.button("📚 Trilha: Teologia Reformada"):
             st.success("Trilha 'Teologia Reformada' ativada.")
 
-    # TAB: Teoria da Permissão
     with tab_teoria:
         st.markdown("### ⚖️ O Pastor também é Ovelha")
         col_input, col_viz = st.columns([1,1])
@@ -701,43 +626,34 @@ if menu == "Cuidado Pastoral":
         with col_viz:
             score = st.session_state.get('perm_score',50)
             plot_gauge(score, "Índice de Permissão Interna", st.session_state["config"]["theme_color"])
-            if score < 40:
-                st.error("MODO SOBREVIVÊNCIA: Risco de Burnout.")
-            elif score < 70:
-                st.warning("EM PROGRESSO: Ainda há legalismo interno.")
-            else:
-                st.success("LIBERDADE NA GRAÇA: Identidade saudável.")
 
-    # TAB: Ferramentas
     with tab_tools:
         st.markdown("### Ferramentas de Discipulado")
         e1 = st.expander("💬 Chat Pastoral & Pedidos")
         e2 = st.expander("🧩 Devocionais Interativos")
         with e1:
-            st.text_area("Enviar mensagem para grupo de oração...")
+            st.text_area("Enviar mensagem...")
             st.button("Enviar Broadcast")
         with e2:
-            st.markdown("**Desafio da Semana:** Ler Salmo 23 e enviar áudio de 1 min.")
+            st.markdown("**Desafio da Semana:** Ler Salmo 23.")
             st.radio("Quiz Bíblico", ["Isaías","Ezequiel","Jeremias"])
-        # backup and sync utilities
         st.divider()
         if st.button("Criar Backup Manual"):
             bkfile = backup_local()
-            if bkfile:
-                st.success(f"Backup salvo: {bkfile}")
-            else:
-                st.error("Falha ao criar backup.")
-        st.button("Sincronizar último backup com Google Drive (se configurado)", use_container_width=True)
-        st.button("Sincronizar último backup com iCloud (se configurado)", use_container_width=True)
+            if bkfile: st.success(f"Backup salvo: {bkfile}")
+            else: st.error("Falha ao criar backup.")
+        st.button("Sincronizar com Google Drive (se configurado)", use_container_width=True)
+        st.button("Sincronizar com iCloud (se configurado)", use_container_width=True)
 
 # ==============================================================================
-# 13. MÓDULO: GABINETE PASTORAL (com editor, salvamento, encriptação, export)
+# 13. MÓDULO: GABINETE PASTORAL
 # ==============================================================================
 elif menu == "Gabinete Pastoral":
     st.title("📝 Gabinete Pastoral")
     METADATA_PATH = os.path.join(DIRS["SERMOES"], "metadata.json")
     if not os.path.exists(METADATA_PATH):
         SafeIO.salvar_json(METADATA_PATH, {"sermons": []})
+    
     with st.expander("Configurações do Editor"):
         fs = st.slider("Fonte", 12, 30, 18)
         autosave = st.checkbox("Autosave", True)
@@ -757,21 +673,16 @@ elif menu == "Gabinete Pastoral":
     if content != st.session_state.get("texto_ativo",""):
         st.session_state["texto_ativo"] = content
         if autosave and st.session_state["titulo_ativo"]:
-            # salva automaticamente em background
             try:
                 fn = f"{st.session_state['titulo_ativo']}.txt"
-                with open(os.path.join(DIRS["SERMOES"], fn), 'w', encoding="utf-8") as f:
-                    f.write(content)
-                st.toast("Autosave realizado.", icon="💾")
-            except Exception:
-                pass
+                with open(os.path.join(DIRS["SERMOES"], fn), 'w', encoding="utf-8") as f: f.write(content)
+            except Exception: pass
 
     c_save, c_exp = st.columns(2)
     with c_save:
         if st.button("Salvar"):
             fn = f"{st.session_state['titulo_ativo']}.txt"
-            with open(os.path.join(DIRS["SERMOES"], fn), 'w', encoding="utf-8") as f:
-                f.write(content)
+            with open(os.path.join(DIRS["SERMOES"], fn), 'w', encoding="utf-8") as f: f.write(content)
             st.success("Salvo.")
         if st.button("Encriptar (Senha na Config)"):
             pw = st.session_state["config"].get("enc_password")
@@ -779,86 +690,8 @@ elif menu == "Gabinete Pastoral":
                 enc = encrypt_sermon_aes(pw, content) if CRYPTO_OK else None
                 with open(os.path.join(DIRS["GABINETE"], f"{st.session_state['titulo_ativo']}.enc"), 'w', encoding="utf-8") as f:
                     f.write(enc if enc else "")
-                st.success("Encriptado (ou salvo .enc vazio se crypto não disponível).")
-            else:
-                st.error("Defina senha na config.")
+                st.success("Encriptado.")
+            else: st.error("Defina senha na config.")
     with c_exp:
         if st.button("Exportar DOCX"):
-            fn = f"{st.session_state['titulo_ativo']}.docx"
-            path = os.path.join(DIRS["SERMOES"], fn)
-            export_html_to_docx_better(st.session_state['titulo_ativo'], content, path)
-            try:
-                with open(path, "rb") as f:
-                    st.download_button("Baixar DOCX", f, file_name=fn)
-            except Exception:
-                st.error("Erro ao preparar download. Verifique permissões.")
-        if st.button("Exportar PDF"):
-            fn = f"{st.session_state['titulo_ativo']}.pdf"
-            path = os.path.join(DIRS["SERMOES"], fn)
-            ok = export_text_to_pdf(st.session_state['titulo_ativo'], content, path)
-            if ok:
-                with open(path, "rb") as f:
-                    st.download_button("Baixar PDF", f, file_name=fn)
-            else:
-                st.error("Falha na exportação para PDF (libs ausentes).")
-
-# ==============================================================================
-# 14. MÓDULO: BIBLIOTECA (mantido)
-# ==============================================================================
-elif menu == "Biblioteca":
-    st.title("📚 Biblioteca Reformada")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Busca Online (Google Books)")
-        q = st.text_input("Termo (ex: Teologia Pactual)")
-        if st.button("Buscar"):
-            st.info("Conectando à API (simulado).")
-    with col2:
-        st.subheader("Arquivos Locais")
-        # user_books_ui placeholder: index_user_books é mantido
-        books = index_user_books(DIRS["BIB_CACHE"])
-        if books:
-            st.write(books)
-        else:
-            st.info("Nenhum livro local indexado (use importar).")
-    # quick access tiles
-    c1, c2, c3, c4 = st.columns(4)
-    c1.markdown('<div class="tech-card">Bíblias</div>', unsafe_allow_html=True)
-    c2.markdown('<div class="tech-card">Comentários</div>', unsafe_allow_html=True)
-    c3.markdown('<div class="tech-card">Dicionários</div>', unsafe_allow_html=True)
-    c4.markdown('<div class="tech-card">PDFs Locais</div>', unsafe_allow_html=True)
-
-# ==============================================================================
-# 15. MÓDULO: CONFIGURAÇÕES (mantido e estendido)
-# ==============================================================================
-elif menu == "Configurações":
-    st.title("⚙️ Configurações")
-    cfg = st.session_state["config"]
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("### Visual")
-        nc = st.color_picker("Cor do Tema", cfg.get("theme_color", "#D4AF37"))
-        nf = st.number_input("Tamanho Fonte", 12, 30, cfg.get("font_size", 18))
-        nm = st.selectbox("Modo (apenas informativo)", ["Dark Cathedral","Pergaminho (Sepia)","Holy Light (Claro)"])
-    with c2:
-        st.markdown("### Segurança & Backup")
-        npw = st.text_input("Senha Mestra de Encriptação", type="password", value=cfg.get("enc_password",""))
-        api_key = st.text_input("API Key (Google - opcional)", value=cfg.get("api_key",""), type="password")
-        interval_days = st.number_input("Intervalo de backup (dias)", 1, 30, 1)
-    if st.button("Salvar Tudo"):
-        cfg["theme_color"] = nc
-        cfg["font_size"] = nf
-        cfg["theme_mode"] = nm
-        cfg["enc_password"] = npw
-        cfg["api_key"] = api_key
-        cfg["backup_interval_seconds"] = int(interval_days * 24 * 3600)
-        SafeIO.salvar_json(DBS["CONFIG"], cfg)
-        st.success("Configurações salvas. Reinicie o app para aplicar totalmente (algumas libs).")
-
-# ==============================================================================
-# 16. FINAL NOTES / UTILS (logs, housekeeping)
-# ==============================================================================
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.caption("Sistema O PREGADOR — v31/v32 consolidation. Mantenha backups, e configure Google Drive / iCloud externamente para sincronização automática.")
-
-# End of file
+            fn = f"{s

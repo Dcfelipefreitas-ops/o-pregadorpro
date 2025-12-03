@@ -1,4 +1,3 @@
-# app.py - O PREGADOR (consolidado)
 import streamlit as st
 import os
 import sys
@@ -77,6 +76,65 @@ class SafeIO:
         except Exception as e:
             logging.error(f"Write Error {caminho}: {e}")
             return False
+
+# ------------------------------
+# VISUAL SYSTEM (Dark Cathedral)
+# ------------------------------
+def inject_css(color="#D4AF37", font_sz=18):
+    st.markdown(f"""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&family=Playfair+Display:wght@600&family=Cinzel:wght@500;800&family=JetBrains+Mono&display=swap');
+        
+        :root {{ 
+            --gold: {color}; 
+            --gold-glow: rgba(212, 175, 55, 0.2);
+            --neon-gold: #FFD700;
+            --bg: #000000; 
+            --panel: #0A0A0A; 
+            --border: #1F1F1F; 
+            --text: #EAEAEA; 
+        }}
+        
+        /* BASE APP STYLE */
+        .stApp {{ 
+            background-color: var(--bg); 
+            background-image: radial-gradient(circle at 50% -20%, #1a1200 0%, #000 70%);
+            color: var(--text); 
+            font-family: 'Inter', sans-serif; 
+        }}
+        
+        [data-testid="stSidebar"] {{
+            background-color: #050505;
+            border-right: 1px solid var(--border);
+        }}
+        
+        /* LOGIN ANIMATION PULSE */
+        @keyframes holy-pulse {{
+            0% {{ filter: drop-shadow(0 0 5px var(--gold-glow)); transform: scale(1); }}
+            50% {{ filter: drop-shadow(0 0 20px var(--gold)); transform: scale(1.02); }}
+            100% {{ filter: drop-shadow(0 0 5px var(--gold-glow)); transform: scale(1); }}
+        }}
+        
+        .prime-logo {{
+            width: 140px; height: 140px;
+            margin: 0 auto 20px auto;
+            animation: holy-pulse 4s infinite ease-in-out;
+            display: block;
+        }}
+        
+        .login-title {{
+            font-family: 'Cinzel'; letter-spacing: 8px; 
+            color: #fff; font-size: 24px; margin-top: 10px;
+            text-transform: uppercase; text-align: center;
+        }}
+        
+        /* CARDS & INPUTS */
+        .tech-card {{ background: #090909; border: 1px solid var(--border); border-left: 2px solid var(--gold); border-radius: 4px; padding: 25px; margin-bottom: 20px; }}
+        .stTextInput input, .stSelectbox div, .stTextArea textarea, .stSlider div {{ background-color: #0A0A0A !important; border: 1px solid #222 !important; color: #eee !important; }}
+        .stButton button {{ border-radius: 2px !important; text-transform: uppercase; font-weight: 700; background: #111; color: #888; border: 1px solid #333; }}
+        .stButton button:hover {{ border-color: var(--gold); color: var(--gold); }}
+    </style>
+    """, unsafe_allow_html=True)
 
 # ------------------------------
 # Basic helpers: encryption, export
@@ -428,18 +486,38 @@ if "config" not in st.session_state:
     st.session_state["config"] = SafeIO.ler_json(DBS["CONFIG"], {"theme_color": "#D4AF37", "font_size": 18, "enc_password": "", "bible_api": {}, "prefer_translation": "ARA"})
 
 # UI layout
-st.set_page_config(page_title="O PREGADOR", layout="wide")
+st.set_page_config(
+    page_title="O PREGADOR", 
+    layout="wide",
+    page_icon="✝️",
+    initial_sidebar_state="expanded"
+)
+
+# Apply Dark Cathedral Visuals
+inject_css(st.session_state["config"].get("theme_color", "#D4AF37"))
+
 if "hide_menu" not in st.session_state:
     st.session_state.hide_menu = False
 
-# Login flow (simple)
+# Login flow (Visual Restoration)
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 if not st.session_state["logado"]:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,1,1])
     with c2:
-        st.markdown("<h2 style='text-align:center'>O PREGADOR</h2>", unsafe_allow_html=True)
+        # VISUAL RESTAURADO: Logo SVG + Título Estilizado
+        gold = st.session_state["config"].get("theme_color", "#D4AF37")
+        st.markdown(f"""
+        <svg class="prime-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="50" r="45" stroke="{gold}" stroke-width="3" fill="none" />
+            <line x1="50" y1="25" x2="50" y2="75" stroke="{gold}" stroke-width="3" />
+            <line x1="35" y1="40" x2="65" y2="40" stroke="{gold}" stroke-width="3" />
+        </svg>
+        <div class="login-title">O PREGADOR</div>
+        <div style="text-align:center;font-size:10px;color:#555;letter-spacing:4px;margin-bottom:20px;">SYSTEM V29 | TEOLOGIA ROBUSTA</div>
+        """, unsafe_allow_html=True)
+        
         tl, tr = st.tabs(["ENTRAR", "REGISTRAR"])
         with tl:
             with st.form("gate"):

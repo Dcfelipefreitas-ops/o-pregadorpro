@@ -645,3 +645,76 @@ elif menu == "Configurações":
         cfg["enc_password"] = npw
         SafeIO.salvar_json(DBS["CONFIG"], cfg)
         st.success("Configurações salvas. Reinicie.")
+# ==============================================================================
+# 2. VISUAL SYSTEM REFORMULADO (Theme Engine)
+# ==============================================================================
+def inject_css(config_dict):
+    # Valores padrão se a config falhar
+    color = config_dict.get("theme_color", "#D4AF37")
+    bg_mode = config_dict.get("theme_mode", "Dark Cathedral")
+    font_fam = config_dict.get("font_family", "Inter")
+    font_sz = config_dict.get("font_size", 18)
+    
+    # Lógica de Temas (Inspirado no TheWord)
+    if bg_mode == "Dark Cathedral":
+        bg_hex = "#000000"
+        panel_hex = "#0A0A0A"
+        text_hex = "#EAEAEA"
+    elif bg_mode == "Pergaminho (Sepia)":
+        bg_hex = "#F4ECD8"
+        panel_hex = "#E8DFCA"
+        text_hex = "#2b2210"
+    elif bg_mode == "Holy Light (Claro)":
+        bg_hex = "#FFFFFF"
+        panel_hex = "#F0F2F6"
+        text_hex = "#111111"
+    else: # Default Dark
+        bg_hex = "#000000"
+        panel_hex = "#0A0A0A"
+        text_hex = "#EAEAEA"
+
+    st.markdown(f"""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&family=Playfair+Display:wght@600&family=Cinzel:wght@500;800&family=Merriweather:wght@300;700&display=swap');
+        
+        :root {{ 
+            --gold: {color}; 
+            --bg: {bg_hex}; 
+            --panel: {panel_hex}; 
+            --text: {text_hex}; 
+            --base-size: {font_sz}px;
+            --main-font: '{font_fam}', sans-serif;
+        }}
+        
+        .stApp {{ 
+            background-color: var(--bg); 
+            color: var(--text); 
+            font-family: var(--main-font); 
+            font-size: var(--base-size);
+        }}
+        
+        /* Controles de Painel estilo TheWord */
+        .stTabs [data-baseweb="tab-list"] {{ border-bottom: 2px solid var(--gold); }}
+        .stTabs [data-baseweb="tab"] {{ font-family: 'Cinzel', serif; font-weight: bold; color: var(--text); }}
+        
+        /* Sidebar Personalizada */
+        [data-testid="stSidebar"] {{ 
+            background-color: var(--panel); 
+            border-right: 1px solid var(--gold);
+        }}
+        
+        /* Inputs Refinados */
+        .stTextInput input, .stSelectbox div, .stTextArea textarea, .stSlider div {{ 
+            background-color: var(--panel) !important; 
+            border: 1px solid #444 !important; 
+            color: var(--text) !important; 
+        }}
+        
+        /* Títulos */
+        h1, h2, h3 {{ color: var(--gold) !important; font-family: 'Cinzel', serif !important; }}
+    </style>
+    """, unsafe_allow_html=True)
+
+# !!! IMPORTANTE: Mude a chamada da função no seu código principal para:
+# inject_css(st.session_state["config"]) 
+# em vez de passar só a cor.

@@ -818,11 +818,9 @@ if app_mode == "Dashboard & Cuidado":
             )
             input_note = st.text_area("Observações do dia", height=100)
 
-            # Botón para registrar estado (dentro de c1)
             if st.button("REGISTRAR ESTADO"):
                 data = _read_json_safe(DB_FILES["SOUL_METRICS"])
                 
-                # Defensa: si el archivo contiene una lista legacy, migrar a dict
                 if isinstance(data, list):
                     data = {"historico": data}
                 elif not isinstance(data, dict):
@@ -839,11 +837,9 @@ if app_mode == "Dashboard & Cuidado":
                 else:
                     st.error("Error al guardar el registro en disco.")
 
-        # Columna derecha: histórico (fuera del if de escritura, sempre visible)
         with c2:
             st.markdown("**Histórico Recente**")
             data = _read_json_safe(DB_FILES["SOUL_METRICS"])
-            # Compatibilidade: el fichero pode ser um dict {"historico": [...]} o una lista [...]
             if isinstance(data, dict):
                 history = data.get("historico", [])[-5:]
             elif isinstance(data, list):
@@ -852,7 +848,6 @@ if app_mode == "Dashboard & Cuidado":
                 history = []
 
             for item in reversed(history):
-                # Proteção adicional se o registro não é dict
                 if isinstance(item, dict):
                     date = item.get('data', '-')
                     humor = item.get('humor', item.get('estado', '-'))

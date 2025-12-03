@@ -55,13 +55,13 @@ from PIL import Image, ImageOps
 # 1. INFRAESTRUTURA DE DADOS (SAFE I/O)
 # ==============================================================================
 st.set_page_config(
-    page_title="O PREGADOR | Theology OS", 
+    page_title="O PREGADOR | Sanctum AI", 
     layout="wide", 
     page_icon="✝️", 
     initial_sidebar_state="expanded"
 )
 
-ROOT = "Dados_Pregador_V25_Immutable"
+ROOT = "Dados_Pregador_V26_Sanctum"
 DIRS = {
     "SERMOES": os.path.join(ROOT, "Sermoes"),
     "GABINETE": os.path.join(ROOT, "Gabinete_Pastoral"),
@@ -101,7 +101,7 @@ class SafeIO:
         except: pass
 
 # ==============================================================================
-# 2. DESIGN SYSTEM "DARK CATHEDRAL"
+# 2. DESIGN SYSTEM "HOLOGRAPHIC CATHEDRAL"
 # ==============================================================================
 def inject_css(color="#D4AF37", font_sz=18):
     st.markdown(f"""
@@ -111,6 +111,7 @@ def inject_css(color="#D4AF37", font_sz=18):
         :root {{ 
             --gold: {color}; 
             --gold-glow: rgba(212, 175, 55, 0.2);
+            --neon-gold: #FFD700;
             --bg: #000000; 
             --panel: #0A0A0A; 
             --border: #1F1F1F; 
@@ -120,7 +121,7 @@ def inject_css(color="#D4AF37", font_sz=18):
         /* BASE */
         .stApp {{ 
             background-color: var(--bg); 
-            background-image: radial-gradient(circle at 50% -20%, #1a1200 0%, #000 60%);
+            background-image: radial-gradient(circle at 50% -20%, #1a1200 0%, #000 70%);
             color: var(--text); 
             font-family: 'Inter', sans-serif; 
         }}
@@ -132,7 +133,51 @@ def inject_css(color="#D4AF37", font_sz=18):
         }}
         [data-testid="stSidebar"] hr {{ margin: 0; border-color: #222; }}
         
-        /* LOGIN LOGO (SVG ANIMATION) */
+        /* --- AVATAR HOLOGRÁFICO (NÍVEL NASA) --- */
+        @keyframes holo-reveal {{
+            0% {{ opacity: 0; transform: scale(0.8) translateY(20px); filter: blur(10px); }}
+            20% {{ opacity: 1; transform: scale(1.1); filter: blur(0px); }}
+            40% {{ opacity: 0.8; transform: scale(0.95); filter: hue-rotate(90deg); }}
+            60% {{ opacity: 1; transform: scale(1.02); filter: hue-rotate(0deg); }}
+            100% {{ opacity: 1; transform: scale(1); }}
+        }}
+        
+        @keyframes scanline {{
+            0% {{ top: -10%; opacity: 0; }}
+            50% {{ opacity: 1; }}
+            100% {{ top: 110%; opacity: 0; }}
+        }}
+
+        .holo-container {{
+            position: relative;
+            width: 120px; height: 120px;
+            margin: 0 auto 20px auto;
+            border-radius: 50%;
+            border: 2px solid var(--gold);
+            overflow: hidden;
+            box-shadow: 0 0 15px var(--gold-glow);
+            animation: holo-reveal 1.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+            background: #000;
+        }}
+        
+        .holo-img {{
+            width: 100%; height: 100%;
+            object-fit: cover;
+            filter: sepia(50%) contrast(1.2);
+        }}
+        
+        /* Linha de Scanner Laser */
+        .holo-container::after {{
+            content: '';
+            position: absolute;
+            width: 100%; height: 5px;
+            background: var(--neon-gold);
+            box-shadow: 0 0 10px var(--neon-gold);
+            opacity: 0.6;
+            animation: scanline 3s infinite linear;
+        }}
+        
+        /* --- LOGIN LOGO (SVG PULSE) --- */
         @keyframes holy-pulse {{
             0% {{ filter: drop-shadow(0 0 5px var(--gold-glow)); transform: scale(1); }}
             50% {{ filter: drop-shadow(0 0 20px var(--gold)); transform: scale(1.02); }}
@@ -140,8 +185,7 @@ def inject_css(color="#D4AF37", font_sz=18):
         }}
         
         .prime-logo {{
-            width: 140px;
-            height: 140px;
+            width: 140px; height: 140px;
             margin: 0 auto 20px auto;
             animation: holy-pulse 4s infinite ease-in-out;
             display: block;
@@ -163,7 +207,7 @@ def inject_css(color="#D4AF37", font_sz=18):
         }}
         .tech-card:hover {{ border-color: #333; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.8); }}
 
-        /* EDITOR SAGRADO */
+        /* EDITOR */
         .editor-wrapper textarea {{
             font-family: 'Playfair Display', serif !important;
             font-size: {font_sz}px !important;
@@ -172,16 +216,6 @@ def inject_css(color="#D4AF37", font_sz=18):
             border: 1px solid #1a1a1a !important;
             color: #ccc !important;
             padding: 40px !important;
-            border-radius: 0px !important;
-        }}
-        .editor-wrapper textarea:focus {{ border-color: var(--gold) !important; outline: none; }}
-        
-        /* STATUS HUD */
-        .hud-bar {{
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 20px; background: rgba(255,255,255,0.03);
-            border: 1px solid #1a1a1a; margin-bottom: 30px;
-            border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px;
         }}
         
         /* INPUTS */
@@ -200,7 +234,7 @@ def inject_css(color="#D4AF37", font_sz=18):
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. MOTORES DE INTELIGÊNCIA (LOGICA PRESERVADA)
+# 3. MOTORES DE INTELIGÊNCIA
 # ==============================================================================
 
 class LiturgicalCalendar:
@@ -264,19 +298,16 @@ if "texto_ativo" not in st.session_state: st.session_state["texto_ativo"] = ""
 if "titulo_ativo" not in st.session_state: st.session_state["titulo_ativo"] = ""
 
 # ==============================================================================
-# 5. TELA DE LOGIN (SVG CORRIGIDO E ATUALIZADO)
+# 5. TELA DE LOGIN (O GRANDE 'O' COM A CRUZ)
 # ==============================================================================
 if not st.session_state["logado"]:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
-        # SVG PERSONALIZADO: O GRANDE O COM CRUZ DENTRO
         gold = st.session_state["config"]["theme_color"]
         svg_logo = f"""
         <svg class="prime-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <!-- O Grande O -->
             <circle cx="50" cy="50" r="45" stroke="{gold}" stroke-width="3" fill="none" />
-            <!-- A Cruz Centralizada -->
             <line x1="50" y1="25" x2="50" y2="75" stroke="{gold}" stroke-width="3" />
             <line x1="35" y1="40" x2="65" y2="40" stroke="{gold}" stroke-width="3" />
         </svg>
@@ -285,7 +316,7 @@ if not st.session_state["logado"]:
         st.markdown(svg_logo, unsafe_allow_html=True)
         st.markdown(f"""
         <div class="login-title">O PREGADOR</div>
-        <div style="text-align:center; font-size:9px; color:#555; letter-spacing:4px; margin-bottom:30px;">THEOLOGY OS V25</div>
+        <div style="text-align:center; font-size:9px; color:#555; letter-spacing:4px; margin-bottom:30px;">SANCTUM AI V26</div>
         """, unsafe_allow_html=True)
         
         with st.form("gate_keeper"):
@@ -307,18 +338,34 @@ if not st.session_state["logado"]:
 # 6. APP PRINCIPAL
 # ==============================================================================
 
-# --- SIDEBAR (MONOLITO) ---
+# --- SIDEBAR (MONOLITO COM AVATAR HOLOGRÁFICO) ---
 with st.sidebar:
-    # Logo simplificado na sidebar
-    gold = st.session_state["config"]["theme_color"]
+    # Lógica de Avatar
+    avatar_path = os.path.join(DIRS["USER"], "avatar.png")
+    
+    if os.path.exists(avatar_path):
+        # Lê a imagem e converte para base64 para injetar no HTML
+        with open(avatar_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+        
+        st.markdown(f"""
+        <div class="holo-container">
+            <img src="data:image/png;base64,{encoded_string}" class="holo-img">
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        # Placeholder se não tiver foto
+        gold = st.session_state["config"]["theme_color"]
+        st.markdown(f"""
+        <div class="holo-container" style="display:flex; align-items:center; justify-content:center;">
+            <span style="font-size:40px; color:{gold}">✝</span>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown(f"""
-    <div style="text-align:center; padding:20px 0;">
-        <svg width="40" height="40" viewBox="0 0 100 100">
-             <circle cx="50" cy="50" r="45" stroke="{gold}" stroke-width="5" fill="none" />
-             <line x1="50" y1="20" x2="50" y2="80" stroke="{gold}" stroke-width="5" />
-             <line x1="30" y1="40" x2="70" y2="40" stroke="{gold}" stroke-width="5" />
-        </svg>
-        <div style="font-family:'Cinzel'; margin-top:10px; font-size:14px; color:{gold}">THEOLOGY OS</div>
+    <div style="text-align:center; padding-bottom:10px;">
+        <div style="font-family:'Cinzel'; font-size:16px; color:{st.session_state["config"]["theme_color"]}">{st.session_state["user_name"]}</div>
+        <div style="font-size:9px; color:#666; letter-spacing:2px;">MINISTRO DO EVANGELHO</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -347,17 +394,13 @@ with st.sidebar:
 status_b, cor_b = PastoralMind.check_burnout()
 dia_liturgico = LiturgicalCalendar.get_status()
 
-st.markdown(f"""
-<div class="hud-bar">
-    <div>
-        <span style="color:#444;">DATA:</span> {datetime.now().strftime("%d.%m.%Y")}
-        <span style="color:#444; margin-left:15px;">LITURGIA:</span> {dia_liturgico}
-    </div>
-    <div>
-        <span style="color:#444;">STATUS:</span> <span style="color:{cor_b}">{status_b}</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# Layout do Header
+col_h1, col_h2 = st.columns([3, 1])
+with col_h1:
+    st.markdown(f"<span style='color:#666; font-size:10px;'>LITURGIA:</span> <span style='font-family:Cinzel'>{dia_liturgico}</span>", unsafe_allow_html=True)
+with col_h2:
+    st.markdown(f"<div style='text-align:right;'><span style='color:#666; font-size:10px;'>VITALIDADE:</span> <span style='color:{cor_b}'>{status_b}</span></div>", unsafe_allow_html=True)
+st.markdown("---")
 
 # --- PÁGINAS ---
 
@@ -460,7 +503,6 @@ elif menu == "Studio Expositivo":
 
 elif menu == "Séries Bíblicas":
     st.title("Séries Bíblicas")
-    # CÓDIGO EXPANDIDO PARA EVITAR ERRO DE SINTAXE LINHA 479
     with st.expander("INICIAR NOVA SÉRIE", expanded=True):
         with st.form("serie"):
             n = st.text_input("Nome")
@@ -468,8 +510,7 @@ elif menu == "Séries Bíblicas":
             if st.form_submit_button("CRIAR"):
                 db = SafeIO.ler_json(DBS["SERIES"], {})
                 ts = int(time.time())
-                sid = f"S{ts}"
-                db[sid] = {"nome": n, "descricao": d}
+                db[f"S{ts}"] = {"nome": n, "descricao": d}
                 SafeIO.salvar_json(DBS["SERIES"], db)
                 st.success("CRIADO.")
                 st.rerun()
@@ -490,12 +531,26 @@ elif menu == "Media Lab":
 
 elif menu == "Configurações":
     st.title("Configurações do Sistema")
+    
+    st.markdown("### Identidade Visual")
     c1, c2 = st.columns(2)
     with c1:
         nc = st.color_picker("Cor Destaque", st.session_state["config"].get("theme_color", "#D4AF37"))
         nf = st.slider("Tamanho Fonte", 14, 28, st.session_state["config"].get("font_size", 18))
     with c2:
-        nk = st.text_input("API Key (Google)", value=st.session_state["config"].get("api_key", ""), type="password")
+        cam = st.camera_input("ID Ministerial (Foto)")
+        if cam:
+            try:
+                img = Image.open(cam)
+                # Processamento Estético do ID
+                img = ImageOps.grayscale(img)
+                img = ImageOps.contrast(img, 1.2)
+                img.save(os.path.join(DIRS["USER"], "avatar.png"))
+                st.success("IDENTIDADE ATUALIZADA.")
+            except: pass
+
+    st.markdown("### Conectividade")
+    nk = st.text_input("API Key (Google)", value=st.session_state["config"].get("api_key", ""), type="password")
         
     if st.button("ATUALIZAR PARÂMETROS", type="primary"):
         cfg = st.session_state["config"]

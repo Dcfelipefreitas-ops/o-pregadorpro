@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+import streamlit as st
+
+st.set_page_config(
+    page_title="O PREGADOR",
+    layout="wide",
+    page_icon="✝️",
+    initial_sidebar_state="expanded"
+)
+
 # main.py
 # O PREGADOR - Sistema consolidado e organizado (v31 -> v32 improvements)
 # Mantive todos os nomes e textos do seu código original.

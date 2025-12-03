@@ -15,4 +15,4 @@ mammoth
 cryptography
 html2docx
 beautifulsoup4
-pip install streamlit-quill beautifulsoup4 python-docx
+

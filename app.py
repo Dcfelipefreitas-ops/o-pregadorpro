@@ -457,3 +457,251 @@ elif menu == "Studio Expositivo":
     with col_editor:
         st.markdown('<div class="editor-wrapper">', unsafe_allow_html=True)
         st.se
+# ============================
+# PATCH / EXTENSÕES DE PERSISTÊNCIA, NASA CONFIG E BRAIN DIVIDER
+# ============================
+
+# ----------------------------
+# Utilitários de Persistência de Sessão e Autosave
+# ----------------------------
+class SessionPersistence:
+    """Salva e restaura chaves importantes do st.session_state por usuário."""
+    @staticmethod
+    def _path_for_user(user):
+        safe_user = (user or "ANON").replace(" ", "_")
+        return os.path.join(DIRS["USER"], f"session_{safe_user}.json")
+
+    @staticmethod
+    def save(user):
+        try:
+            keys_to_save = {k: st.session_state[k] for k in st.session_state.keys() if k in ["logado", "user_name", "texto_ativo", "titulo_ativo", "config"]}
+            SafeIO.salvar_json(SessionPersistence._path_for_user(user), keys_to_save)
+            logging.info("Session saved for %s", user)
+            return True
+        except Exception as e:
+            logging.error("Session save failed: %s", e)
+            return False
+
+    @staticmethod
+    def load(user):
+        try:
+            data = SafeIO.ler_json(SessionPersistence._path_for_user(user), {})
+            for k, v in data.items():
+                st.session_state[k] = v
+            logging.info("Session restored for %s", user)
+            return True
+        except Exception as e:
+            logging.error("Session load failed: %s", e)
+            return False
+
+# Hook: salvar sessão ao final de cada ação importante
+def autosave_hook():
+    if st.session_state.get("user_name"):
+        SessionPersistence.save(st.session_state.get("user_name"))
+
+# Salva ao sair / logout
+def logout_and_save():
+    autosave_hook()
+    st.session_state["logado"] = False
+    st.session_state["user_name"] = ""
+    st.rerun()
+
+# Carrega automaticamente no boot se existir
+if st.session_state.get("user_name") and not st.session_state["logado"]:
+    SessionPersistence.load(st.session_state.get("user_name"))
+
+# ----------------------------
+# NASA STANDARDS: Validação/Schema simples
+# ----------------------------
+class NASAGuard:
+    """Validação mínima de config conforme 'padrões NASA' (schema simplificado)."""
+    DEFAULT = {
+        "theme_color": "#D4AF37",
+        "font_size": 18,
+        "api_key": "",
+        "nasa_compliance": {
+            "standard": "NASA-STD-8739.8",  # exemplo genérico
+            "level": "A",                  # A, B, C (A = crítico)
+            "audit_trail": True,
+            "checksum_algo": "SHA-256"
+        }
+    }
+
+    @staticmethod
+    def validate_config(cfg):
+        # Garante chaves básicas
+        valid = True
+        problems = []
+        if "theme_color" not in cfg: valid = False; problems.append("theme_color faltando")
+        if "font_size" not in cfg: valid = False; problems.append("font_size faltando")
+        if "nasa_compliance" not in cfg:
+            cfg["nasa_compliance"] = NASAGuard.DEFAULT["nasa_compliance"]
+            problems.append("inserido nasa_compliance default")
+        # Checagem de valores
+        lvl = cfg["nasa_compliance"].get("level", "A")
+        if lvl not in ["A", "B", "C"]:
+            cfg["nasa_compliance"]["level"] = "C"
+            problems.append("nivel nasa ajustado para C")
+        return valid, problems
+
+# Ao iniciar, garantir config conforme NASA
+cfg_before = st.session_state.get("config", {})
+valid_cfg, fix_msgs = NASAGuard.validate_config(cfg_before)
+if not valid_cfg or fix_msgs:
+    st.session_state["config"] = {**NASAGuard.DEFAULT, **cfg_before}
+    SafeIO.salvar_json(DBS["CONFIG"], st.session_state["config"])
+    logging.info("Config validated/normalized: %s", fix_msgs)
+
+# ----------------------------
+# BrainDivider: divisão cerebral modular e gerenciável
+# ----------------------------
+class BrainDivider:
+    """Cria e gerencia partições do 'cérebro' do app.
+       Ao invés de injetar 1000 linhas estáticas, geramos módulos dinamicamente e os armazenamos.
+    """
+    BRAIN_FILE = os.path.join(DIRS["GABINETE"], "brain_structure.json")
+
+    @staticmethod
+    def default_modules():
+        return [
+            {"id": "perception", "role": "input_processing", "desc": "Recebe e normaliza entradas"},
+            {"id": "memory", "role": "storage", "desc": "Armazena estados e histórico"},
+            {"id": "reasoning", "role": "logic", "desc": "Regras e análise teológica"},
+            {"id": "planner", "role": "output", "desc": "Gera conteúdo e ações"},
+            {"id": "safety", "role": "policy", "desc": "Filtros e alertas (GenevaProtocol)"}
+        ]
+
+    @staticmethod
+    def generate_partitions(count=16, prefix="module"):
+        """Gera 'count' partições adicionais, com metadados; pode gerar muitos módulos programaticamente."""
+        modules = BrainDivider.default_modules()
+        for i in range(count):
+            modules.append({
+                "id": f"{prefix}_{i+1}",
+                "role": random.choice(["perception","memory","reasoning","planner","safety","monitor"]),
+                "desc": f"Partição gerada automaticamente #{i+1}",
+                "created_at": datetime.now().isoformat()
+            })
+        BrainDivider.save(modules)
+        return modules
+
+    @staticmethod
+    def save(modules):
+        return SafeIO.salvar_json(BrainDivider.BRAIN_FILE, {"modules": modules, "updated": datetime.now().isoformat()})
+
+    @staticmethod
+    def load():
+        data = SafeIO.ler_json(BrainDivider.BRAIN_FILE, {"modules": BrainDivider.default_modules()})
+        return data.get("modules", [])
+
+    @staticmethod
+    def summarize(modules):
+        buckets = {}
+        for m in modules:
+            buckets.setdefault(m["role"], 0)
+            buckets[m["role"]] += 1
+        return buckets
+
+# ----------------------------
+# Integração na UI (substitui a parte truncada do Studio Expositivo)
+# ----------------------------
+
+# Garanto que chaves existam
+for k in ["titulo_ativo", "texto_ativo"]:
+    if k not in st.session_state:
+        st.session_state[k] = ""
+
+if menu == "Studio Expositivo":
+    st.title("Studio Expositivo")
+    c_input, c_act = st.columns([3, 1])
+    with c_input:
+        st.session_state["titulo_ativo"] = st.text_input("Título", st.session_state["titulo_ativo"])
+        st.session_state["texto_ativo"] = st.text_area("Editor", st.session_state["texto_ativo"], height=320)
+
+    with c_act:
+        if st.button("GRAVAR TXT", use_container_width=True):
+            path = os.path.join(DIRS["SERMOES"], f"{(st.session_state['titulo_ativo'] or 'SemTitulo').strip()}.txt")
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(st.session_state["texto_ativo"] or "")
+                st.toast("SALVO NO DISCO.", icon="💾")
+                logging.info("Sermão salvo: %s", path)
+                autosave_hook()
+            except Exception as e:
+                st.error("Erro ao salvar: " + str(e))
+        if st.button("EXPORTAR PDF (Simples)"):
+            # Gera um PDF simples base64 para download (utiliza ReportLab se disponível)
+            try:
+                from reportlab.lib.pagesizes import A4
+                from reportlab.pdfgen import canvas
+                buf = BytesIO()
+                c = canvas.Canvas(buf, pagesize=A4)
+                text = c.beginText(40, 800)
+                for line in (st.session_state["texto_ativo"] or "").splitlines():
+                    text.textLine(line[:1000])
+                c.drawText(text)
+                c.showPage()
+                c.save()
+                buf.seek(0)
+                b64 = base64.b64encode(buf.read()).decode()
+                href = f'<a href="data:application/pdf;base64,{b64}" download="{st.session_state["titulo_ativo"] or "sermao"}.pdf">Baixar PDF</a>'
+                st.markdown(href, unsafe_allow_html=True)
+            except Exception as e:
+                st.error("ReportLab não disponível ou falha: " + str(e))
+
+    # CONTROLES DO BRAIN DIVIDER
+    st.markdown("---")
+    st.markdown("### Cérebro: Divisor e Gerenciamento Modular")
+    col_gen, col_view = st.columns([2, 1])
+    with col_gen:
+        cnt = st.number_input("Número de partições adicionais a gerar", min_value=0, max_value=2000, value=16, step=1)
+        prefix = st.text_input("Prefixo para partições", value="module")
+        if st.button("GERAR PARTIÇÕES"):
+            mods = BrainDivider.generate_partitions(int(cnt), prefix=prefix)
+            st.success(f"{len(mods)} módulos ativos (inclui os padrões).")
+            autosave_hook()
+    with col_view:
+        if st.button("CARREGAR E RESUMIR CÉREBRO"):
+            mods = BrainDivider.load()
+            summary = BrainDivider.summarize(mods)
+            st.json({"total_modules": len(mods), "by_role": summary})
+            autosave_hook()
+
+    # Mostra um pequeno histórico / estrutura
+    mods = BrainDivider.load()
+    if mods:
+        st.markdown(f"**Módulos ativos:** {len(mods)}")
+        # mostra os últimos 8 módulos
+        for m in mods[-8:]:
+            st.markdown(f"- `{m['id']}` ({m.get('role')}) — {m.get('desc')[:80]}")
+
+    # BOTÃO DE LOGOUT SALVANDO SESSÃO
+    if st.button("SALVAR SESSÃO AGORA"):
+        autosave_hook()
+        st.success("Sessão salva.")
+
+    st.markdown("---")
+    st.caption("Arquitetura: módulos programáticos permitem gerar muitas partições sem duplicar código. Use com moderação.")
+
+# ----------------------------
+# Garantir que logout do sidebar salve sessão
+# ----------------------------
+# Substituímos o handler do botão LOGOUT anterior por salvar sessão primeiro.
+# (Se já havia sido definido antes, o novo valor sobrescreve o anterior.)
+with st.sidebar:
+    if st.button("LOGOUT (SALVAR)", use_container_width=True):
+        logout_and_save()
+
+# ----------------------------
+# Pequenas melhorias de confiabilidade
+# ----------------------------
+# 1) Proteção contra leitura de diretórios vazios (contador de sermões)
+try:
+    count_sermoes = len([f for f in os.listdir(DIRS["SERMOES"]) if os.path.isfile(os.path.join(DIRS["SERMOES"], f))])
+except Exception:
+    count_sermoes = 0
+
+# 2) Hook final: salva sessão periodicamente ao realizar ações (colhemos algumas chaves)
+autosave_hook()
+
+# FIM DO PATCH

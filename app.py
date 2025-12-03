@@ -63,7 +63,7 @@ from PIL import Image, ImageOps
 # 1. INFRAESTRUTURA DE DADOS (NASA SAFE I/O)
 # ==============================================================================
 st.set_page_config(
-    page_title="O PREGADOR | Theology OS", 
+    page_title="O PREGADOR", 
     layout="wide", 
     page_icon="✝️", 
     initial_sidebar_state="expanded"

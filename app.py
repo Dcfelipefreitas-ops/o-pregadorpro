@@ -27,7 +27,6 @@ st.set_page_config(
 # ==============================================================================
 # O PREGADOR - SYSTEM OMEGA (V31 -> V32 Consolidated)
 # ==============================================================================
-
 # Imports opcionais (serão tentados instalar pelo kernel se falharem)
 try:
     import google.generativeai as genai
@@ -70,7 +69,9 @@ def _genesis_boot_protocol():
                 "theme_color": "#D4AF37",
                 "font_size": 18,
                 "enc_password": "OMEGA_KEY_DEFAULT",
-                "api_key": ""
+                "api_key": "",
+                "backup_interval_seconds": 24 * 3600,
+                "last_backup": None
             }, f, indent=2, ensure_ascii=False)
 
     # users_db.json
@@ -167,7 +168,6 @@ except Exception:
 # ==============================================================================
 # 1. INFRAESTRUTURA (Pastas e Caminhos)
 # ==============================================================================
-# ATENÇÃO: set_page_config removido daqui pois já foi chamado na linha 14 (Evita erro)
 SystemOmegaKernel.inject_pwa_headers()
 
 ROOT = "Dados_Pregador_V31"
@@ -339,7 +339,7 @@ def index_user_books(folder=None):
     return []
 
 # ==============================================================================
-# 6. ACCESS CONTROL
+# 6. ACCESS CONTROL (mantido, com registro OAuth simulados)
 # ==============================================================================
 class AccessControl:
     DEFAULT_USERS = {"ADMIN": hashlib.sha256("admin".encode()).hexdigest()}
@@ -423,16 +423,27 @@ class Gamification:
         SafeIO.salvar_json(DBS["STATS"], stats)
 
 # ==============================================================================
-# 8. BACKUP
+# 8. BACKUP & SYNC (placeholders)
 # ==============================================================================
 def backup_local():
     try:
         now = datetime.now().strftime("%Y%m%d_%H%M%S")
-        bk_name = os.path.join(DIRS["BACKUP"], f"backup_{now}.zip")
-        shutil.make_archive(bk_name.replace(".zip", ""), 'zip', ROOT)
+        bk_base = os.path.join(DIRS["BACKUP"], f"backup_{now}")
+        shutil.make_archive(bk_base, 'zip', ROOT)
+        bk_name = bk_base + ".zip"
+        logging.info(f"Backup criado: {bk_name}")
         return bk_name
     except Exception as e:
+        logging.error(f"Erro backup: {e}")
         return None
+
+def sync_to_google_drive(file_path):
+    # TODO: configure Google Drive API
+    return False
+
+def sync_to_icloud(file_path):
+    # TODO: configure iCloud / pyicloud
+    return False
 
 def auto_backup_if_due():
     cfg = SafeIO.ler_json(DBS["CONFIG"], {})
@@ -450,7 +461,7 @@ def auto_backup_if_due():
 # 9. STARTUP
 # ==============================================================================
 if "config" not in st.session_state:
-    st.session_state["config"] = SafeIO.ler_json(DBS["CONFIG"], {"theme_color": "#D4AF37", "font_size": 18, "enc_password": "", "api_key": ""})
+    st.session_state["config"] = SafeIO.ler_json(DBS["CONFIG"], {"theme_color": "#D4AF37", "font_size": 18, "enc_password": "", "api_key": "", "backup_interval_seconds": 24*3600})
 
 inject_css_from_config(st.session_state["config"])
 
@@ -465,7 +476,7 @@ except Exception:
     pass
 
 # ==============================================================================
-# 10. LOGIN UI
+# 10. LOGIN UI (mantendo nomes e painel original)
 # ==============================================================================
 if not st.session_state["logado"]:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -525,7 +536,7 @@ if not st.session_state["logado"]:
     st.stop()
 
 # ==============================================================================
-# 11. MAIN APP
+# 11. MAIN APP shell (menu)
 # ==============================================================================
 if "hide_menu" not in st.session_state:
     st.session_state["hide_menu"] = False
@@ -598,7 +609,7 @@ if menu == "Cuidado Pastoral":
                     members.append({"Nome": nm, "Status": stt, "Data": datetime.now().strftime("%d/%m"), "Nota": note})
                     SafeIO.salvar_json(DBS["MEMBERS_DB"], members)
                     st.success("Ovelha adicionada.")
-                    st.rerun()
+                    st.experimental_rerun()
         if members:
             df = pd.DataFrame(members)
             st.dataframe(df, use_container_width=True)
@@ -626,6 +637,12 @@ if menu == "Cuidado Pastoral":
         with col_viz:
             score = st.session_state.get('perm_score',50)
             plot_gauge(score, "Índice de Permissão Interna", st.session_state["config"]["theme_color"])
+            if score < 40:
+                st.error("MODO SOBREVIVÊNCIA: Risco de Burnout.")
+            elif score < 70:
+                st.warning("EM PROGRESSO: Ainda há legalismo interno.")
+            else:
+                st.success("LIBERDADE NA GRAÇA: Identidade saudável.")
 
     with tab_tools:
         st.markdown("### Ferramentas de Discipulado")
@@ -642,8 +659,10 @@ if menu == "Cuidado Pastoral":
             bkfile = backup_local()
             if bkfile: st.success(f"Backup salvo: {bkfile}")
             else: st.error("Falha ao criar backup.")
-        st.button("Sincronizar com Google Drive (se configurado)", use_container_width=True)
-        st.button("Sincronizar com iCloud (se configurado)", use_container_width=True)
+        if st.button("Sincronizar com Google Drive (se configurado)"):
+            st.info("Sincronização simulada. Configure credenciais para ativar.")
+        if st.button("Sincronizar com iCloud (se configurado)"):
+            st.info("Sincronização simulada. Configure credenciais para ativar.")
 
 # ==============================================================================
 # 13. MÓDULO: GABINETE PASTORAL
@@ -676,7 +695,9 @@ elif menu == "Gabinete Pastoral":
             try:
                 fn = f"{st.session_state['titulo_ativo']}.txt"
                 with open(os.path.join(DIRS["SERMOES"], fn), 'w', encoding="utf-8") as f: f.write(content)
-            except Exception: pass
+                st.toast("Autosave realizado.", icon="💾")
+            except Exception:
+                pass
 
     c_save, c_exp = st.columns(2)
     with c_save:
@@ -691,7 +712,81 @@ elif menu == "Gabinete Pastoral":
                 with open(os.path.join(DIRS["GABINETE"], f"{st.session_state['titulo_ativo']}.enc"), 'w', encoding="utf-8") as f:
                     f.write(enc if enc else "")
                 st.success("Encriptado.")
-            else: st.error("Defina senha na config.")
+            else:
+                st.error("Defina senha na config.")
     with c_exp:
         if st.button("Exportar DOCX"):
-            fn = f"{s
+            fn = f"{st.session_state['titulo_ativo']}.docx"
+            path = os.path.join(DIRS["SERMOES"], fn)
+            export_html_to_docx_better(st.session_state['titulo_ativo'], content, path)
+            try:
+                with open(path, "rb") as f:
+                    st.download_button("Baixar DOCX", f, file_name=fn)
+            except Exception:
+                st.error("Erro ao preparar download do DOCX.")
+        if st.button("Exportar PDF"):
+            fn = f"{st.session_state['titulo_ativo']}.pdf"
+            path = os.path.join(DIRS["SERMOES"], fn)
+            ok = export_text_to_pdf(st.session_state['titulo_ativo'], content, path)
+            if ok:
+                with open(path, "rb") as f:
+                    st.download_button("Baixar PDF", f, file_name=fn)
+            else:
+                st.error("Falha na exportação para PDF (libs ausentes).")
+
+# ==============================================================================
+# 14. MÓDULO: BIBLIOTECA
+# ==============================================================================
+elif menu == "Biblioteca":
+    st.title("📚 Biblioteca Reformada")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Busca Online (Google Books)")
+        q = st.text_input("Termo (ex: Teologia Pactual)")
+        if st.button("Buscar"):
+            st.info("Conectando à API (simulado).")
+    with col2:
+        st.subheader("Arquivos Locais")
+        books = index_user_books(DIRS["BIB_CACHE"])
+        if books:
+            st.write(books)
+        else:
+            st.info("Nenhum livro local indexado (use importar).")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.markdown('<div class="tech-card">Bíblias</div>', unsafe_allow_html=True)
+    c2.markdown('<div class="tech-card">Comentários</div>', unsafe_allow_html=True)
+    c3.markdown('<div class="tech-card">Dicionários</div>', unsafe_allow_html=True)
+    c4.markdown('<div class="tech-card">PDFs Locais</div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 15. MÓDULO: CONFIGURAÇÕES
+# ==============================================================================
+elif menu == "Configurações":
+    st.title("⚙️ Configurações")
+    cfg = st.session_state["config"]
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("### Visual")
+        nc = st.color_picker("Cor do Tema", cfg.get("theme_color", "#D4AF37"))
+        nf = st.number_input("Tamanho Fonte", 12, 30, cfg.get("font_size", 18))
+        nm = st.selectbox("Modo (apenas informativo)", ["Dark Cathedral","Pergaminho (Sepia)","Holy Light (Claro)"])
+    with c2:
+        st.markdown("### Segurança & Backup")
+        npw = st.text_input("Senha Mestra de Encriptação", type="password", value=cfg.get("enc_password",""))
+        api_key = st.text_input("API Key (Google - opcional)", value=cfg.get("api_key",""), type="password")
+        interval_days = st.number_input("Intervalo de backup (dias)", 1, 30, int(cfg.get("backup_interval_seconds", 24*3600)//86400))
+    if st.button("Salvar Tudo"):
+        cfg["theme_color"] = nc
+        cfg["font_size"] = nf
+        cfg["theme_mode"] = nm
+        cfg["enc_password"] = npw
+        cfg["api_key"] = api_key
+        cfg["backup_interval_seconds"] = int(interval_days * 24 * 3600)
+        SafeIO.salvar_json(DBS["CONFIG"], cfg)
+        st.success("Configurações salvas. Reinicie o app para aplicar totalmente quando necessário.")
+
+# ==============================================================================
+# 16. FINAL NOTES
+# ==============================================================================
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.caption("Sistema O PREGADOR — Versão consolidada. Configure Google Drive / iCloud externamente para sincronização automática quando desejar.")

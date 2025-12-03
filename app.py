@@ -61,7 +61,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-ROOT = "Dados_Pregador_V24_TheologyOS"
+ROOT = "Dados_Pregador_V25_Immutable"
 DIRS = {
     "SERMOES": os.path.join(ROOT, "Sermoes"),
     "GABINETE": os.path.join(ROOT, "Gabinete_Pastoral"),
@@ -140,8 +140,8 @@ def inject_css(color="#D4AF37", font_sz=18):
         }}
         
         .prime-logo {{
-            width: 120px;
-            height: 120px;
+            width: 140px;
+            height: 140px;
             margin: 0 auto 20px auto;
             animation: holy-pulse 4s infinite ease-in-out;
             display: block;
@@ -264,7 +264,7 @@ if "texto_ativo" not in st.session_state: st.session_state["texto_ativo"] = ""
 if "titulo_ativo" not in st.session_state: st.session_state["titulo_ativo"] = ""
 
 # ==============================================================================
-# 5. TELA DE LOGIN (O GRANDE 'O' COM A CRUZ)
+# 5. TELA DE LOGIN (SVG CORRIGIDO E ATUALIZADO)
 # ==============================================================================
 if not st.session_state["logado"]:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -285,7 +285,7 @@ if not st.session_state["logado"]:
         st.markdown(svg_logo, unsafe_allow_html=True)
         st.markdown(f"""
         <div class="login-title">O PREGADOR</div>
-        <div style="text-align:center; font-size:9px; color:#555; letter-spacing:4px; margin-bottom:30px;">THEOLOGY OS V24</div>
+        <div style="text-align:center; font-size:9px; color:#555; letter-spacing:4px; margin-bottom:30px;">THEOLOGY OS V25</div>
         """, unsafe_allow_html=True)
         
         with st.form("gate_keeper"):
@@ -428,7 +428,8 @@ elif menu == "Studio Expositivo":
     if c2.button("PERSISTIR DADOS", use_container_width=True, type="primary"):
         if st.session_state["titulo_ativo"]:
             path = os.path.join(DIRS["SERMOES"], f"{st.session_state['titulo_ativo']}.txt")
-            with open(path, 'w', encoding='utf-8') as f: f.write(st.session_state["texto_ativo"])
+            with open(path, 'w', encoding='utf-8') as f: 
+                f.write(st.session_state["texto_ativo"])
             SafeIO.salvar_json(os.path.join(DIRS["BACKUP"], "log.json"), {"saved": True})
             st.toast("DADOS SALVOS.", icon="💾")
 
@@ -459,13 +460,16 @@ elif menu == "Studio Expositivo":
 
 elif menu == "Séries Bíblicas":
     st.title("Séries Bíblicas")
+    # CÓDIGO EXPANDIDO PARA EVITAR ERRO DE SINTAXE LINHA 479
     with st.expander("INICIAR NOVA SÉRIE", expanded=True):
         with st.form("serie"):
             n = st.text_input("Nome")
             d = st.text_area("Escopo")
             if st.form_submit_button("CRIAR"):
                 db = SafeIO.ler_json(DBS["SERIES"], {})
-                db[f"S{int(time.time())}"] = {"nome": n, "descricao": d}
+                ts = int(time.time())
+                sid = f"S{ts}"
+                db[sid] = {"nome": n, "descricao": d}
                 SafeIO.salvar_json(DBS["SERIES"], db)
                 st.success("CRIADO.")
                 st.rerun()
@@ -476,4 +480,27 @@ elif menu == "Séries Bíblicas":
         st.markdown(f"<div class='tech-card'><b>{v['nome']}</b><br><small>{v['descricao']}</small></div>", unsafe_allow_html=True)
 
 elif menu == "Media Lab":
-    st.title("Med
+    st.title("Media Lab")
+    c1, c2 = st.columns(2)
+    with c1: st.markdown('<div style="height:300px; border:1px dashed #333; display:flex; align-items:center; justify-content:center; color:#444;">RENDER PREVIEW</div>', unsafe_allow_html=True)
+    with c2:
+        st.text_input("Texto Overlay")
+        st.selectbox("Template", ["Dark Theology", "Light Grace", "Nature"])
+        if st.button("RENDERIZAR (SIMULAÇÃO)"): st.success("PROCESSADO.")
+
+elif menu == "Configurações":
+    st.title("Configurações do Sistema")
+    c1, c2 = st.columns(2)
+    with c1:
+        nc = st.color_picker("Cor Destaque", st.session_state["config"].get("theme_color", "#D4AF37"))
+        nf = st.slider("Tamanho Fonte", 14, 28, st.session_state["config"].get("font_size", 18))
+    with c2:
+        nk = st.text_input("API Key (Google)", value=st.session_state["config"].get("api_key", ""), type="password")
+        
+    if st.button("ATUALIZAR PARÂMETROS", type="primary"):
+        cfg = st.session_state["config"]
+        cfg.update({"theme_color": nc, "font_size": nf, "api_key": nk})
+        SafeIO.salvar_json(DBS["CONFIG"], cfg)
+        st.success("SISTEMA REINICIANDO...")
+        time.sleep(1)
+        st.rerun()

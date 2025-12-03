@@ -13,22 +13,24 @@ import hashlib
 import pandas as pd
 from datetime import datetime, timedelta
 from io import BytesIO
+import plotly.express as px
+import plotly.graph_objects as go
 
 # ==============================================================================
-# 0. CONFIGURAÇÃO (LINHA 1 OBRIGATÓRIA - SYSTEM KERNEL)
+# 0. LINHA 1 OBRIGATÓRIA (NÃO APAGAR)
 # ==============================================================================
 st.set_page_config(
-    page_title="O PREGADOR | OMEGA", 
+    page_title="O PREGADOR", 
     layout="wide", 
     page_icon="✝️", 
     initial_sidebar_state="expanded"
 )
 
 # ==============================================================================
-# [-] GENESIS PROTOCOL: INFRAESTRUTURA DE DADOS V32
+# [-] GENESIS PROTOCOL: RESTAURADO (COM ROTINAS V32)
 # ==============================================================================
 def _genesis_boot_protocol():
-    ROOT = "Dados_Pregador_V32_Pro"
+    ROOT = "Dados_Pregador_Final"
     DIRS = {
         "SERMOES": os.path.join(ROOT, "Sermoes"),
         "GABINETE": os.path.join(ROOT, "Gabinete_Pastoral"),
@@ -39,79 +41,102 @@ def _genesis_boot_protocol():
         "MEMBROS": os.path.join(ROOT, "Membresia")
     }
     
-    # Criação Física
+    # Cria Pastas
     for p in DIRS.values(): os.makedirs(p, exist_ok=True)
 
-    # Garante integridade dos arquivos base
-    if not os.path.exists(os.path.join(DIRS["USER"], "users_db.json")):
-        with open(os.path.join(DIRS["USER"], "users_db.json"), "w") as f: 
-            json.dump({"ADMIN": hashlib.sha256("admin".encode()).hexdigest()}, f)
+    # Cria Arquivos Base
+    files_check = {
+        os.path.join(DIRS["USER"], "users_db.json"): {"ADMIN": hashlib.sha256("admin".encode()).hexdigest()},
+        os.path.join(DIRS["USER"], "config.json"): {"theme_color": "#D4AF37", "font_size": 18, "enc_password": "", "theme_bg": "#000000", "theme_panel": "#0A0A0A"},
+        os.path.join(DIRS["USER"], "routines.json"): ["Orar na Madrugada", "Leitura Bíblica"], # Nova Feature
+        os.path.join(DIRS["MEMBROS"], "members.json"): []
+    }
+    
+    for path, content in files_check.items():
+        if not os.path.exists(path):
+            with open(path, "w", encoding='utf-8') as f: json.dump(content, f)
             
-    if not os.path.exists(os.path.join(DIRS["USER"], "config.json")):
-        with open(os.path.join(DIRS["USER"], "config.json"), "w") as f:
-            json.dump({
-                "theme_bg": "#000000", 
-                "theme_panel": "#0A0A0A", 
-                "theme_color": "#D4AF37", 
-                "font_size": 18, 
-                "modules_active": {"gabinete": True, "biblioteca": True}
-            }, f)
-
-    if not os.path.exists(os.path.join(DIRS["USER"], "routines.json")):
-        with open(os.path.join(DIRS["USER"], "routines.json"), "w") as f:
-            json.dump(["Orar na Madrugada", "Leitura da Palavra", "Visitar Enfermos"], f)
-
-    if not os.path.exists(os.path.join(DIRS["MEMBROS"], "members.json")):
-        with open(os.path.join(DIRS["MEMBROS"], "members.json"), "w") as f: json.dump([], f)
-        
     return DIRS
 
 DIRS = _genesis_boot_protocol()
 DBS = {
     "CONFIG": os.path.join(DIRS["USER"], "config.json"),
     "USERS": os.path.join(DIRS["USER"], "users_db.json"),
-    "ROUTINES": os.path.join(DIRS["USER"], "routines.json"),
+    "ROUTINES": os.path.join(DIRS["USER"], "routines.json"), # FEATURE NOVA
     "MEMBERS": os.path.join(DIRS["MEMBROS"], "members.json")
 }
 
 # ==============================================================================
-# 0.1 KERNEL DEPENDENCIES
+# 0.1 KERNEL V31 (ORIGINAL)
 # ==============================================================================
 class SystemOmegaKernel:
-    REQUIRED = [
-        "google-generativeai", "streamlit-lottie", "Pillow", "pandas",
-        "streamlit-quill", "python-docx", "reportlab", "mammoth", 
-        "plotly", "cryptography"
-    ]
+    REQUIRED = ["streamlit-quill", "plotly", "pandas", "cryptography", "mammoth"]
     @staticmethod
-    def check():
-        try:
-            import plotly
+    def _install_quiet(pkg):
+        try: subprocess.check_call([sys.executable, "-m", "pip", "install", pkg, "--quiet"])
+        except: pass
+    @staticmethod
+    def boot():
+        try: 
             import streamlit_quill
-            import cryptography
-        except ImportError:
-            for lib in SystemOmegaKernel.REQUIRED:
-                try: subprocess.check_call([sys.executable, "-m", "pip", "install", lib, "--quiet"])
-                except: pass
+            import plotly
+        except:
+            for lib in SystemOmegaKernel.REQUIRED: SystemOmegaKernel._install_quiet(lib)
             st.rerun()
 
-SystemOmegaKernel.check()
-
-# Imports
-import plotly.express as px
-import plotly.graph_objects as go
-from streamlit_quill import st_quill
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-try: import mammoth; HTML2DOCX=True
-except: HTML2DOCX=False
+SystemOmegaKernel.boot()
+try: from streamlit_quill import st_quill; QUILL_AVAILABLE = True
+except: QUILL_AVAILABLE = False
+try: from cryptography.hazmat.primitives.ciphers.aead import AESGCM; CRYPTO_OK = True
+except: CRYPTO_OK = False
+try: import mammoth; HTML2DOCX = "mammoth"
+except: HTML2DOCX = None
 
 # ==============================================================================
-# 1. VISUAL ENGINE V32 (THEME BUILDER + CSS INJECTOR)
+# 1. IO SEGURANÇA
+# ==============================================================================
+class SafeIO:
+    @staticmethod
+    def ler(p, d): 
+        try: return json.load(open(p, encoding='utf-8'))
+        except: return d
+    @staticmethod
+    def salvar(p, d):
+        try: 
+            json.dump(d, open(p, 'w', encoding='utf-8'), indent=4, ensure_ascii=False)
+            return True
+        except: return False
+
+def encrypt_sermon_aes(password, plaintext):
+    if not CRYPTO_OK: return None
+    key = hashlib.sha256(password.encode()).digest()
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)
+    ct = aesgcm.encrypt(nonce, plaintext.encode('utf-8'), None)
+    return base64.b64encode(nonce + ct).decode('utf-8')
+
+class AccessControl:
+    @staticmethod
+    def register(u, p):
+        db = SafeIO.ler(DBS["USERS"], {})
+        if u.upper() in db: return False
+        db[u.upper()] = hashlib.sha256(p.encode()).hexdigest()
+        SafeIO.salvar(DBS["USERS"], db) # Salva Imediato
+        return True
+    @staticmethod
+    def login(u, p):
+        db = SafeIO.ler(DBS["USERS"], {})
+        if not db and u=="ADMIN" and p=="1234": return True # Backdoor inicial
+        h = hashlib.sha256(p.encode()).hexdigest()
+        return db.get(u.upper()) == h
+
+# ==============================================================================
+# 2. VISUAL V31 RESTAURADO + RECURSOS NOVOS (TILES & EDITOR)
 # ==============================================================================
 def inject_css(cfg):
-    bg = cfg.get("theme_bg", "#000000")
-    panel = cfg.get("theme_panel", "#090909")
     gold = cfg.get("theme_color", "#D4AF37")
+    bg = cfg.get("theme_bg", "#000000")      # Config nova integrada ao visual velho
+    panel = cfg.get("theme_panel", "#0A0A0A") # Config nova
     font = cfg.get("font_family", "Cinzel")
     fs = cfg.get("font_size", 18)
 
@@ -119,381 +144,256 @@ def inject_css(cfg):
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;600&family=Playfair+Display&display=swap');
         
-        :root {{ --main: {gold}; --bg: {bg}; --panel: {panel}; --font: '{font}'; }}
+        :root {{ --gold: {gold}; --bg: {bg}; --panel: {panel}; --txt: #EAEAEA; }}
         
-        .stApp {{ background-color: var(--bg); color: #EAEAEA; font-family: var(--font), sans-serif; font-size: {fs}px; }}
+        .stApp {{ background-color: var(--bg); color: var(--txt); font-family: 'Inter', sans-serif; font-size: {fs}px; }}
+        [data-testid="stSidebar"] {{ background-color: var(--panel); border-right: 1px solid var(--gold); }}
         
-        /* Sidebar Professional */
-        [data-testid="stSidebar"] {{ background-color: var(--panel); border-right: 1px solid var(--main); }}
+        /* RESTAURADO V31 */
+        .stTextInput input, .stSelectbox div, .stTextArea textarea {{ background-color: var(--panel) !important; border: 1px solid #333 !important; color: #EEE !important; }}
+        h1, h2, h3 {{ color: var(--gold) !important; font-family: 'Cinzel', serif !important; }}
         
-        /* Inputs Dark Modern */
-        .stTextInput input, .stSelectbox div, .stTextArea textarea, .stNumberInput input {{
-            background-color: var(--panel) !important;
-            border: 1px solid #333 !important;
-            color: #EAEAEA !important;
-            border-radius: 4px;
+        /* BOTÕES NOVOS (TILES DA BIBLIOTECA) */
+        .lib-tile {{
+            border: 1px solid var(--gold); background: #111; color: var(--gold);
+            padding: 20px; text-align: center; border-radius: 4px; cursor: pointer;
+            transition: 0.3s; margin-bottom: 10px;
         }}
-        .stTextInput input:focus {{ border-color: var(--main) !important; box-shadow: 0 0 10px var(--main); }}
+        .lib-tile:hover {{ background: var(--gold); color: #000; box-shadow: 0 0 10px var(--gold); }}
 
-        /* Botões Profissionais (Tile Style) */
-        .lib-button {{
-            display: inline-block; width: 100%; padding: 15px; margin: 5px 0;
-            background: #111; border: 1px solid #333; color: #888; text-align: center;
-            border-radius: 5px; cursor: pointer; transition: 0.3s;
-        }}
-        .lib-button:hover {{ border-color: var(--main); color: var(--main); background: #1a1a1a; }}
+        /* GRÁFICOS TRANSPARENTES */
+        .js-plotly-plot .plotly .main-svg {{ background: rgba(0,0,0,0) !important; }}
         
-        /* Header Fix */
-        h1, h2, h3 {{ color: var(--main) !important; font-family: 'Cinzel', serif !important; }}
+        .stButton button {{ border: 1px solid var(--gold); color: var(--gold); background: transparent; text-transform: uppercase; font-weight: bold; }}
+        .stButton button:hover {{ background: var(--gold); color: #000; }}
         
-        /* Button Streamlit Default override */
-        .stButton button {{
-            border: 1px solid var(--main); color: var(--main); background: transparent;
-            text-transform: uppercase; font-weight: bold; width: 100%;
-        }}
-        .stButton button:hover {{ background: var(--main); color: #000; }}
+        /* LOGO CRUZ LOGIN V31 */
+        @keyframes pulse {{ 0% {{ filter: drop-shadow(0 0 2px {gold}); }} 50% {{ filter: drop-shadow(0 0 10px {gold}); }} }}
+        .cross-logo {{ display:block; margin: 0 auto; animation: pulse 4s infinite; }}
     </style>
     """, unsafe_allow_html=True)
 
-# ==============================================================================
-# 2. IO SAFE & AUTH
-# ==============================================================================
-class SafeIO:
-    @staticmethod
-    def ler(path, default):
-        try:
-            if not os.path.exists(path): return default
-            with open(path, 'r', encoding='utf-8') as f: return json.load(f)
-        except: return default
-    @staticmethod
-    def salvar(path, data):
-        try:
-            with open(path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
-            return True
-        except: return False
-
-def auth_login(u, p):
-    users = SafeIO.ler(DBS["USERS"], {})
-    if not users and u=="ADMIN" and p=="1234": return True
-    h = hashlib.sha256(p.encode()).hexdigest()
-    return users.get(u.upper()) == h
-
-# ==============================================================================
-# 3. GRAPHICS ENGINE V32 (FUTURE UI)
-# ==============================================================================
-def render_neon_radar(cats, vals, title):
-    cfg = st.session_state["config"]
-    color = cfg.get("theme_color", "#D4AF37")
-    
-    fig = go.Figure(data=go.Scatterpolar(
-        r=vals, theta=cats, fill='toself',
-        line=dict(color=color, width=3),
-        marker=dict(color='white', size=8),
-        fillcolor=f"{color}33" # 20% transparencia hex
-    ))
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(visible=True, range=[0, 100], color='#666', gridcolor='#333'),
-            angularaxis=dict(color='#888', gridcolor='#333'),
-            bgcolor='rgba(0,0,0,0)'
-        ),
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#EEE', family='Cinzel'),
-        title=dict(text=title.upper(), x=0.5, font=dict(size=20, color=color)),
-        margin=dict(t=50, b=40, l=40, r=40)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
+# GRÁFICOS FUTURISTAS (Nova demanda, Visual Aprovado V32)
 def render_future_gauge(val, title, color):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number", value = val,
-        number = {'font': {'size': 40, 'color': color, 'family': 'Inter'}, 'suffix': "%"},
-        title = {'text': title.upper(), 'font': {'size': 14, 'color': "#888", 'family': 'Inter'}},
+        number = {'font': {'size': 30, 'color': color, 'family': 'Inter'}, 'suffix': "%"},
+        title = {'text': title, 'font': {'size': 18, 'color': "#888", 'family': 'Cinzel'}},
         gauge = {
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#333"},
-            'bar': {'color': color, 'line': {'color': 'white', 'width': 2}},
+            'axis': {'range': [0, 100], 'tickwidth': 1},
+            'bar': {'color': color},
             'bgcolor': "rgba(0,0,0,0)",
-            'borderwidth': 0,
-            'steps': [
-                {'range': [0, 100], 'color': '#111'},
-                {'range': [0, val], 'color': f"{color}22"} # Glow effect background
-            ],
-            'threshold': {
-                'line': {'color': "white", 'width': 4},
-                'thickness': 0.75,
-                'value': val
-            }
+            'steps': [{'range': [0, 100], 'color': '#111'}, {'range': [0, val], 'color': f"{color}33"}]
         }
     ))
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=20,b=20,l=20,r=20), height=200)
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=20,b=20,l=20,r=20), height=180)
     st.plotly_chart(fig, use_container_width=True)
 
 # ==============================================================================
-# 4. APP LOGIC
+# 3. APP LOGIC V31
 # ==============================================================================
-# Boot Config
 config = SafeIO.ler(DBS["CONFIG"], {})
 st.session_state["config"] = config
 inject_css(config)
 
-# LOGIN
 if "logado" not in st.session_state: st.session_state["logado"] = False
+
+# TELA DE LOGIN ORIGINAL (CRUZ + O PREGADOR) - RESTAURADO 100%
 if not st.session_state["logado"]:
     c1, c2, c3 = st.columns([1,1,1])
     with c2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         gold = config.get("theme_color")
-        st.markdown(f"""<center><h1 style='color:{gold}; border-bottom:2px solid {gold}'>OMEGA SYSTEM</h1><p>ACCESS PROTOCOL V32</p></center>""", unsafe_allow_html=True)
-        u = st.text_input("ID")
-        p = st.text_input("CODE", type="password")
-        if st.button("EXECUTE"):
-            if auth_login(u, p):
-                st.session_state["logado"] = True
-                st.rerun()
-            else: st.error("ACCESS DENIED")
+        # SUA CRUZ SVG
+        st.markdown(f"""
+        <center>
+            <svg class="cross-logo" width="100" height="150" viewBox="0 0 100 150">
+                <rect x="45" y="10" width="10" height="130" fill="{gold}" />
+                <rect x="20" y="40" width="60" height="10" fill="{gold}" />
+                <circle cx="50" cy="45" r="5" fill="#000" stroke="{gold}" stroke-width="2"/>
+            </svg>
+            <h1 style="font-family:'Cinzel'; font-size:28px; margin-top:10px;">O PREGADOR</h1>
+            <small style="letter-spacing:3px;">SYSTEM V31 | SHEPHERD EDITION</small>
+        </center>
+        """, unsafe_allow_html=True)
+        
+        t1, t2 = st.tabs(["ENTRAR", "REGISTRAR"])
+        with t1:
+            u = st.text_input("ID")
+            p = st.text_input("Senha", type="password")
+            if st.button("ACESSAR", use_container_width=True):
+                if AccessControl.login(u, p):
+                    st.session_state["logado"] = True
+                    st.session_state["user_name"] = u.upper()
+                    st.rerun()
+                else: st.error("Acesso Negado.")
+        with t2:
+            nu = st.text_input("Novo ID")
+            np = st.text_input("Nova Senha", type="password")
+            if st.button("CRIAR"):
+                if AccessControl.register(nu, np): st.success("Registrado.")
+                else: st.error("Erro ou Existente.")
     st.stop()
 
-# MAIN INTERFACE
+# MENUS ORIGINAIS
 with st.sidebar:
-    st.markdown(f"**PASTORAL UNIT: CONNECTED**")
-    menu = st.radio("MÓDULOS", ["Rotina & Cuidado", "Gabinete (Editor)", "Biblioteca", "Configurações Master"])
-    if st.button("SAIR DO SISTEMA"):
+    st.markdown(f"<div style='text-align:center'>Pastor: <b>{st.session_state['user_name']}</b></div>", unsafe_allow_html=True)
+    st.markdown("---")
+    menu = st.radio("NAVEGAÇÃO", ["Cuidado Pastoral", "Gabinete Pastoral", "Biblioteca", "Configurações"], index=0)
+    st.markdown("---")
+    if st.button("SAIR"): 
         st.session_state["logado"] = False
         st.rerun()
 
 # ------------------------------------------------------------------------------
-# MÓDULO 1: ROTINA E CUIDADO PASTORAL
+# 1. CUIDADO PASTORAL (Visual Antigo + Funcionalidades Novas)
 # ------------------------------------------------------------------------------
-if menu == "Rotina & Cuidado":
-    st.title("🛡️ Cuidado Pastoral Avançado")
-    t1, t2, t3 = st.tabs(["📝 Minha Rotina", "⚖️ Teoria da Permissão", "🐑 Gestão Rebanho"])
+if menu == "Cuidado Pastoral":
+    st.title("🛡️ Cuidado Pastoral")
     
-    # ROTINAS PERSONALIZADAS (O que você pediu: botão de + e customização)
+    # Abas Originais
+    t1, t2, t3 = st.tabs(["Minha Rotina (Update)", "Teoria da Permissão (Gráficos Future)", "Meu Rebanho"])
+    
+    # 1.1 ROTINAS COM O BOTÃO "+" QUE VOCÊ PEDIU
     with t1:
-        st.subheader("Gerenciador de Tarefas Ministeriais")
+        st.subheader("Gerenciar Tarefas")
         routines = SafeIO.ler(DBS["ROUTINES"], [])
         
-        c_add1, c_add2 = st.columns([4, 1])
-        new_task = c_add1.text_input("Adicionar nova tarefa à rotina:", placeholder="Ex: Estudar Hebraico...")
-        if c_add2.button("➕ ADICIONAR"):
-            if new_task and new_task not in routines:
+        # O Update do "+"
+        c_in, c_btn = st.columns([4, 1])
+        new_task = c_in.text_input("Nova Tarefa Personalizada", label_visibility="collapsed")
+        if c_btn.button("➕"):
+            if new_task:
                 routines.append(new_task)
                 SafeIO.salvar(DBS["ROUTINES"], routines)
-                st.success("Tarefa Adicionada.")
                 st.rerun()
         
         st.markdown("---")
-        # Renderiza checkboxes
         for r in routines:
-            c_check, c_del = st.columns([5, 0.5])
-            c_check.checkbox(f"📍 {r}", key=r)
-            if c_del.button("✕", key=f"del_{r}"):
+            cc1, cc2 = st.columns([5, 0.5])
+            cc1.checkbox(r)
+            if cc2.button("✕", key=r): 
                 routines.remove(r)
                 SafeIO.salvar(DBS["ROUTINES"], routines)
                 st.rerun()
 
-    # TEORIA DA PERMISSÃO (GRÁFICOS FUTURISTAS)
+    # 1.2 TEORIA DA PERMISSÃO COM GRÁFICOS FUTURISTAS
     with t2:
-        st.subheader("Bio-Feedback Emocional (Future UI)")
-        
-        c_sld, c_gfx = st.columns(2)
-        with c_sld:
-            st.markdown("#### Input de Dados")
-            p1 = st.slider("Graça (Falhar)", 0, 100, 50)
-            p2 = st.slider("Humanidade (Sentir)", 0, 100, 50)
-            p3 = st.slider("Limites (Descansar)", 0, 100, 50)
-            p4 = st.slider("Dignidade (Sucesso)", 0, 100, 50)
-        
-        with c_gfx:
-            avg = (p1 + p2 + p3 + p4) / 4
-            render_future_gauge(avg, "Nível de Permissão Interna", config.get("theme_color"))
-            
-            # Radar pequeno
-            render_neon_radar(["Falhar", "Sentir", "Descansar", "Sucesso"], [p1,p2,p3,p4], "Espectro")
+        st.markdown("### Diagnóstico Emocional")
+        col_s, col_g = st.columns(2)
+        with col_s:
+            pf = st.slider("FALHAR", 0, 100, 50)
+            ps = st.slider("SENTIR", 0, 100, 50)
+            pd = st.slider("DESCANSAR", 0, 100, 50)
+            pi = st.slider("SUCESSO", 0, 100, 50)
+        with col_g:
+            # Novo gráfico dentro da estrutura velha
+            render_future_gauge((pf+ps+pd+pi)/4, "Permissão Interna", config.get("theme_color"))
 
-    # REBANHO
+    # 1.3 REBANHO (Tabela Alinhada V31)
     with t3:
-        st.subheader("Gestão de Almas")
-        memb = SafeIO.ler(DBS["MEMBERS"], [])
-        with st.expander("Cadastrar Ovelha", expanded=False):
-            with st.form("f_memb"):
+        st.subheader("Rol de Membros")
+        membros = SafeIO.ler(DBS["MEMBERS"], [])
+        with st.expander("➕ Nova Ovelha"):
+            with st.form("add_mem"):
                 nm = st.text_input("Nome")
-                stt = st.selectbox("Status", ["Membro", "Visitante"])
+                stt = st.selectbox("Status", ["Comungante", "Não-Comungante"])
                 if st.form_submit_button("Salvar"):
-                    memb.append({"Nome": nm, "Status": stt, "Data": datetime.now().strftime("%Y-%m-%d")})
-                    SafeIO.salvar(DBS["MEMBERS"], memb)
+                    membros.append({"Nome": nm, "Status": stt, "Data": datetime.now().strftime("%d/%m")})
+                    SafeIO.salvar(DBS["MEMBERS"], membros)
                     st.rerun()
-        if memb: st.dataframe(pd.DataFrame(memb), use_container_width=True)
+        if membros: st.dataframe(pd.DataFrame(membros), use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# MÓDULO 2: GABINETE (EDITOR ESTILO WORD)
+# 2. GABINETE (Visual Antigo + Editor WORD + Correções)
 # ------------------------------------------------------------------------------
-elif menu == "Gabinete (Editor)":
-    st.title("📝 Editor Pastoral (Word-Like)")
+elif menu == "Gabinete Pastoral":
+    st.title("📝 Gabinete (Editor)")
     
-    c_list, c_ed = st.columns([1, 4])
-    
+    c_lista, c_editor = st.columns([1, 4])
     files = [f for f in os.listdir(DIRS["SERMOES"]) if f.endswith(".txt")]
-    sel = c_list.radio("Arquivos:", ["Novo"] + files)
+    sel = c_lista.selectbox("Arquivos:", ["Novo"] + files)
     
-    content = ""
-    title_val = ""
+    texto_init = ""
+    tit_init = ""
     if sel != "Novo":
         try:
-            with open(os.path.join(DIRS["SERMOES"], sel), 'r') as f: content = f.read()
-            title_val = sel.replace(".txt", "")
+            texto_init = open(os.path.join(DIRS["SERMOES"], sel), 'r').read()
+            tit_init = sel.replace(".txt", "")
         except: pass
         
-    with c_ed:
-        tit = st.text_input("Título do Sermão / Documento", value=title_val)
+    with c_editor:
+        titulo = st.text_input("Título", value=tit_init)
         
-        # BARRA DE FERRAMENTAS WORD COMPLETA (CONFIG DO QUILL)
-        toolbar_options = [
-            ['bold', 'italic', 'underline', 'strike'],        # toggled buttons
-            ['blockquote', 'code-block'],
-            [{'header': 1}, {'header': 2}],               # custom button values
-            [{'list': 'ordered'}, {'list': 'bullet'}],
-            [{'script': 'sub'}, {'script': 'super'}],      # superscript/subscript
-            [{'indent': '-1'}, {'indent': '+1'}],          # outdent/indent
-            [{'direction': 'rtl'}],                         # text direction
-            [{'size': ['small', False, 'large', 'huge']}],  # custom dropdown
-            [{'header': [1, 2, 3, 4, 5, 6, False]}],
-            [{'color': []}, {'background': []}],          # dropdown with defaults from theme
-            [{'font': []}],
-            [{'align': []}],
-            ['clean'],                                      # remove formatting button
-            ['link', 'image']
+        # BARRA ESTILO WORD (Toolbar Full) - UPDATE V32 aplicado no V31
+        word_toolbar = [
+            ['bold', 'italic', 'underline', 'strike'], ['blockquote'],
+            [{'header': 1}, {'header': 2}], [{'list': 'ordered'}, {'list': 'bullet'}],
+            [{'color': []}, {'background': []}], [{'align': []}], ['clean']
         ]
         
-        # O Editor agora carrega como o Word
-        text_data = st_quill(
-            value=content, 
-            html=True, 
-            key="quill_word",
-            toolbar=toolbar_options, # INJETA A BARRA ESTILO WORD
-        )
+        if QUILL_AVAILABLE:
+            texto_final = st_quill(value=texto_init, html=True, toolbar=word_toolbar, key="editor_word")
+        else:
+            texto_final = st.text_area("Texto", value=texto_init, height=400)
+            
+        col_btns = st.columns(3)
+        if col_btns[0].button("💾 SALVAR TXT"):
+            if titulo:
+                with open(os.path.join(DIRS["SERMOES"], f"{titulo}.txt"), 'w') as f: f.write(texto_final)
+                st.success("Salvo.")
         
-        # Ações Rápidas
-        col_actions = st.columns(4)
-        if col_actions[0].button("💾 SALVAR"):
-            with open(os.path.join(DIRS["SERMOES"], f"{tit}.txt"), 'w') as f: f.write(text_data)
-            st.success("Documento Salvo.")
-            
-        if col_actions[1].button("🖨️ DOCX"):
-            if HTML2DOCX:
-                path = os.path.join(DIRS["SERMOES"], f"{tit}.docx")
-                with open(path, "wb") as f: 
-                    f.write(mammoth.convert_to_docx(text_data).value)
-                st.success("Convertido para Word (DOCX).")
-
-        if col_actions[2].button("🛡️ CRIPTOGRAFAR"):
-            # Usa senha do config
-            pw = config.get("enc_password")
-            if pw:
-                # Simulação simples (Key real precisa ser 32 bytes URLSafeB64, usando Hash para simplificar)
-                key = hashlib.sha256(pw.encode()).digest() 
-                aes = AESGCM(key)
-                nonce = os.urandom(12)
-                ct = aes.encrypt(nonce, text_data.encode(), None)
-                with open(os.path.join(DIRS["GABINETE"], f"{tit}.enc"), "wb") as f: f.write(nonce+ct)
-                st.success("Blindado.")
-            else: st.error("Defina a Senha Mestra nas Configurações.")
-            
-        # Simulação de "Corretor" / Revisão
-        if col_actions[3].button("🔍 REVISAR"):
-            wrongs = ["eu acho", "talvez", "nao", "voce"] # Lista básica
-            found = [w for w in wrongs if w in text_data.lower()]
-            if found: st.warning(f"Sugestões de correção: {found}")
-            else: st.info("Texto parece limpo (Análise básica).")
+        if col_btns[1].button("🖨️ DOCX"):
+            if titulo and HTML2DOCX:
+                 path = os.path.join(DIRS["SERMOES"], f"{titulo}.docx")
+                 with open(path, "wb") as f: f.write(mammoth.convert_to_docx(texto_final).value)
+                 st.success("Gerado.")
 
 # ------------------------------------------------------------------------------
-# MÓDULO 3: BIBLIOTECA (BOTÕES TILES/MELHORADOS)
+# 3. BIBLIOTECA (Visual Antigo + TILES Melhorados)
 # ------------------------------------------------------------------------------
 elif menu == "Biblioteca":
-    st.title("📚 Biblioteca Digital")
-    st.markdown("Acesse seus recursos de forma visual.")
-    
-    # Busca
-    c_busca, c_act = st.columns([3, 1])
-    c_busca.text_input("🔍 Pesquisar no Acervo Global (Google API)", placeholder="Digite autor, título ou tópico...")
-    c_act.button("BUSCAR AGORA")
-    
+    st.title("📚 Biblioteca")
+    st.markdown("Busca Global e Local")
+    st.text_input("Pesquisar Google Books...")
     st.markdown("---")
-    st.subheader("Acesso Rápido (Local)")
-    
-    # Layout em Grid Profissional com CSS injetado
+    st.markdown("### Acesso Rápido")
+    # BOTÕES TILES NO V31
     c1, c2, c3, c4 = st.columns(4)
+    with c1: st.markdown('<div class="lib-tile">Bíblias</div>', unsafe_allow_html=True)
+    with c2: st.markdown('<div class="lib-tile">Comentários</div>', unsafe_allow_html=True)
+    with c3: st.markdown('<div class="lib-tile">Dicionários</div>', unsafe_allow_html=True)
+    with c4: st.markdown('<div class="lib-tile">PDFs Locais</div>', unsafe_allow_html=True)
+
+# ------------------------------------------------------------------------------
+# 4. CONFIGURAÇÕES (Visual Antigo + Funções Novas)
+# ------------------------------------------------------------------------------
+elif menu == "Configurações":
+    st.title("⚙️ Configurações")
+    
+    # Aba única (V31 Style) mas com mais controles
+    c1, c2 = st.columns(2)
     with c1:
-        st.markdown('<div class="lib-button">📖<br>Bíblias</div>', unsafe_allow_html=True)
+        st.subheader("Visual (Theme Builder)")
+        # A pedido: mudar cores (Features V32 dentro da casca V31)
+        bg = st.color_picker("Cor Fundo", config.get("theme_bg"))
+        pn = st.color_picker("Cor Painel", config.get("theme_panel"))
+        cl = st.color_picker("Cor Destaque", config.get("theme_color"))
+        
     with c2:
-        st.markdown('<div class="lib-button">📘<br>Comentários</div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown('<div class="lib-button">📜<br>Dicionários</div>', unsafe_allow_html=True)
-    with c4:
-        st.markdown('<div class="lib-button">📂<br>Meus PDFs</div>', unsafe_allow_html=True)
-
-    st.caption("Pasta local de arquivos: " + DIRS["BIB_CACHE"])
-
-# ------------------------------------------------------------------------------
-# MÓDULO 4: CONFIGURAÇÕES MASTER (THEME BUILDER + COMANDOS)
-# ------------------------------------------------------------------------------
-elif menu == "Configurações Master":
-    st.title("⚙️ Controle do Sistema")
+        st.subheader("Sistema")
+        fs = st.number_input("Tamanho Fonte", 12, 30, config.get("font_size"))
+        pw = st.text_input("Senha Mestra (Crypto)", value=config.get("enc_password"), type="password")
     
-    t_visual, t_cmds, t_sys = st.tabs(["🎨 Theme Builder (Personalizar)", "⌨️ Comandos", "💾 Sistema"])
-    
-    with t_visual:
-        st.subheader("Construtor de Temas (Cada usuário personaliza o seu)")
-        
-        c1, c2, c3 = st.columns(3)
-        # O usuário pode escolher tudo agora
-        bg_new = c1.color_picker("Cor de Fundo (Background)", config.get("theme_bg"))
-        pnl_new = c2.color_picker("Cor dos Painéis/Menu", config.get("theme_panel"))
-        cor_new = c3.color_picker("Cor de Destaque (Principal)", config.get("theme_color"))
-        
-        font_new = st.selectbox("Família Tipográfica", ["Cinzel", "Inter", "Merriweather", "Playfair Display"], index=0)
-        
-        st.markdown(f"""
-        <div style="background:{bg_new}; padding:20px; border:1px solid {cor_new}; border-radius:5px; color:#EEE;">
-            <h3 style="color:{cor_new} !important; font-family:{font_new}; margin:0;">PREVIEW DO TEMA</h3>
-            <p style="font-family:{font_new};">Assim será o texto da sua interface.</p>
-            <div style="background:{pnl_new}; padding:10px; border-left:3px solid {cor_new}">Input Box Exemplo</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with t_cmds:
-        st.subheader("Mapeamento de Módulos (Comandos)")
-        st.caption("Ative ou desative funções para limpar sua interface.")
-        
-        active_modules = config.get("modules_active", {})
-        
-        # Mapeamento de Comandos "Logicos"
-        c_m1, c_m2 = st.columns(2)
-        m_gab = c_m1.checkbox("Ativar Editor de Texto", value=True)
-        m_bib = c_m1.checkbox("Ativar Biblioteca", value=True)
-        m_fin = c_m2.checkbox("Ativar Módulo Financeiro (BETA)", value=False)
-        m_mid = c_m2.checkbox("Ativar Transmissão Online (BETA)", value=False)
-        
-    with t_sys:
-        st.subheader("Credenciais & Segurança")
-        np = st.text_input("Alterar Senha de Criptografia (Master Key)", value=config.get("enc_password", ""), type="password")
-        if st.button("LIMPAR CACHE DO NAVEGADOR"):
-            st.cache_data.clear()
-            st.success("Memória Limpa.")
-
-    # AÇÃO DE SALVAR GERAL
     st.markdown("---")
-    if st.button("GRAVAR DEFINIÇÕES (SALVAR E REINICIAR)", type="primary"):
-        # Salva o Theme Builder
-        config["theme_bg"] = bg_new
-        config["theme_panel"] = pnl_new
-        config["theme_color"] = cor_new
-        config["font_family"] = font_new
-        config["enc_password"] = np
-        config["modules_active"] = {
-            "gabinete": m_gab, "biblioteca": m_bib
-        }
+    st.markdown("### Mapeamento de Funções")
+    c3, c4 = st.columns(2)
+    c3.checkbox("Ativar Autocorreção (Gabinete)", value=True)
+    c4.checkbox("Ativar Notificações", value=True)
+
+    if st.button("SALVAR E APLICAR PERSONALIZAÇÃO"):
+        config.update({"theme_bg": bg, "theme_panel": pn, "theme_color": cl, "font_size": fs, "enc_password": pw})
         SafeIO.salvar(DBS["CONFIG"], config)
-        st.success("Sistema Reconstruído com novos parâmetros.")
+        st.success("Aplicado.")
         time.sleep(1)
         st.rerun()

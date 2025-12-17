@@ -1,0 +1,30 @@
+[2025-12-05 10:02:44] | [INFO] | MODULE: app | PROCESS: 13228 | MSG: >>> INICIALIZAÇÃO DO SISTEMA OMEGA: CICLO STARTUP <<<
+[2025-12-05 10:02:44] | [WARNING] | MODULE: app | PROCESS: 13228 | MSG: Dependência Falhou: CKEditor (No module named 'streamlit_ckeditor')
+[2025-12-05 10:02:44] | [WARNING] | MODULE: app | PROCESS: 13228 | MSG: Dependência Falhou: Quill (No module named 'streamlit_quill')
+[2025-12-05 10:02:44] | [WARNING] | MODULE: app | PROCESS: 13228 | MSG: Dependência Falhou: Plotly (No module named 'plotly')
+[2025-12-05 10:02:44] | [WARNING] | MODULE: app | PROCESS: 13228 | MSG: Dependência Falhou: Cryptography (No module named 'cryptography')
+[2025-12-05 10:02:44] | [INFO] | MODULE: core | PROCESS: 13228 | MSG: Genesis: checagem de integridade iniciada.
+[2025-12-05 10:02:50] | [INFO] | MODULE: app | PROCESS: 27008 | MSG: >>> INICIALIZAÇÃO DO SISTEMA OMEGA: CICLO STARTUP <<<
+[2025-12-05 10:02:50] | [WARNING] | MODULE: app | PROCESS: 27008 | MSG: Dependência Falhou: CKEditor (No module named 'streamlit_ckeditor')
+[2025-12-05 10:02:50] | [WARNING] | MODULE: app | PROCESS: 27008 | MSG: Dependência Falhou: Quill (No module named 'streamlit_quill')
+[2025-12-05 10:02:50] | [WARNING] | MODULE: app | PROCESS: 27008 | MSG: Dependência Falhou: Plotly (No module named 'plotly')
+[2025-12-05 10:02:50] | [WARNING] | MODULE: app | PROCESS: 27008 | MSG: Dependência Falhou: Cryptography (No module named 'cryptography')
+[2025-12-05 10:02:50] | [INFO] | MODULE: core | PROCESS: 27008 | MSG: Genesis: checagem de integridade iniciada.
+[2025-12-05 10:02:52] | [INFO] | MODULE: app | PROCESS: 34480 | MSG: >>> INICIALIZAÇÃO DO SISTEMA OMEGA: CICLO STARTUP <<<
+[2025-12-05 10:02:52] | [WARNING] | MODULE: app | PROCESS: 34480 | MSG: Dependência Falhou: CKEditor (No module named 'streamlit_ckeditor')
+[2025-12-05 10:02:52] | [WARNING] | MODULE: app | PROCESS: 34480 | MSG: Dependência Falhou: Quill (No module named 'streamlit_quill')
+[2025-12-05 10:02:52] | [WARNING] | MODULE: app | PROCESS: 34480 | MSG: Dependência Falhou: Plotly (No module named 'plotly')
+[2025-12-05 10:02:52] | [WARNING] | MODULE: app | PROCESS: 34480 | MSG: Dependência Falhou: Cryptography (No module named 'cryptography')
+[2025-12-05 10:02:52] | [INFO] | MODULE: core | PROCESS: 34480 | MSG: Genesis: checagem de integridade iniciada.
+[2025-12-05 10:04:23] | [INFO] | MODULE: app | PROCESS: 9616 | MSG: >>> INICIALIZAÇÃO DO SISTEMA OMEGA: CICLO STARTUP <<<
+[2025-12-05 10:04:23] | [WARNING] | MODULE: app | PROCESS: 9616 | MSG: Dependência Falhou: CKEditor (No module named 'streamlit_ckeditor')
+[2025-12-05 10:04:23] | [WARNING] | MODULE: app | PROCESS: 9616 | MSG: Dependência Falhou: Quill (No module named 'streamlit_quill')
+[2025-12-05 10:04:23] | [WARNING] | MODULE: app | PROCESS: 9616 | MSG: Dependência Falhou: Plotly (No module named 'plotly')
+[2025-12-05 10:04:23] | [WARNING] | MODULE: app | PROCESS: 9616 | MSG: Dependência Falhou: Cryptography (No module named 'cryptography')
+[2025-12-05 10:04:23] | [INFO] | MODULE: core | PROCESS: 9616 | MSG: Genesis: checagem de integridade iniciada.
+[2025-12-05 10:04:45] | [INFO] | MODULE: app | PROCESS: 23624 | MSG: >>> INICIALIZAÇÃO DO SISTEMA OMEGA: CICLO STARTUP <<<
+[2025-12-05 10:04:45] | [WARNING] | MODULE: app | PROCESS: 23624 | MSG: Dependência Falhou: CKEditor (No module named 'streamlit_ckeditor')
+[2025-12-05 10:04:45] | [WARNING] | MODULE: app | PROCESS: 23624 | MSG: Dependência Falhou: Quill (No module named 'streamlit_quill')
+[2025-12-05 10:04:45] | [WARNING] | MODULE: app | PROCESS: 23624 | MSG: Dependência Falhou: Plotly (No module named 'plotly')
+[2025-12-05 10:04:45] | [WARNING] | MODULE: app | PROCESS: 23624 | MSG: Dependência Falhou: Cryptography (No module named 'cryptography')
+[2025-12-05 10:04:45] | [INFO] | MODULE: core | PROCESS: 23624 | MSG: Genesis: checagem de integridade iniciada.

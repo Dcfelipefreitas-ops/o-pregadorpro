@@ -1,0 +1,15 @@
+{
+    "theme_color": "#D4AF37",
+    "theme_mode": "Dark Cathedral",
+    "font_family": "Inter",
+    "security_level": "High",
+    "backup_frequency": "Daily",
+    "module_active_word": true,
+    "module_active_network": true,
+    "rotina_pastoral": [
+        "Oração Inicial (30 min)",
+        "Leitura Bíblica Devocional",
+        "Estudo Teológico",
+        "Gestão Eclesiástica"
+    ]
+}

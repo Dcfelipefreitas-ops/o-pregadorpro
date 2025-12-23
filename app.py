@@ -164,6 +164,7 @@ if "current_user" not in st.session_state:
 # ==============================================================================
 def create_account(username, password):
     username = username.upper().strip()
+
     if not username or not password:
         return False, "Usuário e senha obrigatórios."
 
@@ -179,6 +180,13 @@ def create_account(username, password):
         "role": "PASTOR",
         "active": True
     }
+
+    _write_json_atomic(db, users)
+    IDENTITY_CORE.load(username)
+
+    logging.info(f"Conta criada com sucesso: {username}")
+    return True, "Conta criada com sucesso."
+
 
     _write_json_atomic(db, users)
     IDENTITY_CORE.load(username)

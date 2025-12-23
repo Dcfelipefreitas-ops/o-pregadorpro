@@ -12,6 +12,17 @@ import streamlit as st
 import os, sys, time, json, base64, math, shutil, random, logging, hashlib, re, sqlite3, uuid
 from datetime import datetime, timedelta
 from io import BytesIO
+# ==============================================================================
+# BLINDAGEM DE BANCO DE USUÁRIOS (ANTI-KeyError)
+# ==============================================================================
+if "USERS" not in DB_FILES:
+    USERS_DB_PATH = os.path.join(SYSTEM_ROOT, "db", "users.json")
+    os.makedirs(os.path.dirname(USERS_DB_PATH), exist_ok=True)
+    DB_FILES["USERS"] = USERS_DB_PATH
+
+    if not os.path.exists(USERS_DB_PATH):
+        _write_json_atomic(USERS_DB_PATH, {})
+        logging.warning("DB_FILES['USERS'] não existia. Criado automaticamente.")
 
 # ==============================================================================
 # 01. INJEÇÃO VISUAL (MANTIDA)

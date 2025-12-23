@@ -148,23 +148,70 @@ if "session_valid" not in st.session_state:
     st.session_state["session_valid"] = False
 if "current_user" not in st.session_state:
     st.session_state["current_user"] = "GUEST"
+# ==============================================================================
+# AUTH EXTENSION – REGISTRO DE USUÁRIO (ROBUSTO)
+# ==============================================================================
+def create_account(username, password):
+    username = username.upper().strip()
+    if not username or not password:
+        return False, "Usuário e senha obrigatórios."
+
+    db = DB_FILES["USERS"]
+    users = _read_json_safe(db, default={})
+
+    if username in users:
+        return False, "Usuário já existe."
+
+    users[username] = {
+        "password": hashlib.sha256(password.encode()).hexdigest(),
+        "created": datetime.utcnow().isoformat(),
+        "role": "PASTOR",
+        "active": True
+    }
+
+    _write_json_atomic(db, users)
+    IDENTITY_CORE.load(username)
+    logging.info(f"Conta criada: {username}")
+    return True, "Conta criada com sucesso."
 
 # ==============================================================================
-# 09. LOGIN (INALTERADO)
+# 09. LOGIN + CRIAÇÃO DE CONTA (COMPLETO)
 # ==============================================================================
 if not st.session_state["session_valid"]:
     st.title("O PREGADOR – Acesso Seguro")
-    u = st.text_input("Usuário")
-    p = st.text_input("Senha", type="password")
-    if st.button("ENTRAR"):
-        if AccessGate.login_check(u, p):
-            st.session_state["session_valid"] = True
-            st.session_state["current_user"] = u.upper()
-            IDENTITY_CORE.load(u.upper())
-            st.rerun()
-        else:
-            st.error("Credenciais inválidas.")
+
+    tab_login, tab_register = st.tabs(["🔐 Entrar", "🆕 Criar Conta"])
+
+    with tab_login:
+        u = st.text_input("Usuário", key="login_user")
+        p = st.text_input("Senha", type="password", key="login_pass")
+
+        if st.button("ENTRAR"):
+            if AccessGate.login_check(u, p):
+                st.session_state["session_valid"] = True
+                st.session_state["current_user"] = u.upper()
+                IDENTITY_CORE.load(u.upper())
+                st.rerun()
+            else:
+                st.error("Usuário ou senha inválidos.")
+
+    with tab_register:
+        nu = st.text_input("Novo Usuário")
+        np = st.text_input("Nova Senha", type="password")
+        np2 = st.text_input("Confirmar Senha", type="password")
+
+        if st.button("CRIAR CONTA"):
+            if np != np2:
+                st.error("As senhas não conferem.")
+            else:
+                ok, msg = create_account(nu, np)
+                if ok:
+                    st.success(msg)
+                else:
+                    st.error(msg)
+
     st.stop()
+
 
 # ==============================================================================
 # 10. SIDEBAR

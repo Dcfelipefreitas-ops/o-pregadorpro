@@ -14,7 +14,42 @@
 #  7. UX/UI RENDERER: Motor gráfico com animações CSS (Pulsing Cross).         #
 ################################################################################
 """
+def inject_word_style():
+    st.markdown("""
+        <style>
+            /* Expande o layout para quase 100% da tela */
+            .main .block-container {
+                max-width: 98% !important;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+                padding-top: 1rem !important;
+            }
+            
+            /* Estilização do Editor para parecer uma folha de papel */
+            .ck-editor__editable {
+                min-height: 700px !important;
+                background-color: white !important;
+                color: black !important;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1) !important;
+                margin: 0 auto !important;
+            }
 
+            /* Ajuste para Mobile */
+            @media (max-width: 768px) {
+                .main .block-container {
+                    padding-left: 0.5rem !important;
+                    padding-right: 0.5rem !important;
+                }
+                .stButton button {
+                    width: 100% !important;
+                    margin-bottom: 5px;
+                }
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+# Chame a função logo após o início
+inject_word_style()
 # ==============================================================================
 # 00. IMPORTAÇÕES DE MÓDULOS DE SISTEMA
 # ==============================================================================
@@ -377,12 +412,25 @@ if app_mode == "Dashboard & Cuidado":
 
 elif app_mode == "Gabinete de Preparação":
     st.title("📝 Gabinete Pastoral Avançado")
-    col_nav, col_work = st.columns([1, 4])
+    
+    # Layout Proporcional: Coluna de arquivos menor (2), Editor maior (10)
+    col_nav, col_work = st.columns([1.5, 8.5])
+    
     with col_nav:
-        st.markdown("**🗂️ Arquivos**")
+        st.markdown("### 🗂️ Acervo")
         all_files = [f for f in os.listdir(DIRECTORY_STRUCTURE["SERMONS"]) if f.endswith(".html")]
         all_files.sort(reverse=True)
-        selected_file = st.radio("Acervo", ["NOVO DOCUMENTO"] + all_files)
+        # Selectbox economiza mais espaço no mobile que Radio
+        selected_file = st.selectbox("Escolher Documento", ["NOVO DOCUMENTO"] + all_files)
+        
+        st.divider()
+        st.markdown("### 🛠️ Ações")
+        # Botões de ação movidos para a lateral para liberar espaço vertical no editor
+        c_save = st.container()
+        c_word = st.container()
+        c_pdf = st.container()
+        c_scan = st.container()
+
     with col_work:
         active_content = ""
         active_title = ""
@@ -395,9 +443,78 @@ elif app_mode == "Gabinete de Preparação":
             except Exception as e:
                 st.error(f"Erro de I/O: {e}")
 
-        doc_title_input = st.text_input("TÍTULO DA MENSAGEM / ESTUDO", value=active_title)
+        doc_title_input = st.text_input("TÍTULO DA MENSAGEM", value=active_title, placeholder="Ex: O Sermão do Monte")
+        
+        # --- ÁREA DO EDITOR ESTILO WORD ---
         final_editor_content = active_content
 
+        if GLOBAL_MODULES.get("CKEDITOR"):
+            # Configuração expandida do CKEditor
+            custom_config = {
+                'toolbar': [
+                    ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable'],
+                    ['undo', 'redo', '|', 'alignment', 'fontColor', 'fontSize', 'highlight']
+                ],
+                'height': 700, # Aumentado para parecer uma folha
+                'width': '100%'
+            }
+            final_editor_content = st_ckeditor(
+                value=active_content, 
+                key="ck_editor_core", 
+                config=custom_config
+            )
+        elif GLOBAL_MODULES.get("QUILL"):
+            final_editor_content = st_quill(
+                value=active_content, 
+                html=True, 
+                key="quill_editor_core",
+                height=700
+            )
+        else:
+            st.warning("Usando modo Texto Simples (Editores Visuais Indisponíveis)")
+            final_editor_content = st.text_area("Editor", value=active_content, height=700)
+
+        # Processamento de Dados (Lógica original preservada)
+        clean_fname = TextUtils.sanitize_filename(doc_title_input if doc_title_input else "novo_sermao")
+
+        with c_save:
+            if st.button("💾 GRAVAR AGORA", use_container_width=True, type="primary"):
+                save_path = os.path.join(DIRECTORY_STRUCTURE["SERMONS"], f"{clean_fname}.html")
+                with open(save_path, "w", encoding="utf-8") as f:
+                    f.write(final_editor_content)
+                st.toast("Documento salvo!", icon="✅")
+                time.sleep(1)
+                st.rerun()
+
+        with c_word:
+            if st.button("📄 GERAR WORD (.docx)", use_container_width=True):
+                out_path = os.path.join(DIRECTORY_STRUCTURE["SERMONS"], f"{clean_fname}.docx")
+                processor = WordProcessorEngine(title=doc_title_input, content_html=final_editor_content, output_path=out_path)
+                with st.spinner("Compilando..."):
+                    status, msg = processor.execute_docx_export()
+                if status:
+                    st.success("Word Gerado!")
+                    with open(out_path, "rb") as f:
+                        st.download_button("BAIXAR DOCX", f, file_name=f"{clean_fname}.docx", use_container_width=True)
+
+        with c_pdf:
+            if st.button("📕 GERAR PDF", use_container_width=True):
+                out_path = os.path.join(DIRECTORY_STRUCTURE["SERMONS"], f"{clean_fname}.pdf")
+                processor = WordProcessorEngine(title=doc_title_input, content_html=final_editor_content, output_path=out_path)
+                with st.spinner("Renderizando..."):
+                    status, msg = processor.execute_pdf_export()
+                if status:
+                    st.success("PDF Pronto!")
+                    with open(out_path, "rb") as f:
+                        st.download_button("BAIXAR PDF", f, file_name=f"{clean_fname}.pdf", use_container_width=True)
+
+        with c_scan:
+            if st.button("🔍 SCAN DOUTRINÁRIO", use_container_width=True):
+                alerts = GenevaDoctrineCore.scan(final_editor_content)
+                if alerts:
+                    for a in alerts: st.error(a)
+                else:
+                    st.success("Doutrina íntegra.")
         if GLOBAL_MODULES.get("CKEDITOR"):
             final_editor_content = st_ckeditor(value=active_content, key="ck_editor_core", height=600)
         elif GLOBAL_MODULES.get("QUILL"):

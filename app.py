@@ -1,63 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-===============================================================================
- O PREGADOR | SYSTEM OMEGA – ACESSO LIVRE (COMPLETO COM CUIDADO AUDIODIGITAL)
-===============================================================================
-"""
-
-import os
-
-# Create directory structure for simulation and ensuring modules exist
-os.makedirs("app_modules", exist_ok=True)
-
-# Create a mock core.py to ensure the imports don't crash
-with open("app_modules/core.py", "w", encoding="utf-8") as f:
-    f.write('''
-import os
-import json
-
-DB_FILES = {}
-DIRECTORY_STRUCTURE = {}
-
-def genesis_filesystem_integrity_check():
-    pass
-
-def _write_json_atomic(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f)
-''')
-
-# Create a mock visual.py
-with open("app_modules/visual.py", "w", encoding="utf-8") as f:
-    f.write('''
-def inject_visual_core():
-    pass
-''')
-
-# Create a mock dashboard.py
-with open("app_modules/dashboard.py", "w", encoding="utf-8") as f:
-    f.write('''
-import streamlit as st
-def render_dashboard():
-    st.subheader("📊 Painel Geral de Monitoramento Pastoral")
-    st.info("Módulo integrado com sucesso. Exibindo dados consolidados da igreja.")
-''')
-
-print("Mock modules created successfully.")
-
-
-
-```text
-Mock modules created successfully.
-
-
-```
-
-Aqui está o código-fonte completo e unificado do seu arquivo principal.
-
-Esta versão traz **toda a estrutura anterior corrigida** (sem os travamentos de concorrência, com persistência veloz via `st.session_state` e proteção de rotas) combinada com a nova **Central do Pastor de Cuidado Audiodigital e Acessibilidade**.
-
-O sistema foi preparado para ser totalmente funcional, com abas interativas para gerenciar os membros que precisam de suporte por áudio, publicar devocionais e disparar os alertas personalizados baseados no perfil de leitura de cada um.
 
 ```python
 # -*- coding: utf-8 -*-
@@ -220,7 +160,7 @@ if "current_user" not in st.session_state:
     st.session_state["current_user"] = DEFAULT_USER
     st.session_state["user_data"] = st.session_state["identity_core"].load(DEFAULT_USER)
 
-# Inicializa o banco de dados de Membros na memória do app (Seasons State)
+# Inicializa o banco de dados de Membros na memória do app (Session State)
 if "membros_igreja" not in st.session_state:
     st.session_state["membros_igreja"] = [
         {"nome": "Maria José", "contato": "maria@email.com", "tipo_alerta": "E-mail", "preferencia": "Apenas Áudio (Não lê)", "historico_escuta": 14},
@@ -295,7 +235,7 @@ elif "Gabinete" in app_mode:
             """
             <div class='pastoral-card'>
                 <h4>Gabinete de Estudos</h4>
-                <p>O ecossistema está operando em modo de contingência local ativa. Suas digitações estão protegidas contra quedas de conexão.</p>
+                <p>O ecossistema está operando em modo de contingência local activa. Suas digitações estão protegidas contra quedas de conexão.</p>
             </div>
             """, 
             unsafe_allow_html=True
@@ -351,9 +291,9 @@ elif "Rede Ministerial" in app_mode:
                     destino = membro["contato"]
                     
                     if membro["preferencia"] == "Apenas Áudio (Não lê)":
-                        msg = f"Olá {nome}! O Pastor gravou uma mensagem em áudio muito especial pra você hoje. Não precisa ler nada, é só apertar o play no azulzinho para escutar o Pastor: [Link do App]"
+                        msg = f"Olá {nome}! O Pastor gravou uma mensagem em áudio muito especial pra você hoje. Não precisa ler nada, é só abrir o app para escutar o Pastor."
                     else:
-                        msg = f"Olá {nome}, a nova mensagem bíblica '{titulo_audio}' ({ref_biblica}) já está pronta em texto e áudio! Acompanhe aqui: [Link do App]"
+                        msg = f"Olá {nome}, a nova mensagem bíblica '{titulo_audio}' ({ref_biblica}) já está pronta em texto e áudio! Acompanhe no app!"
                         
                     st.write(f"🟢 **Disparado via {canal} para {nome} ({destino}):** *\"{msg}\"*")
                 st.balloons()

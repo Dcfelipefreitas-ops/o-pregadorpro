@@ -1,8 +1,3 @@
-Aqui está o código limpo, puro e formatado do jeito exato que o arquivo de código precisa ser.
-
-Pode copiar tudo o que está no bloco abaixo e colar por cima de todo o conteúdo do seu arquivo `app.py`. Não se preocupe, este bloco abaixo foi configurado para que o seu editor ignore as marcações visuais e copie apenas o texto do Python.
-
-```python
 # -*- coding: utf-8 -*-
 """
 ===============================================================================
@@ -385,11 +380,9 @@ elif "Configurações" in app_mode:
     if st.button("Salvar Configurações Globais", type="primary"):
         st.session_state['user_data']['tradition'] = nova_tradicao
         st.session_state["identity_core"].save(st.session_state['current_user'], st.session_state['user_data'])
-        st.success("Configurações atualizadas e gravadas com atomicidade no disco local!")
+        st.success("Configurações updated e gravadas com atomicidade no disco local!")
         st.rerun()
 
 # ==============================================================================
 # FIM DO SISTEMA
 # ==============================================================================
-
-```

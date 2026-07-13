@@ -6,9 +6,6 @@
 """
 
 import os
-...
-```python
-import os
 
 # Create directory structure for simulation and ensuring modules exist
 os.makedirs("app_modules", exist_ok=True)

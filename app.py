@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===============================================================================
- O PREGADOR | SYSTEM OMEGA – BUILD ESTÁVEL (LOGIN + REGISTRO FUNCIONAL)
+ O PREGADOR | SYSTEM OMEGA – ACESSO LIVRE (SEM LOGIN / SEM SENHA)
 ===============================================================================
 """
 
@@ -10,12 +10,9 @@
 # ==============================================================================
 import streamlit as st
 import os
-import sys
 import json
-import time
-import hashlib
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ==============================================================================
 # 01. CONFIGURAÇÃO DA PÁGINA (VISUAL INALTERADO)
@@ -26,6 +23,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
 
 def inject_word_style():
     st.markdown("""
@@ -38,6 +36,7 @@ def inject_word_style():
         }
     </style>
     """, unsafe_allow_html=True)
+
 
 inject_word_style()
 
@@ -59,15 +58,18 @@ logging.basicConfig(
 # ==============================================================================
 # 03. IMPORTAÇÃO DOS MÓDULOS DO SISTEMA (ORDEM CORRETA)
 # ==============================================================================
+# OBS: estes módulos (app_modules/core.py, visual.py, dashboard.py) não foram
+# enviados nesta conversa, então não pude revisar o conteúdo deles. O import
+# de "AccessGate" foi removido abaixo porque o login deixou de existir — se
+# app_modules/auth.py só era usado para isso, ele nem precisa mais ser
+# importado aqui.
 from app_modules.core import (
     genesis_filesystem_integrity_check,
     DB_FILES,
     _read_json_safe,
     _write_json_atomic,
-    DIRECTORY_STRUCTURE
+    DIRECTORY_STRUCTURE,
 )
-
-from app_modules.auth import AccessGate
 from app_modules.visual import inject_visual_core
 from app_modules import dashboard as dashboard_module
 
@@ -101,103 +103,45 @@ class SpiritualIdentity:
     def load(self, user):
         f = os.path.join(self.PATH, f"{user}.json")
         if os.path.exists(f):
-            return json.load(open(f, "r", encoding="utf-8"))
+            # CORREÇÃO: abrir o arquivo com "with" para garantir que ele
+            # seja fechado corretamente (antes o handle ficava aberto).
+            with open(f, "r", encoding="utf-8") as fh:
+                return json.load(fh)
         data = {
             "user": user,
             "calling": "",
             "tradition": "Reformada",
-            "created": datetime.utcnow().isoformat(),
-            "history": []
+            # CORREÇÃO: datetime.utcnow() está depreciado a partir do
+            # Python 3.12. Usamos datetime.now(timezone.utc) no lugar.
+            "created": datetime.now(timezone.utc).isoformat(),
+            "history": [],
         }
         self.save(user, data)
         return data
 
     def save(self, user, data):
-        json.dump(
-            data,
-            open(os.path.join(self.PATH, f"{user}.json"), "w", encoding="utf-8"),
-            indent=2,
-            ensure_ascii=False
-        )
+        with open(
+            os.path.join(self.PATH, f"{user}.json"), "w", encoding="utf-8"
+        ) as fh:
+            json.dump(data, fh, indent=2, ensure_ascii=False)
+
 
 IDENTITY_CORE = SpiritualIdentity()
 
 # ==============================================================================
-# 07. CRIAÇÃO DE CONTA (FUNCIONAL)
+# 07. ACESSO LIVRE — SEM LOGIN, SEM SENHA
 # ==============================================================================
-def create_account(username, password):
-    username = username.upper().strip()
-
-    if not username or not password:
-        return False, "Usuário e senha obrigatórios."
-
-    users = _read_json_safe(DB_FILES["USERS"], default={})
-
-    if username in users:
-        return False, "Usuário já existe."
-
-    users[username] = {
-        "password": hashlib.sha256(password.encode()).hexdigest(),
-        "created": datetime.utcnow().isoformat(),
-        "active": True,
-        "role": "PASTOR"
-    }
-
-    _write_json_atomic(DB_FILES["USERS"], users)
-    IDENTITY_CORE.load(username)
-
-    logging.info(f"Conta criada: {username}")
-    return True, "Conta criada com sucesso."
-
-# ==============================================================================
-# 08. CONTROLE DE SESSÃO
-# ==============================================================================
-if "session_valid" not in st.session_state:
-    st.session_state["session_valid"] = False
+# Antes o sistema exigia login/registro com senha (hash sha256) antes de
+# liberar o app. Isso foi removido por completo. Agora o app entra direto
+# em um usuário padrão local, sem tela de autenticação.
+DEFAULT_USER = "PASTOR"
 
 if "current_user" not in st.session_state:
-    st.session_state["current_user"] = None
+    st.session_state["current_user"] = DEFAULT_USER
+    IDENTITY_CORE.load(DEFAULT_USER)
 
 # ==============================================================================
-# 09. LOGIN + REGISTRO (SEM ERRO)
-# ==============================================================================
-if not st.session_state["session_valid"]:
-    st.title("O PREGADOR – Acesso Seguro")
-
-    tab_login, tab_register = st.tabs(["🔐 Entrar", "🆕 Criar Conta"])
-
-    with tab_login:
-        u = st.text_input("Usuário")
-        p = st.text_input("Senha", type="password")
-
-        if st.button("ENTRAR"):
-            if AccessGate.login_check(u, p):
-                st.session_state["session_valid"] = True
-                st.session_state["current_user"] = u.upper()
-                IDENTITY_CORE.load(u.upper())
-                st.rerun()
-            else:
-                st.error("Usuário ou senha inválidos.")
-
-    with tab_register:
-        nu = st.text_input("Novo usuário")
-        np = st.text_input("Senha", type="password")
-        np2 = st.text_input("Confirmar senha", type="password")
-
-        if st.button("CRIAR CONTA"):
-            if np != np2:
-                st.error("As senhas não conferem.")
-            else:
-                ok, msg = create_account(nu, np)
-                if ok:
-                    st.success(msg)
-                else:
-                    st.error(msg)
-
-    st.stop()
-
-# ==============================================================================
-# 10. SIDEBAR
+# 08. SIDEBAR
 # ==============================================================================
 with st.sidebar:
     st.markdown(f"### Usuário\n**{st.session_state['current_user']}**")
@@ -208,12 +152,12 @@ with st.sidebar:
             "Gabinete de Preparação",
             "Rede Ministerial",
             "Biblioteca Digital",
-            "Configurações"
-        ]
+            "Configurações",
+        ],
     )
 
 # ==============================================================================
-# 11. ROTAS PRINCIPAIS
+# 09. ROTAS PRINCIPAIS
 # ==============================================================================
 if app_mode == "Dashboard & Cuidado":
     dashboard_module.render_dashboard()

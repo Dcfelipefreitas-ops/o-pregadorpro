@@ -1,3 +1,12 @@
+# -*- coding: utf-8 -*-
+"""
+===============================================================================
+ O PREGADOR | SYSTEM OMEGA – ACESSO LIVRE (COMPLETO COM CUIDADO AUDIODIGITAL)
+===============================================================================
+"""
+
+import os
+...
 ```python
 import os
 

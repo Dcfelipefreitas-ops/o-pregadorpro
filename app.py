@@ -46,7 +46,6 @@ def render_dashboard():
 print("Mock modules created successfully.")
 
 
-```
 
 ```text
 Mock modules created successfully.

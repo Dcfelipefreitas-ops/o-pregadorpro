@@ -47,6 +47,7 @@ def _write_json_atomic(path, data):
     except Exception as e:
         logging.error(f"Erro na escrita atômica {path}: {e}")
         return False
+        
 def _read_json_safe(path, default=None):
     if default is None: default = {}
     try:

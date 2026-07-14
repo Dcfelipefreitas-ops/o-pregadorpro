@@ -35,6 +35,7 @@ logging.basicConfig(
     format='[%(asctime)s] | [%(levelname)s] | MODULE: %(module)s | MSG: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
 def _write_json_atomic(path, data):
     temp_path = f"{path}.tmp.{uuid.uuid4().hex}"
     d = os.path.dirname(path)
@@ -93,7 +94,6 @@ def genesis_filesystem_integrity_check():
                 "Leitura Bíblica Devocional",
                 "Estudo Teológico",
                 "Gestão Eclesiástica"
-            ]
         }
         _write_json_atomic(DB_FILES["CONFIG"], default_config)
 

@@ -13,6 +13,7 @@ DIRECTORY_STRUCTURE = {
     "LIBRARY_CACHE": os.path.join(SYSTEM_ROOT, "BibliaCache"),
     "MEMBERSHIP": os.path.join(SYSTEM_ROOT, "Membresia"),
     "NETWORK_LAYER": os.path.join(SYSTEM_ROOT, "Rede_Ministerial")
+    "DISCIPULADO": os.path.join(SYSTEM_ROOT, "Discipulado") # Nova pasta
 }
 
 DB_FILES = {
@@ -22,6 +23,7 @@ DB_FILES = {
     "STATS_METRICS": os.path.join(DIRECTORY_STRUCTURE["USER_CONFIG"], "db_stats.json"),
     "MEMBERS_DB": os.path.join(DIRECTORY_STRUCTURE["MEMBERSHIP"], "members.json"),
     "NETWORK_FEED": os.path.join(DIRECTORY_STRUCTURE["NETWORK_LAYER"], "feed_data.json")
+     "DISCIPLES_DB": os.path.join(DIRECTORY_STRUCTURE["DISCIPULADO"], "discipulado.json") # Novo arquivo
 }
 
 if not os.path.exists(LOG_PATH):

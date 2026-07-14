@@ -148,7 +148,8 @@ class SpiritualIdentity:
 # Instanciação única protegida dentro do fluxo do Streamlit
 if "identity_core" not in st.session_state:
     st.session_state["identity_core"] = SpiritualIdentity(SYSTEM_ROOT)
- def cadastrar_discipulo(nome, mentor="Geral"):
+
+def cadastrar_discipulo(nome, mentor="Geral"):
     """Registra um novo aluno no discipulado."""
     discipulos = _read_json_safe(DB_FILES["DISCIPLES_DB"], default=[])
     

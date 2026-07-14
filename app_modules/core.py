@@ -78,6 +78,7 @@ def genesis_filesystem_integrity_check():
                     f.write("System Integrity File - Do Not Delete")
             except Exception as e:
                 logging.error(f"Erro sentinel {path}: {e}")
+                 _ensure_empty_json_list(DB_FILES["DISCIPLES_DB"])
 
     if not os.path.exists(DB_FILES["CONFIG"]):
         default_config = {

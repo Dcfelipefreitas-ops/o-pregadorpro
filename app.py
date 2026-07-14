@@ -148,6 +148,49 @@ class SpiritualIdentity:
 # Instanciação única protegida dentro do fluxo do Streamlit
 if "identity_core" not in st.session_state:
     st.session_state["identity_core"] = SpiritualIdentity(SYSTEM_ROOT)
+ def cadastrar_discipulo(nome, mentor="Geral"):
+    """Registra um novo aluno no discipulado."""
+    discipulos = _read_json_safe(DB_FILES["DISCIPLES_DB"], default=[])
+    
+    novo_discipulo = {
+        "id": str(uuid.uuid4())[:8],
+        "nome": nome,
+        "mentor": mentor,
+        "data_inicio": datetime.now().strftime("%d/%m/%Y"),
+        "materias_concluidas": [], # Lista de nomes das matérias
+        "status": "Em curso"
+    }
+    
+    discipulos.append(novo_discipulo)
+    return _write_json_atomic(DB_FILES["DISCIPLES_DB"], discipulos)
+
+def marcar_materia_concluida(discipulo_id, nome_materia):
+    """Marca uma lição/matéria como estudada para um aluno específico."""
+    discipulos = _read_json_safe(DB_FILES["DISCIPLES_DB"], default=[])
+    sucesso = False
+    
+    for d in discipulos:
+        if d["id"] == discipulo_id:
+            if nome_materia not in d["materias_concluidas"]:
+                d["materias_concluidas"].append({
+                    "materia": nome_materia,
+                    "data_conclusao": datetime.now().strftime("%d/%m/%Y %H:%M")
+                })
+                logging.info(f"Matéria {nome_materia} concluída por {d['nome']}")
+                sucesso = True
+            break
+            
+    if sucesso:
+        _write_json_atomic(DB_FILES["DISCIPLES_DB"], discipulos)
+    return sucesso
+
+def listar_progresso_discipulo(discipulo_id):
+    """Retorna o progresso de um aluno."""
+    discipulos = _read_json_safe(DB_FILES["DISCIPLES_DB"], default=[])
+    for d in discipulos:
+        if d["id"] == discipulo_id:
+            return d
+    return None
 
 # ==============================================================================
 # 06. CONTROLE DE ESTADO GLOBAL (ACESSO LIVRE) & BANCOS SIMULADOS

@@ -35,7 +35,6 @@ logging.basicConfig(
     format='[%(asctime)s] | [%(levelname)s] | MODULE: %(module)s | MSG: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-
 def _write_json_atomic(path, data):
     temp_path = f"{path}.tmp.{uuid.uuid4().hex}"
     d = os.path.dirname(path)
@@ -48,7 +47,6 @@ def _write_json_atomic(path, data):
     except Exception as e:
         logging.error(f"Erro na escrita atômica {path}: {e}")
         return False
-
 def _read_json_safe(path, default=None):
     if default is None: default = {}
     try:

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os
+import os.makedirs(os.path.join(SYSTEM_ROOT, "acervo_pastoral"), exist_ok=True)
 import json
 import logging
 import uuid
@@ -174,20 +174,46 @@ if app_mode == "GESTAO_PASTORAL":
             categoria = st.selectbox("Categoria", ["Discipulado", "Teologia", "Vida Cristã", "Família"])
             conteudo_livro = st.text_area("Conteúdo do Livro (Texto ou Link para PDF)", height=300)
             
-            if st.form_submit_button("🚀 PUBLICAR PARA A IGREJA"):
-                if titulo_livro and conteudo_livro:
-                    db_livros = os.path.join(SYSTEM_ROOT, "db", "livros.json")
-                    livros = _read_json_safe(db_livros, default=[])
-                    livros.append({
-                        "id": str(uuid.uuid4())[:8],
-                        "titulo": titulo_livro,
-                        "subtitulo": subtitulo_livro,
-                        "categoria": categoria,
-                        "conteudo": conteudo_livro,
-                        "data": datetime.now().strftime("%d/%m/%Y")
-                    })
-                    _write_json_atomic(db_livros, livros)
-                    st.success(f"O livro '{titulo_livro}' agora está disponível para todos!")
+          with st.expander("📚 PUBLICAR E IMPORTAR MATERIAIS"):
+        with st.form("form_importacao"):
+            t_obra = st.text_input("Título do Livro/Material")
+            cat = st.selectbox("Categoria", ["Discipulado", "Teologia", "Sermões", "Ebooks"])
+            tipo_entrada = st.radio("Origem do Material", ["Importar Arquivo do PC (PDF/DOCX)", "Digitar Texto Manual"])
+            
+            # Campo de Upload (Aparece se selecionar importar)
+            uploaded_file = None
+            conteudo_txt = ""
+            if "Importar" in tipo_entrada:
+                uploaded_file = st.file_uploader("Escolha o arquivo no seu computador", type=["pdf", "docx", "txt", "epub"])
+            else:
+                conteudo_txt = st.text_area("Cole ou escreva o conteúdo aqui", height=200)
+
+            if st.form_submit_button("📁 INCORPORAR AO ACERVO"):
+                db_livros = os.path.join(SYSTEM_ROOT, "db", "livros.json")
+                acervo = _read_json_safe(db_livros, default=[])
+                novo_id = str(uuid.uuid4())[:8]
+                file_path = ""
+
+                # Lógica para salvar o arquivo físico no servidor
+                if uploaded_file is not None:
+                    file_path = os.path.join(SYSTEM_ROOT, "acervo_pastoral", f"{novo_id}_{uploaded_file.name}")
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    st.success(f"Arquivo '{uploaded_file.name}' importado com sucesso!")
+                
+                # Salva o registro no Banco de Dados
+                acervo.append({
+                    "id": novo_id,
+                    "titulo": t_obra,
+                    "categoria": cat,
+                    "tipo": tipo_entrada,
+                    "conteudo_texto": conteudo_txt,
+                    "file_path": file_path,
+                    "nome_arquivo": uploaded_file.name if uploaded_file else "",
+                    "data": datetime.now().strftime("%d/%m/%Y")
+                })
+                _write_json_atomic(db_livros, acervo)
+                st.balloons()
 # ==============================================================================
 # 06. ÁREAS DE CONTEÚDO
 # ==============================================================================
@@ -197,11 +223,39 @@ elif "Resumo" in app_mode:
 
 elif "Estudo" in app_mode:
     st.title("📚 Biblioteca Digital")
-    st.markdown("<p style='color:gray;'>Materiais exclusivos produzidos pelo Pr. Felipe Freitas</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:gray;'>Acervo intelectual exclusivo Pr. Felipe Freitas</p>", unsafe_allow_html=True)
 
     db_livros = os.path.join(SYSTEM_ROOT, "db", "livros.json")
     acervo = _read_json_safe(db_livros, default=[])
 
+    if not acervo:
+        st.info("Nenhum material disponível no acervo no momento.")
+    else:
+        for item in acervo:
+            with st.container():
+                st.markdown(f"""
+                <div class='ministerial-card'>
+                    <h3 style='margin:0; color:#D4AF37;'>{item['titulo']}</h3>
+                    <small style='color:gray;'>Categoria: {item['categoria']} | Adicionado: {item['data']}</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Se o material for texto, abre o expansor. Se for arquivo, mostra o botão de baixar.
+                if "Importar" in item['tipo']:
+                    if os.path.exists(item['file_path']):
+                        with open(item['file_path'], "rb") as f:
+                            st.download_button(
+                                label=f"📥 BAIXAR MATERIAL: {item['nome_arquivo']}",
+                                data=f,
+                                file_name=item['nome_arquivo'],
+                                mime="application/octet-stream"
+                            )
+                    else:
+                        st.error("Erro: O arquivo físico não foi encontrado no servidor.")
+                else:
+                    with st.expander("📖 ABRIR PARA LEITURA"):
+                        st.markdown(item['conteudo_texto'])
+            st.divider()
     if not acervo:
         st.info("O Pastor ainda não publicou materiais neste módulo.")
     else:

@@ -283,7 +283,49 @@ with st.sidebar:
         ],
         index=0
     )
+# --- DENTRO DA ROTA DO GABINETE NO app.py ---
+elif "Gabinete" in app_mode:
+    from app_modules.visual import inject_nasa_ui, pastoral_card
+    from app_modules.homiletica import PastoralReviewer
+    
+    inject_nasa_ui() # Aplica as fontes NASA
+    
+    st.title("📟 Console de Comando Homilético")
+    
+    # Barra Lateral de Ferramentas de Escrita
+    with st.sidebar.expander("🛠️ Preferências de Interface", expanded=True):
+        fonte_escolhida = st.selectbox("Tipografia", ["Inter (Padrão)", "JetBrains Mono (Dados)", "Serif (Leitura)"])
+        estilo_texto = "monospace-font" if "JetBrains" in fonte_escolhida else ""
 
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        st.subheader("📝 Manuscrito Ativo")
+        conteudo = st.text_area(
+            "Digite seu sermão aqui", 
+            height=500, 
+            placeholder="Comece a digitar... O System Omega analisará seu texto em tempo real.",
+            key="input_sermao"
+        )
+        
+        # Mecanismo de Revisão Ortográfica/Teológica Ativo
+        if conteudo:
+            alertas = PastoralReviewer.checar_ortografia_basica(conteudo)
+            densidade = PastoralReviewer.analisar_densidade_teologica(conteudo)
+            
+            with st.expander(f"🧐 Relatório de Inteligência do Texto ({len(alertas)} notificações)"):
+                for a in alertas:
+                    st.write(a)
+                st.progress(min(densidade * 20, 100), text=f"Densidade Teológica: {densidade}")
+
+    with col2:
+        pastoral_card(
+            "Métricas de Voo", 
+            "Análise estática do manuscrito em execução.", 
+            f"Caracteres: {len(conteudo)}"
+        )
+        st.button("💾 Enviar para o Vault", use_container_width=True)
+        st.info("💡 Dica NASA: Use a tipografia JetBrains Mono para revisar referências fortes, ela evita confusão entre 1, l e I.")
 # ==============================================================================
 # 08. ROTAS E RENDERIZAÇÃO DE TELAS
 # ==============================================================================

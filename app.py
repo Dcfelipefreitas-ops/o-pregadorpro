@@ -16,6 +16,7 @@ for path in [DB_DIR, ACERVO_DIR]:
 PATH_USERS = os.path.join(DB_DIR, "users_db.json")
 PATH_LIVROS = os.path.join(DB_DIR, "livros_biblioteca.json")
 PATH_MSGS = os.path.join(DB_DIR, "mensagens_contato.json")
+PATH_ACONSELHAMENTO = os.path.join(DB_DIR, "prontuarios_aconselhamento.json")
 
 # ==============================================================================
 # 02. ESTÉTICA CELESTIAL (MIDNIGHT BLUE & GOLD)
@@ -175,6 +176,86 @@ elif choice == "📖 Gabinete de Hermenêutica":
             st.write(f"**Termos Identificados:** {', '.join(achados) if achados else 'Aguardando termos técnicos...'}")
             st.progress(min(len(achados)*20, 100))
     st.button("💾 Sincronizar Estudo")
+    # ==============================================================================
+# ROTA: GABINETE DE ACONSELHAMENTO (PRONTUÁRIO COMPARTILHADO)
+# ==============================================================================
+elif choice == "🧭 Aconselhamento Pastoral":
+    st.title("🧭 Gabinete de Aconselhamento")
+    
+    # 1. Carrega o Banco de Prontuários
+    db_acon = _read_json(PATH_ACONSELHAMENTO, default=[])
+    
+    if st.session_state["role"] != "ADMIN":
+        # --- VISÃO DO ALUNO/MEMBRO ---
+        tab_pedido, tab_meu_plano = st.tabs(["🆕 Solicitar Aconselhamento", "📝 Meu Plano de Evolução"])
+        
+        with tab_pedido:
+            st.subheader("Iniciar Processo de Cuidado")
+            with st.form("solicitar_acon"):
+                tema = st.selectbox("Sobre o que deseja conversar?", ["Batismo", "Casamento", "Filhos", "Dificuldades Financeiras", "Vida Espiritual", "Outros"])
+                descricao = st.text_area("Descreva brevemente sua necessidade atual:")
+                if st.form_submit_button("Enviar para o Pastor"):
+                    novo_caso = {
+                        "id": str(uuid.uuid4())[:8],
+                        "aluno": st.session_state["user"],
+                        "tema": tema,
+                        "descricao_inicial": descricao,
+                        "status": "Em Espera",
+                        "prontuario": [], # Notas que o pastor vai escrever
+                        "material_leitura": "", # Indicações do pastor
+                        "data_inicio": datetime.now().strftime("%d/%m/%Y")
+                    }
+                    db_acon.append(novo_caso)
+                    _write_json(PATH_ACONSELHAMENTO, db_acon)
+                    st.success("Sua solicitação foi enviada. O Pastor Freitas entrará em contato em breve.")
+
+        with tab_meu_plano:
+            meus_casos = [c for c in db_acon if c['aluno'] == st.session_state['user']]
+            if not meus_casos:
+                st.info("Você ainda não possui planos de aconselhamento ativos.")
+            for c in meus_casos:
+                with st.container():
+                    st.markdown(f"<div class='ministerial-card'><h4>{c['tema']} (Iniciado em {c['data_inicio']})</h4><p>Status: {c['status']}</p></div>", unsafe_allow_html=True)
+                    if c['prontuario']:
+                        st.subheader("🗒️ Evolução do Aconselhamento (Notas do Pastor)")
+                        for nota in c['prontuario']:
+                            st.info(f"**Data: {nota['data']}**\n\n{nota['conteudo']}")
+                    if c['material_leitura']:
+                        st.subheader("📚 Minha Jornada de Estudo")
+                        st.success(c['material_leitura'])
+
+    else:
+        # --- VISÃO DO PASTOR (ADMIN) ---
+        st.subheader("Painel de Gestão de Casos")
+        if not db_acon:
+            st.info("Não há solicitações de aconselhamento no momento.")
+        else:
+            for i, c in enumerate(db_acon):
+                with st.expander(f"👤 {c['aluno']} - Tema: {c['tema']} ({c['status']})"):
+                    st.write(f"**Descrição Inicial:** {c['descricao_inicial']}")
+                    
+                    st.divider()
+                    st.subheader("Adicionar Nota ao Prontuário")
+                    nova_nota = st.text_area("Evolução, Devocional ou Orientação", key=f"nota_{c['id']}")
+                    material = st.text_area("Referências Bíblicas e Livros Recomendados", value=c['material_leitura'], key=f"mat_{c['id']}")
+                    
+                    col_b1, col_b2 = st.columns(2)
+                    if col_b1.button("💾 Salvar Evolução", key=f"btn_{c['id']}"):
+                        if nova_nota:
+                            db_acon[i]['prontuario'].append({
+                                "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                                "conteudo": nova_nota
+                            })
+                        db_acon[i]['material_leitura'] = material
+                        db_acon[i]['status'] = "Em Processo"
+                        _write_json(PATH_ACONSELHAMENTO, db_acon)
+                        st.success("Prontuário atualizado. O aluno já pode visualizar o novo material.")
+                        st.rerun()
+                    
+                    if col_b2.button("✅ Encerrar Caso", key=f"finish_{c['id']}"):
+                        db_acon[i]['status'] = "Concluído"
+                        _write_json(PATH_ACONSELHAMENTO, db_acon)
+                        st.rerun()
 
 # ==============================================================================
 # 09. DEMAIS ROTAS

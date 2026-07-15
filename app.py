@@ -56,6 +56,15 @@ def _read_json(path, default=None):
 
 def _write_json(path, data):
     with open(path, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
+        
+def analise_hermeneutica(texto):
+    """Analisa termos teológicos e aprofundamento do texto."""
+    keywords = ["exegese", "hermenêutica", "soteriologia", "cristocentrismo", "escatologia", "graça", "doutrina"]
+    achadas = [w for w in keywords if w in texto.lower()]
+    alertas = []
+    if 10 < len(texto) < 300: alertas.append("⚠️ O texto pode ser mais aprofundado.")
+    if len(achadas) == 0 and len(texto) > 100: alertas.append("🔍 Dica: Adicione termos da Hermenêutica para maior precisão.")
+    return achadas, alertas
 
 # ==============================================================================
 # 04. SISTEMA DE LOGIN PERSISTENTE
@@ -179,6 +188,22 @@ elif choice == "📚 Biblioteca Digital":
 # ==============================================================================
 # 08. ROTA: OUTROS MODULOS
 # ==============================================================================
+    elif choice == "📖 Gabinete de Hermenêutica":
+    st.title("📖 Gabinete de Estudo e Hermenêutica")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        tema = st.text_input("Tema de Estudo")
+        texto_estudo = st.text_area("Desenvolvimento da Mensagem", height=450)
+        if texto_estudo:
+            achados, avisos = analise_hermeneutica(texto_estudo)
+            with st.expander("🧐 Relatório de Inteligência Teológica", expanded=True):
+                for a in avisos: st.warning(a)
+                st.write(f"**Termos Identificados:** {', '.join(achados) if achados else 'Nenhum termo técnico detectado.'}")
+                st.progress(min(len(achados) * 20, 100))
+    with col2:
+        st.markdown(f"<div class='ministerial-card'><b>OPERADOR</b><br>{st.session_state['user']}</div>", unsafe_allow_html=True)
+        st.button("💾 Arquivar Estudo")
+        
 elif choice == "📊 Dashboard Geral":
     st.title("📊 Painel Ministerial")
     st.markdown("<div class='ministerial-card'>Sistemas Ativos. Seja bem-vindo ao portal unificado de discipulado.</div>", unsafe_allow_html=True)

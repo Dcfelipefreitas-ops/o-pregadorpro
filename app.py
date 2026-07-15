@@ -166,6 +166,29 @@ if not st.session_state["logged_in"]:
     
     st.markdown("<p style='text-align: center; color: #333; margin-top: 50px;'>PROTOCOL OMEGA INTEGRITY VERIFIED</p>", unsafe_allow_html=True)
     st.stop()
+    # --- ABA DE REGISTRO (MODIFICADA PARA IDENTIFICAR ADMIN) ---
+        with aba_registro:
+            st.info("⚠️ Nota: O primeiro usuário registrado como 'ADMIN' terá controle total.")
+            with st.form("registro_nasa"):
+                novo_user = st.text_input("DEFINIR CODINOME").upper().strip()
+                nova_senha = st.text_input("DEFINIR ASSINATURA", type="password")
+                
+                if st.form_submit_button("✅ SOLICITAR REGISTRO"):
+                    usuarios_db_path = os.path.join(SYSTEM_ROOT, "db", "users_db.json")
+                    usuarios = _read_json_safe(usuarios_db_path, default={})
+                    
+                    role = "ADMIN" if novo_user == "ADMIN" or not usuarios else "MEMBRO"
+                    
+                    if novo_user in usuarios:
+                        st.warning("Este codinome já está registrado.")
+                    else:
+                        usuarios[novo_user] = {
+                            "hash": hashlib_sha256(nova_senha),
+                            "role": role,
+                            "created_at": datetime.now().strftime("%d/%m %H:%M")
+                        }
+                        _write_json_atomic(usuarios_db_path, usuarios)
+                        st.success(f"Operador {novo_user} ({role}) registrado! Faça login.")
 # ==============================================================================
 # 05. INTERFACE DE COMANDO (SIDEBAR)
 # ==============================================================================

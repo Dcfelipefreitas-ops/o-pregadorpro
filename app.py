@@ -19,7 +19,7 @@ os.makedirs(os.path.join(SYSTEM_ROOT, "acervo_pastoral"), exist_ok=True)
 # 02. ESTÉTICA CELESTIAL: VISUAL PREMIUM DE ALTA TECNOLOGIA
 # ==============================================================================
 st.set_page_config(
-    page_title="GABINETE CELESTIAL | PR FELIPE FREITAS",
+    page_title="ACONSELHAMNETO BIBLICO | PR FELIPE FREITAS",
     page_icon="✨",
     layout="wide",
     initial_sidebar_state="expanded"

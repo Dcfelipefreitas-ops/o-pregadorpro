@@ -3,50 +3,45 @@ import os, json, logging, uuid, hashlib, streamlit as st
 from datetime import datetime
 
 # ==============================================================================
-# 01. CONFIGURAÇÕES PERMANENTES (NÃO ALTERAR)
+# 01. CONFIGURAÇÕES GLOBAIS E PASTAS
 # ==============================================================================
 APP_TITLE = "DISCIPULADO | PR. FELIPE FREITAS"
-SYSTEM_ROOT = "DADOS_SISTEMA_DISCIPULADO"  # Nome da pasta fixo
+SYSTEM_ROOT = "DADOS_SISTEMA_DISCIPULADO" 
 DB_DIR = os.path.join(SYSTEM_ROOT, "db")
 ACERVO_DIR = os.path.join(SYSTEM_ROOT, "acervo_arquivos")
 
-# Criar estrutura de pastas única vez
-for path in [DB_DIR, ACERVO_DIR]:
+for path in [DB_DIR, ACERVO_DIR]: 
     os.makedirs(path, exist_ok=True)
 
-# Definição de Caminhos de Arquivos
 PATH_USERS = os.path.join(DB_DIR, "users_db.json")
 PATH_LIVROS = os.path.join(DB_DIR, "livros_biblioteca.json")
 PATH_MSGS = os.path.join(DB_DIR, "mensagens_contato.json")
 
 # ==============================================================================
-# 02. ESTÉTICA GABINETE: VISUAL MINISTERIAL FIXO (MIDNIGHT BLUE & GOLD)
+# 02. ESTÉTICA CELESTIAL (MIDNIGHT BLUE & GOLD)
 # ==============================================================================
 st.set_page_config(page_title=APP_TITLE, page_icon="✝️", layout="wide")
 
-def inject_ui_fixed():
-    st.markdown(f"""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
-        html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
-        .main {{ background-color: #050a1a; color: #ffffff; }}
-        .ministerial-card {{
-            background: rgba(255, 255, 255, 0.05);
-            border-left: 5px solid #D4AF37;
-            padding: 20px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(212, 175, 55, 0.1);
-        }}
-        h1, h2, h3 {{ color: #D4AF37 !important; }}
-        .stDeployButton {{ display: none !important; }}
-    </style>
-    """, unsafe_allow_html=True)
-
-inject_ui_fixed()
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .main { background-color: #050a1a; color: #ffffff; }
+    .ministerial-card {
+        background: rgba(255, 255, 255, 0.05);
+        border-left: 5px solid #D4AF37;
+        padding: 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(212, 175, 55, 0.1);
+    }
+    h1, h2, h3 { color: #D4AF37 !important; }
+    .stDeployButton { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
 
 # ==============================================================================
-# 03. FUNÇÕES DE SEGURANÇA E DADOS
+# 03. MOTORES DE LÓGICA E HERMENÊUTICA
 # ==============================================================================
 def hashlib_sha256(v): return hashlib.sha256(v.encode()).hexdigest()
 
@@ -56,169 +51,146 @@ def _read_json(path, default=None):
 
 def _write_json(path, data):
     with open(path, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
-        
+
 def analise_hermeneutica(texto):
-    """Analisa termos teológicos e aprofundamento do texto."""
     keywords = ["exegese", "hermenêutica", "soteriologia", "cristocentrismo", "escatologia", "graça", "doutrina"]
     achadas = [w for w in keywords if w in texto.lower()]
     alertas = []
-    if 10 < len(texto) < 300: alertas.append("⚠️ O texto pode ser mais aprofundado.")
-    if len(achadas) == 0 and len(texto) > 100: alertas.append("🔍 Dica: Adicione termos da Hermenêutica para maior precisão.")
+    if texto and 10 < len(texto) < 300: alertas.append("⚠️ O conteúdo pode ser mais aprofundado.")
+    if texto and not achadas and len(texto) > 100: alertas.append("🔍 Adicione termos técnicos teológicos.")
     return achadas, alertas
 
 # ==============================================================================
-# 04. SISTEMA DE LOGIN PERSISTENTE
+# 04. LOGIN PERSISTENTE
 # ==============================================================================
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
+if "logged_in" not in st.session_state: st.session_state["logged_in"] = False
 
 if not st.session_state["logged_in"]:
     st.markdown(f"<h1 style='text-align:center;'>{APP_TITLE}</h1>", unsafe_allow_html=True)
-    
     col_l, col_c, col_r = st.columns([1, 2, 1])
     with col_c:
-        tab_login, tab_cad = st.tabs(["🔒 ACESSAR", "📝 CADASTRAR"])
-        
+        tab_login, tab_cad = st.tabs(["🔒 ACESSAR", "📝 REGISTRAR"])
         with tab_login:
-            with st.form("form_login"):
+            with st.form("f_log"):
                 u = st.text_input("Usuário").upper().strip()
                 p = st.text_input("Senha", type="password")
-                if st.form_submit_button("CONECTAR AO GABINETE"):
-                    usuarios = _read_json(PATH_USERS, default={})
-                    if u in usuarios and usuarios[u].get("hash") == hashlib_sha256(p):
-                        st.session_state["logged_in"] = True
-                        st.session_state["user"] = u
-                        st.session_state["role"] = usuarios[u].get("role", "MEMBRO")
+                if st.form_submit_button("ENTRAR"):
+                    users = _read_json(PATH_USERS, default={})
+                    if u in users and users[u].get("hash") == hashlib_sha256(p):
+                        st.session_state.update({"logged_in":True, "user":u, "role":users[u].get("role", "MEMBRO")})
                         st.rerun()
-                    else: st.error("Acesso Negado. Verifique usuário e senha.")
-
+                    else: st.error("Dados incorretos.")
         with tab_cad:
-            st.caption("Crie seu acesso apenas uma vez.")
-            with st.form("form_cad"):
-                nu = st.text_input("Novo Usuário").upper().strip()
-                np = st.text_input("Nova Senha", type="password")
-                if st.form_submit_button("CRIAR MEU ACESSO"):
+            with st.form("f_cad"):
+                nu = st.text_input("Nome").upper().strip()
+                np = st.text_input("Senha", type="password")
+                if st.form_submit_button("CADASTRAR"):
                     usrs = _read_json(PATH_USERS, default={})
                     role = "ADMIN" if nu == "ADMIN" or not usrs else "MEMBRO"
-                    if nu in usrs: st.warning("Usuário já existe.")
+                    if nu in usrs: st.warning("Existe.")
                     else:
-                        usrs[nu] = {"hash": hashlib_sha256(np), "role": role, "data": datetime.now().strftime("%d/%m/%y")}
-                        _write_json(PATH_USERS, usrs)
-                        st.success("Cadastro realizado com sucesso! Use a aba de ACESSAR.")
+                        usrs[nu] = {"hash":hashlib_sha256(np), "role":role, "data":datetime.now().strftime("%d/%m/%y")}
+                        _write_json(PATH_USERS, usrs); st.success("Pronto! Vá em ACESSAR.")
     st.stop()
 
 # ==============================================================================
-# 05. NAVEGAÇÃO E SIDEBAR (DURÁVEL)
+# 05. BARRA LATERAL (SIDEBAR)
 # ==============================================================================
 with st.sidebar:
     st.markdown(f"### 👤 {st.session_state['user']}\nNível: `{st.session_state['role']}`")
     st.divider()
-    menu = ["📊 Dashboard Geral", "📚 Biblioteca Digital", "✍️ Meus Estudos", "💬 Central Ministerial"]
-    choice = st.radio("Módulo Ativo:", menu)
-
-    # Painel do Admin (Pr. Felipe Freitas)
+    menu = ["📊 Painel Geral", "📖 Gabinete de Hermenêutica", "📚 Biblioteca Digital", "✍️ Estudos", "💬 Central Ministerial"]
+    choice = st.radio("Escolha o Módulo:", menu)
+    
     if st.session_state["role"] == "ADMIN":
         st.divider()
-        is_admin_mode = st.checkbox("⚙️ SECRETARIA ADMIN")
-        if is_admin_mode: choice = "MODO_ADMIN"
-
-    if st.button("🚪 DESCONECTAR"):
-        st.session_state["logged_in"] = False
-        st.rerun()
+        if st.checkbox("⚙️ SECRETARIA ADMIN"): choice = "MODO_ADMIN"
+    if st.button("SAIR"):
+        st.session_state["logged_in"] = False; st.rerun()
 
 # ==============================================================================
-# 06. ROTA: MODO ADMINISTRATIVO (CADASTRO DE LIVROS E ARQUIVOS)
+# 06. ROTA: MODO ADMIN (ENVIO DE LIVROS)
 # ==============================================================================
-
 if choice == "MODO_ADMIN":
     st.title("🗄️ Secretaria Administrativa")
-    # ... (coloque aqui o código da sua secretaria) ...
+    t1, t2, t3 = st.tabs(["👥 Alunos", "📤 Publicar Livro", "📬 SOS Mensagens"])
+    
+    with t1:
+        u_list = _read_json(PATH_USERS)
+        for u, d in u_list.items():
+            if isinstance(d, dict): st.write(f"🔹 **{u}** | {d.get('role')} | Adesão: {d.get('data')}")
+            
+    with t2:
+        st.subheader("Subir Livros do PC ou Criar Texto")
+        with st.form("pub_form"):
+            titulo = st.text_input("Título do Material")
+            fonte = st.radio("Fonte", ["Importar Arquivo do PC", "Texto Manual"])
+            f_up = st.file_uploader("Selecione o arquivo (PDF/DOC)", type=["pdf","docx"]) if "PC" in fonte else None
+            txt_in = st.text_area("Texto Manual") if "Manual" in fonte else ""
+            if st.form_submit_button("🚀 PUBLICAR PARA TODOS"):
+                bibli = _read_json(PATH_LIVROS, default=[])
+                nid = str(uuid.uuid4())[:8]; fp = ""
+                if f_up:
+                    fp = os.path.join(ACERVO_DIR, f"{nid}_{f_up.name}")
+                    with open(fp, "wb") as f: f.write(f_up.getbuffer())
+                bibli.append({
+                    "id": nid, "titulo": titulo, "tipo": fonte, "path": fp, 
+                    "nome": f_up.name if f_up else "", "texto": txt_in, "data": datetime.now().strftime("%d/%m/%Y")
+                })
+                _write_json(PATH_LIVROS, bibli); st.success("Livro adicionado!")
 
+    with t3:
+        m_list = _read_json(PATH_MSGS, default=[])
+        for msg in reversed(m_list): st.info(f"De {msg['de']}: {msg['txt']}")
+
+# ==============================================================================
+# 07. ROTA: BIBLIOTECA DIGITAL (MEMBROS BAIXAM/LEEM)
+# ==============================================================================
+elif choice == "📚 Biblioteca Digital":
+    st.title("📚 Biblioteca Digital")
+    acervo = _read_json(PATH_LIVROS, default=[])
+    if not acervo: st.info("Nada publicado ainda.")
+    else:
+        for b in acervo:
+            with st.container():
+                st.markdown(f"<div class='ministerial-card'><h3>{b['titulo']}</h3><small>{b['data']}</small></div>", unsafe_allow_html=True)
+                if "PC" in b['tipo'] and b['path'] and os.path.exists(b['path']):
+                    with open(b['path'], "rb") as f:
+                        st.download_button(f"📥 Baixar Arquivo: {b['nome']}", f, file_name=b['nome'], key=b['id'])
+                else:
+                    with st.expander("📖 Ler on-line"): st.markdown(b['texto'])
+                st.divider()
+
+# ==============================================================================
+# 08. ROTA: GABINETE DE HERMENÊUTICA (NOVO)
+# ==============================================================================
 elif choice == "📖 Gabinete de Hermenêutica":
     st.title("📖 Gabinete de Hermenêutica")
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        tema_h = st.text_input("Tema de Estudo Teológico")
-        texto_h = st.text_area("Desenvolvimento da Mensagem", height=450, key="txt_herm")
-        if texto_h:
-            achados, avisos = analise_hermeneutica(texto_h)
-            with st.expander("🧐 Relatório de Inteligência Teológica", expanded=True):
-                for a in avisos: st.warning(a)
-                st.write(f"**Termos Identificados:** {', '.join(achados) if achados else 'Nenhum termo técnico detectado.'}")
-                st.progress(min(len(achados) * 20, 100))
-    with col2:
-        st.markdown(f"<div class='ministerial-card'><b>OPERADOR</b><br>{st.session_state['user']}</div>", unsafe_allow_html=True)
-        if st.button("💾 Arquivar Estudo"):
-            st.success("Estudo sincronizado com o servidor.")
-
-elif choice == "📚 Biblioteca Digital":
-    st.title("📚 Biblioteca Digital")
-    # ... (coloque aqui o seu código da biblioteca) ...
-
-elif choice == "📊 Dashboard Geral":
-    st.title("📊 Painel Ministerial")
-    st.info("Sistemas Ativos. Seja bem-vindo ao portal unificado.")
-
-elif choice == "✍️ Meus Estudos":
-    st.title("✍️ Meus Estudos")
-    # ... (seu código de rascunhos) ...
-
-elif choice == "💬 Central Ministerial":
-    st.title("💬 Central Ministerial")
-    # ... (seu código de SOS Pastoral) ...
+    tema_h = st.text_input("Tema Central do Estudo")
+    texto_h = st.text_area("Escreva seu Manuscrito", height=450)
+    if texto_h:
+        achados, avisos = analise_hermeneutica(texto_h)
+        with st.expander("🧐 Análise Teológica do Sistema", expanded=True):
+            for a in avisos: st.warning(a)
+            st.write(f"**Termos Identificados:** {', '.join(achados) if achados else 'Aguardando termos técnicos...'}")
+            st.progress(min(len(achados)*20, 100))
+    st.button("💾 Sincronizar Estudo")
 
 # ==============================================================================
-# 07. ROTA: BIBLIOTECA (VISUALIZAÇÃO DE ARQUIVOS E TEXTOS)
+# 09. DEMAIS ROTAS
 # ==============================================================================
-elif choice == "📚 Biblioteca Digital":
-    st.title("📚 Biblioteca Digital")
-    biblioteca = _read_json(PATH_LIVROS, default=[])
-    if not biblioteca: st.info("O acervo está sendo atualizado pelo Pastor.")
-    else:
-        for b in biblioteca:
-            with st.container():
-                st.markdown(f"<div class='ministerial-card'><h3>{b['titulo']}</h3><small>Publicado em {b['data']}</small></div>", unsafe_allow_html=True)
-                if "PC" in b['tipo'] and b['path']:
-                    if os.path.exists(b['path']):
-                        with open(b['path'], "rb") as file:
-                            st.download_button(f"📥 Baixar Arquivo: {b['nome']}", file, file_name=b['nome'], key=b['id'])
-                else:
-                    with st.expander("📖 Ler On-line"): st.write(b['conteudo'])
-            st.divider()
+elif choice == "📊 Painel Geral":
+    st.title("📊 Painel Geral")
+    st.info("Operação ministerial nominal. Bem-vindo.")
 
-# ==============================================================================
-# 08. ROTA: OUTROS MODULOS
-# ==============================================================================
-elif choice == "📖 Gabinete de Hermenêutica":
-    st.title("📖 Gabinete de Estudo e Hermenêutica")
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        tema = st.text_input("Tema de Estudo")
-        texto_estudo = st.text_area("Desenvolvimento da Mensagem", height=450)
-        if texto_estudo:
-            achados, avisos = analise_hermeneutica(texto_estudo)
-            with st.expander("🧐 Relatório de Inteligência Teológica", expanded=True):
-                for a in avisos: st.warning(a)
-                st.write(f"**Termos Identificados:** {', '.join(achados) if achados else 'Nenhum termo técnico detectado.'}")
-                st.progress(min(len(achados) * 20, 100))
-    with col2:
-        st.markdown(f"<div class='ministerial-card'><b>OPERADOR</b><br>{st.session_state['user']}</div>", unsafe_allow_html=True)
-        st.button("💾 Arquivar Estudo")
-        
-elif choice == "📊 Dashboard Geral":
-    st.title("📊 Painel Ministerial")
-    st.markdown("<div class='ministerial-card'>Sistemas Ativos. Seja bem-vindo ao portal unificado de discipulado.</div>", unsafe_allow_html=True)
-
-elif choice == "✍️ Meus Estudos":
-    st.title("✍️ Composição de Estudos")
-    st.text_area("Bloco de Notas Privado", height=300, placeholder="Digite aqui seus rascunhos de pregações...")
-    st.button("Salvar Rascunho")
+elif "Estudos" in choice:
+    st.title("✍️ Notas e Estudos Privados")
+    st.text_area("Meus Rascunhos", height=300)
 
 elif choice == "💬 Central Ministerial":
     st.title("💬 SOS Pastoral")
-    msg_sos = st.text_area("Deseja enviar uma mensagem direta para o Pr. Felipe Freitas?")
-    if st.button("Enviar"):
-        msgs = _read_json(PATH_MSGS, default=[])
-        msgs.append({"de": st.session_state["user"], "txt": msg_sos})
-        _write_json(PATH_MSGS, msgs)
-        st.success("Mensagem enviada com sucesso ao gabinete.")
+    txt_s = st.text_area("Enviar mensagem para o Gabinete do Pastor:")
+    if st.button("Enviar SOS"):
+        mlist = _read_json(PATH_MSGS, default=[])
+        mlist.append({"de": st.session_state["user"], "txt": txt_s})
+        _write_json(PATH_MSGS, mlist); st.success("Mensagem enviada.")

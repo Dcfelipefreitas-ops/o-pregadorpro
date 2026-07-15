@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os.makedirs(os.path.join(SYSTEM_ROOT, "acervo_pastoral"), exist_ok=True)
+import os
 import json
 import logging
 import uuid
@@ -7,7 +7,7 @@ import hashlib
 import streamlit as st
 from datetime import datetime, timezone
 from typing import Dict, Any
-
+os.makedirs(os.path.join(SYSTEM_ROOT, "acervo_pastoral"), exist_ok=True)
 # ==============================================================================
 # 01. ESTÉTICA GABINETE: VISUAL MINISTERIAL PROFISSIONAL
 # ==============================================================================

@@ -295,84 +295,81 @@ elif choice == "🧭 Aconselhamento Pastoral":
 # 09. DEMAIS ROTAS
 # ==============================================================================
 # ==============================================================================
-# 08. ROTA: PAINEL GERAL (CENTRO DE COMANDO EM SOUZEL)
+# 06. ROTA: PAINEL GERAL (SOUZEL | SINCRONIZAÇÃO TOTAL GOOGLE)
 # ==============================================================================
 elif choice == "📊 Painel Geral":
-    st.markdown(f"<h1 style='text-align:center; color:#D4AF37;'>🏛️ GABINETE PASTORAL | SOUZEL</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color:gray;'>Bem-vindo ao centro de operações da Igreja em Souzel. Tudo pronto para sua edificação.</p>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align:center; color:#D4AF37; margin-bottom:0;'>IGREJA BATISTA EM SOUZEL</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color:gray;'>Protocolo de Discipulado Sincronizado | Gabinete Pr. Felipe Freitas</p>", unsafe_allow_html=True)
     st.divider()
 
     # --- LINHA 1: BÍBLIA DIGITAL NVT ---
-    st.subheader("📖 A Espada do Espírito (Bíblia NVT)")
-    with st.container():
-        col_bib1, col_bib2 = st.columns([1, 2])
-        with col_bib1:
-            st.markdown("""
-                <div style='background: rgba(212, 175, 55, 0.1); padding: 15px; border-radius: 10px; border: 1px solid #D4AF37;'>
-                    <h5 style='color:#D4AF37; margin:0;'>LEITURA RÁPIDA</h5>
-                    <small style='color:gray;'>Selecione o Livro e o Capítulo para meditar agora.</small>
-                </div>
-            """, unsafe_allow_html=True)
-            # Simulação de Navegador Bíblico Nível NASA
-            livro_bib = st.selectbox("Livro:", ["Salmos", "Mateus", "Romanos", "Gênesis", "João", "Hebreus"])
-            cap_bib = st.number_input("Capítulo:", min_value=1, max_value=150, value=1)
-            
-        with col_bib2:
-            # Texto da Versão NVT (Simulação Profissional)
-            st.markdown(f"""
-                <div class='ministerial-card' style='height: 250px; overflow-y: scroll;'>
-                    <h4 style='color:#D4AF37;'>{livro_bib} {cap_bib} (NVT)</h4>
-                    <p style='font-style: italic; color:#E0E0E0;'>
-                        "O Senhor é meu pastor; nada me faltará. Em verdes pastagens me faz repousar e me conduz a águas tranquilas. 
-                        Restaura-me o vigor e me guia pelo caminho da justiça por amor do seu nome." <br><b>— Salmo 23:1-3 (Exemplo NVT)</b>
-                    </p>
-                    <p style='color: gray; font-size: 0.9rem;'>
-                        Sua conexão com as Escrituras é a base desta plataforma. Use o material de apoio na biblioteca para estudos exegéticos profundos.
-                    </p>
-                </div>
-            """, unsafe_allow_html=True)
-
-    st.divider()
-
-    # --- LINHA 2: AGENDA DA IGREJA EM SOUZEL ---
-    col_a1, col_a2 = st.columns([1, 1])
-
-    with col_a1:
-        st.subheader("📅 Escala de Celebrações")
+    col_b1, col_b2 = st.columns([1, 2])
+    with col_b1:
+        st.subheader("📖 NVT DIGITAL")
+        l_bib = st.selectbox("Livro:", ["Mateus", "Salmos", "Gênesis", "João", "Romanos"], key="nb_l")
+        c_bib = st.number_input("Capítulo:", min_value=1, max_value=150, value=1, key="nb_c")
+        
+    with col_b2:
         st.markdown(f"""
-            <div class='ministerial-card'>
-                <div style='display:flex; justify-content:space-between; border-bottom:1px solid #333; padding-bottom:5px;'>
-                    <span style='color:#D4AF37;'><b>DOMINGO</b></span>
-                    <span style='font-family: JetBrains Mono;'>19:30</span>
-                </div>
-                <p style='margin:5px 0;'>Culto de Celebração e Adoração ao Senhor.</p>
-                
-                <div style='display:flex; justify-content:space-between; border-bottom:1px solid #333; padding-bottom:5px; margin-top:10px;'>
-                    <span style='color:#D4AF37;'><b>QUARTA-FEIRA</b></span>
-                    <span style='font-family: JetBrains Mono;'>19:30</span>
-                </div>
-                <p style='margin:5px 0;'>Noite de Estudo Bíblico e Oração em Família.</p>
-                
-                <div style='display:flex; justify-content:space-between; border-bottom:1px solid #333; padding-bottom:5px; margin-top:10px;'>
-                    <span style='color:#D4AF37;'><b>SÁBADO (EBD)</b></span>
-                    <span style='font-family: JetBrains Mono;'>19:30</span>
-                </div>
-                <p style='margin:5px 0;'>Escola Bíblica de Discipulado Avançado.</p>
+            <div class='ministerial-card' style='height: 200px; overflow-y: auto; padding: 25px;'>
+                <h4 style='margin:0; color:#D4AF37;'>{l_bib} {c_bib} (NVT)</h4><br>
+                <p style='font-style: italic; color:#E2E8F0; font-size:1.1rem;'>
+                "Lâmpada para os meus pés é a tua palavra e luz, para o meu caminho."
+                </p>
+                <small style='color: gray;'>Acesse o Gabinete de Hermenêutica para análises exegéticas.</small>
             </div>
         """, unsafe_allow_html=True)
 
-    with col_a2:
-        st.subheader("📢 Mural de Avisos")
-        # Pega as últimas notícias enviadas no sistema ou via admin
-        st.warning("⚠️ **AVISO:** Reunião de liderança no próximo Domingo após o culto.")
-        st.info("💡 **DICA:** Não esqueça de preencher seu Prontuário de Aconselhamento no módulo 🧭.")
+    st.divider()
+
+    # --- LINHA 2: AGENDA GOOGLE DA IGREJA EM SOUZEL ---
+    st.subheader("📅 Calendário de Eventos em Souzel")
+    
+    # Parâmetros NASA para o Google Calendar
+    CALENDAR_ID = "igrejabatistaemsouzel@gmail.com"
+    # A cor de fundo é #050a1a para sumir no fundo do seu app
+    google_url = f"https://calendar.google.com/calendar/embed?src={CALENDAR_ID}&ctz=America%2FSao_Paulo&bgcolor=%23050a1a&color=%23D4AF37&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0"
+
+    st.markdown(f"""
+        <div style='border: 1px solid rgba(212,175,55,0.3); border-radius: 12px; overflow: hidden;'>
+            <iframe src="{google_url}" style="border:0" width="100%" height="550" frameborder="0" scrolling="no"></iframe>
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # --- LINHA 3: HORÁRIOS FIXOS INSTITUCIONAIS ---
+    st.subheader("🏛️ Celebrações de Souzel (Horários Fixos)")
+    h_col1, h_col2, h_col3 = st.columns(3)
+    
+    with h_col1:
+        st.markdown("""
+            <div class='ministerial-card' style='text-align:center;'>
+                <h4 style='margin:0;'>QUARTA-FEIRA</h4>
+                <p style='color:#D4AF37; font-size: 1.5rem; font-family: monospace;'>19:30</p>
+                <small style='color:gray;'>ENSINO E ORAÇÃO</small>
+            </div>
+        """, unsafe_allow_html=True)
         
-        st.markdown("#### Estatísticas do Reino (Admin)")
-        sc1, sc2 = st.columns(2)
-        with sc1:
-            st.metric("Inscritos em Souzel", len(_read_json(PATH_USERS, default={})), "+1")
-        with sc2:
-            st.metric("Casos em Aconselhamento", len(_read_json(PATH_ACONSELHAMENTO, default=[])), "Ativos")
+    with h_col2:
+        st.markdown("""
+            <div class='ministerial-card' style='text-align:center;'>
+                <h4 style='margin:0;'>SÁBADO (EBD)</h4>
+                <p style='color:#D4AF37; font-size: 1.5rem; font-family: monospace;'>19:30</p>
+                <small style='color:gray;'>DISCIPULADO AVANÇADO</small>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with h_col3:
+        st.markdown("""
+            <div class='ministerial-card' style='text-align:center;'>
+                <h4 style='margin:0;'>DOMINGO</h4>
+                <p style='color:#D4AF37; font-size: 1.5rem; font-family: monospace;'>19:30</p>
+                <small style='color:gray;'>CULTO DA FAMÍLIA</small>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<center style='margin-top:20px; color:#333;'><small>SYNC COMPLETED: PROTOCOL SOUZEL ACTIVE</small></center>", unsafe_allow_html=True)
 
 elif "Estudos" in choice:
     st.title("✍️ Notas e Estudos ")

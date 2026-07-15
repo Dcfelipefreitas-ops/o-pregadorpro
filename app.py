@@ -297,7 +297,7 @@ elif choice == "🧭 Aconselhamento Pastoral":
 # ==============================================================================
 # 08. ROTA: PAINEL GERAL (CENTRO DE COMANDO EM SOUZEL)
 # ==============================================================================
-elif choice == "📊 Dashboard Geral":
+elif choice == "📊 Painel Geral":
     st.markdown(f"<h1 style='text-align:center; color:#D4AF37;'>🏛️ GABINETE PASTORAL | SOUZEL</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center; color:gray;'>Bem-vindo ao centro de operações da Igreja em Souzel. Tudo pronto para sua edificação.</p>", unsafe_allow_html=True)
     st.divider()

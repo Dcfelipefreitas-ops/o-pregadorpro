@@ -192,7 +192,42 @@ def listar_progresso_discipulo(discipulo_id):
         if d["id"] == discipulo_id:
             return d
     return None
+import uuid
 
+# Configuração de Notificação (Exemplo com Twilio ou similar)
+def enviar_notificacao_externa(mensagem, destino, tipo="WhatsApp"):
+    """
+    Simulação de envio de mensagem. 
+    Para funcionar real, você precisará de uma API (Twilio, Evolution API, etc.)
+    """
+    logging.info(f"Enviando {tipo} para {destino}: {mensagem}")
+    # Aqui entraria o código da API: requests.post("https://api.whatsapp...", data=...)
+    return True
+
+def enviar_mensagem_interna(remetente, destinatario, texto):
+    """Grava uma mensagem no banco de dados e tenta notificar o destinatário."""
+    mensagens_path = os.path.join(SYSTEM_ROOT, "db", "mensagens.json")
+    mensagens = _read_json_safe(mensagens_path, default=[])
+    
+    nova_msg = {
+        "id": str(uuid.uuid4()),
+        "remetente": remetente,
+        "destinatario": destinatario,
+        "texto": texto,
+        "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "lida": False
+    }
+    
+    mensagens.append(nova_msg)
+    _write_json_atomic(mensagens_path, mensagens)
+    
+    # Notificar o destinatário (Exemplo: Se for para o Pastor)
+    enviar_notificacao_externa(
+        mensagem=f"Nova mensagem de {remetente}: {texto[:30]}...",
+        destino="SEU_NUMERO_AQUI", # Ideal buscar do cadastro do usuário
+        tipo="WhatsApp"
+    )
+    return True
 # ==============================================================================
 # 06. CONTROLE DE ESTADO GLOBAL (ACESSO LIVRE) & BANCOS SIMULADOS
 # ==============================================================================

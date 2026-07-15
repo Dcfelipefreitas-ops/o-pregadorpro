@@ -189,7 +189,7 @@ elif choice == "📚 Biblioteca Digital":
 # ==============================================================================
 # 08. ROTA: OUTROS MODULOS
 # ==============================================================================
-    elif choice == "📖 Gabinete de Hermenêutica":
+elif choice == "📖 Gabinete de Hermenêutica":
     st.title("📖 Gabinete de Estudo e Hermenêutica")
     col1, col2 = st.columns([3, 1])
     with col1:

@@ -174,7 +174,7 @@ if app_mode == "GESTAO_PASTORAL":
             categoria = st.selectbox("Categoria", ["Discipulado", "Teologia", "Vida Cristã", "Família"])
             conteudo_livro = st.text_area("Conteúdo do Livro (Texto ou Link para PDF)", height=300)
             
-          with st.expander("📚 PUBLICAR E IMPORTAR MATERIAIS"):
+        
         with st.form("form_importacao"):
             t_obra = st.text_input("Título do Livro/Material")
             cat = st.selectbox("Categoria", ["Discipulado", "Teologia", "Sermões", "Ebooks"])

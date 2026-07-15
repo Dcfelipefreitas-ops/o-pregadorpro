@@ -176,86 +176,120 @@ elif choice == "📖 Gabinete de Hermenêutica":
             st.write(f"**Termos Identificados:** {', '.join(achados) if achados else 'Aguardando termos técnicos...'}")
             st.progress(min(len(achados)*20, 100))
     st.button("💾 Sincronizar Estudo")
-    # ==============================================================================
-# ROTA: GABINETE DE ACONSELHAMENTO (PRONTUÁRIO COMPARTILHADO)
+# ==============================================================================
+# ROTA: GABINETE DE ACONSELHAMENTO (PRONTUÁRIO INTERATIVO)
 # ==============================================================================
 elif choice == "🧭 Aconselhamento Pastoral":
-    st.title("🧭 Gabinete de Aconselhamento")
+    st.title("🧭 Gabinete de Cuidado Ministerial")
+    st.markdown("<p style='color:gray;'>Acompanhamento personalizado para edificação e orientação pastoral.</p>", unsafe_allow_html=True)
     
-    # 1. Carrega o Banco de Prontuários
+    # Carregamento do Banco
     db_acon = _read_json(PATH_ACONSELHAMENTO, default=[])
     
     if st.session_state["role"] != "ADMIN":
-        # --- VISÃO DO ALUNO/MEMBRO ---
-        tab_pedido, tab_meu_plano = st.tabs(["🆕 Solicitar Aconselhamento", "📝 Meu Plano de Evolução"])
+        # --- VISÃO DO ALUNO (ESTANTE DE CRESCIMENTO) ---
+        meus_processos = [p for p in db_acon if p['aluno'] == st.session_state['user']]
         
-        with tab_pedido:
-            st.subheader("Iniciar Processo de Cuidado")
-            with st.form("solicitar_acon"):
-                tema = st.selectbox("Sobre o que deseja conversar?", ["Batismo", "Casamento", "Filhos", "Dificuldades Financeiras", "Vida Espiritual", "Outros"])
-                descricao = st.text_area("Descreva brevemente sua necessidade atual:")
-                if st.form_submit_button("Enviar para o Pastor"):
-                    novo_caso = {
-                        "id": str(uuid.uuid4())[:8],
-                        "aluno": st.session_state["user"],
-                        "tema": tema,
-                        "descricao_inicial": descricao,
-                        "status": "Em Espera",
-                        "prontuario": [], # Notas que o pastor vai escrever
-                        "material_leitura": "", # Indicações do pastor
-                        "data_inicio": datetime.now().strftime("%d/%m/%Y")
-                    }
-                    db_acon.append(novo_caso)
-                    _write_json(PATH_ACONSELHAMENTO, db_acon)
-                    st.success("Sua solicitação foi enviada. O Pastor Freitas entrará em contato em breve.")
-
-        with tab_meu_plano:
-            meus_casos = [c for c in db_acon if c['aluno'] == st.session_state['user']]
-            if not meus_casos:
-                st.info("Você ainda não possui planos de aconselhamento ativos.")
-            for c in meus_casos:
+        if not meus_processos:
+            st.info("Você ainda não possui um processo de aconselhamento iniciado.")
+            with st.expander("🆕 Solicitar Nova Orientação"):
+                with st.form("sol_acon_aluno"):
+                    t_escolhido = st.selectbox("Sobre qual área deseja orientação?", 
+                                              ["Batismo", "Casamento", "Educação de Filhos", "Crescimento Espiritual", "Apoio em Crises", "Outros"])
+                    d_inicial = st.text_area("Descreva o que está passando (Privado ao Pastor)")
+                    if st.form_submit_button("Iniciar Processo"):
+                        p_novo = {
+                            "id": str(uuid.uuid4())[:8],
+                            "aluno": st.session_state["user"],
+                            "tema": t_escolhido,
+                            "historico": [], # Registros de conversas
+                            "plano_da_semana": {"devocional": "", "leitura": "", "referencia": ""},
+                            "status": "Em Espera",
+                            "data_abertura": datetime.now().strftime("%d/%m/%Y")
+                        }
+                        db_acon.append(p_novo)
+                        _write_json(PATH_ACONSELHAMENTO, db_acon)
+                        st.success("Solicitação enviada. O Pastor Freitas montará seu plano de cuidado.")
+                        st.rerun()
+        else:
+            # Lista os processos que o aluno tem
+            for proc in meus_processos:
                 with st.container():
-                    st.markdown(f"<div class='ministerial-card'><h4>{c['tema']} (Iniciado em {c['data_inicio']})</h4><p>Status: {c['status']}</p></div>", unsafe_allow_html=True)
-                    if c['prontuario']:
-                        st.subheader("🗒️ Evolução do Aconselhamento (Notas do Pastor)")
-                        for nota in c['prontuario']:
-                            st.info(f"**Data: {nota['data']}**\n\n{nota['conteudo']}")
-                    if c['material_leitura']:
-                        st.subheader("📚 Minha Jornada de Estudo")
-                        st.success(c['material_leitura'])
+                    st.markdown(f"""
+                        <div class='ministerial-card'>
+                            <h3 style='margin:0;'>PROCESSO: {proc['tema']}</h3>
+                            <small>Início: {proc['data_abertura']} | Status: {proc['status']}</small>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    c1, c2 = st.columns([1, 1])
+                    with c1:
+                        st.markdown("#### 📖 Meu Plano de Estudo")
+                        if proc['plano_da_semana']['devocional']:
+                            st.info(f"**Devocional:**\n\n{proc['plano_da_semana']['devocional']}")
+                            st.success(f"**Leituras Sugeridas:**\n\n{proc['plano_da_semana']['leitura']}")
+                            st.warning(f"**Referência Bíblica:** {proc['plano_da_semana']['referencia']}")
+                        else:
+                            st.caption("O Pastor está preparando seu material de estudo para esta semana.")
+
+                    with c2:
+                        st.markdown("#### 📅 Evolução das Conversas")
+                        for h in reversed(proc['historico']):
+                            with st.expander(f"Nota de {h['data']}"):
+                                st.write(h['nota'])
 
     else:
-        # --- VISÃO DO PASTOR (ADMIN) ---
-        st.subheader("Painel de Gestão de Casos")
+        # --- VISÃO DO PASTOR (GESTOR DE PRONTUÁRIOS) ---
+        st.subheader("📋 Gestão de Prontuários Pastoriais")
+        
         if not db_acon:
-            st.info("Não há solicitações de aconselhamento no momento.")
+            st.info("Nenhuma solicitação de acompanhamento ativa.")
         else:
-            for i, c in enumerate(db_acon):
-                with st.expander(f"👤 {c['aluno']} - Tema: {c['tema']} ({c['status']})"):
-                    st.write(f"**Descrição Inicial:** {c['descricao_inicial']}")
-                    
-                    st.divider()
-                    st.subheader("Adicionar Nota ao Prontuário")
-                    nova_nota = st.text_area("Evolução, Devocional ou Orientação", key=f"nota_{c['id']}")
-                    material = st.text_area("Referências Bíblicas e Livros Recomendados", value=c['material_leitura'], key=f"mat_{c['id']}")
-                    
-                    col_b1, col_b2 = st.columns(2)
-                    if col_b1.button("💾 Salvar Evolução", key=f"btn_{c['id']}"):
-                        if nova_nota:
-                            db_acon[i]['prontuario'].append({
-                                "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                                "conteudo": nova_nota
-                            })
-                        db_acon[i]['material_leitura'] = material
-                        db_acon[i]['status'] = "Em Processo"
-                        _write_json(PATH_ACONSELHAMENTO, db_acon)
-                        st.success("Prontuário atualizado. O aluno já pode visualizar o novo material.")
-                        st.rerun()
-                    
-                    if col_b2.button("✅ Encerrar Caso", key=f"finish_{c['id']}"):
-                        db_acon[i]['status'] = "Concluído"
-                        _write_json(PATH_ACONSELHAMENTO, db_acon)
-                        st.rerun()
+            # Seleciona o aluno que quer atender
+            nomes_alunos = sorted(list(set([p['aluno'] for p in db_acon])))
+            aluno_alvo = st.selectbox("Selecione o Aluno para Atender:", nomes_alunos)
+            
+            # Filtra os processos desse aluno
+            processos_aluno = [p for p in db_acon if p['aluno'] == aluno_alvo]
+            
+            for idx, p_global in enumerate(db_acon):
+                if p_global['aluno'] == aluno_alvo:
+                    with st.expander(f"Atenção a: {p_global['aluno']} | Tema: {p_global['tema']}", expanded=True):
+                        st.caption(f"Status Atual: {p_global['status']}")
+                        
+                        col_adm1, col_adm2 = st.columns(2)
+                        with col_adm1:
+                            st.markdown("##### 📝 Anotação Pastoral (Prontuário)")
+                            txt_nota = st.text_area("Notas da Conversa / Evolução do caso", key=f"note_{p_global['id']}")
+                        
+                        with col_adm2:
+                            st.markdown("##### ⚓ Tarefas da Semana (Aluno visualiza)")
+                            dev_txt = st.text_input("Tema do Devocional", value=p_global['plano_da_semana']['devocional'], key=f"dev_{p_global['id']}")
+                            leit_txt = st.text_input("Indicação de Livro/Apostila", value=p_global['plano_da_semana']['leitura'], key=f"lei_{p_global['id']}")
+                            ref_txt = st.text_input("Referência Bíblica Chave", value=p_global['plano_da_semana']['referencia'], key=f"ref_{p_global['id']}")
+                        
+                        if st.button("✅ Atualizar Prontuário e Enviar ao Aluno", key=f"save_{p_global['id']}"):
+                            # Se escreveu algo na nota, salva no histórico
+                            if txt_nota:
+                                db_acon[idx]['historico'].append({
+                                    "data": datetime.now().strftime("%d/%m %H:%M"),
+                                    "nota": txt_nota
+                                })
+                            # Atualiza as tarefas que o aluno lê
+                            db_acon[idx]['plano_da_semana'] = {
+                                "devocional": dev_txt,
+                                "leitura": leit_txt,
+                                "referencia": ref_txt
+                            }
+                            db_acon[idx]['status'] = "Em Acompanhamento"
+                            _write_json(PATH_ACONSELHAMENTO, db_acon)
+                            st.success(f"O plano de {p_global['aluno']} foi atualizado com sucesso.")
+                            st.rerun()
+
+                        if st.button("🚮 Finalizar/Arquivar Processo", key=f"del_{p_global['id']}"):
+                            db_acon.pop(idx)
+                            _write_json(PATH_ACONSELHAMENTO, db_acon)
+                            st.rerun()
 
 # ==============================================================================
 # 09. DEMAIS ROTAS

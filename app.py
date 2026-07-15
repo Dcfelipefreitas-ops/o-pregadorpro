@@ -11,7 +11,7 @@ from typing import Dict, Any
 # 01. CONFIGURAÇÃO NASA: UI & TIPOGRAFIA DE ALTA PRECISÃO
 # ==============================================================================
 st.set_page_config(
-    page_title="SYSTEM OMEGA | MISSION CONTROL",
+    page_title="DISCIPULADO| PR FELIPE FREITAS ",
     page_icon="🛰️",
     layout="wide",
     initial_sidebar_state="expanded"

@@ -166,7 +166,28 @@ if app_mode == "GESTAO_PASTORAL":
             with st.chat_message("user"):
                 st.write(f"**De: {m.get('de')}** | {m.get('data')}")
                 st.write(m.get('texto'))
-
+# --- ADICIONE ESTE BLOCO DENTRO DO IF DA GESTAO_PASTORAL ---
+    with st.expander("➕ PUBLICAR NOVO LIVRO/MATERIAL"):
+        with st.form("form_livro"):
+            titulo_livro = st.text_input("Título da Obra")
+            subtitulo_livro = st.text_input("Subtítulo ou Volume")
+            categoria = st.selectbox("Categoria", ["Discipulado", "Teologia", "Vida Cristã", "Família"])
+            conteudo_livro = st.text_area("Conteúdo do Livro (Texto ou Link para PDF)", height=300)
+            
+            if st.form_submit_button("🚀 PUBLICAR PARA A IGREJA"):
+                if titulo_livro and conteudo_livro:
+                    db_livros = os.path.join(SYSTEM_ROOT, "db", "livros.json")
+                    livros = _read_json_safe(db_livros, default=[])
+                    livros.append({
+                        "id": str(uuid.uuid4())[:8],
+                        "titulo": titulo_livro,
+                        "subtitulo": subtitulo_livro,
+                        "categoria": categoria,
+                        "conteudo": conteudo_livro,
+                        "data": datetime.now().strftime("%d/%m/%Y")
+                    })
+                    _write_json_atomic(db_livros, livros)
+                    st.success(f"O livro '{titulo_livro}' agora está disponível para todos!")
 # ==============================================================================
 # 06. ÁREAS DE CONTEÚDO
 # ==============================================================================
@@ -175,8 +196,35 @@ elif "Resumo" in app_mode:
     st.info("Sistemas de integridade ativos. Dados nominais de discipulado.")
 
 elif "Estudo" in app_mode:
-    st.title("📚 Biblioteca e Material")
-    st.markdown("<div class='ministerial-card'>Escolha um módulo de discipulado para iniciar sua leitura.</div>", unsafe_allow_html=True)
+    st.title("📚 Biblioteca Digital")
+    st.markdown("<p style='color:gray;'>Materiais exclusivos produzidos pelo Pr. Felipe Freitas</p>", unsafe_allow_html=True)
+
+    db_livros = os.path.join(SYSTEM_ROOT, "db", "livros.json")
+    acervo = _read_json_safe(db_livros, default=[])
+
+    if not acervo:
+        st.info("O Pastor ainda não publicou materiais neste módulo.")
+    else:
+        # Filtro de Categoria
+        cats = list(set([l['categoria'] for l in acervo]))
+        filtro = st.multiselect("Filtrar por Categoria:", cats, default=cats)
+
+        for livro in acervo:
+            if livro['categoria'] in filtro:
+                with st.container():
+                    st.markdown(f"""
+                    <div class='ministerial-card'>
+                        <h3 style='margin:0; color:#D4AF37;'>{livro['titulo']}</h3>
+                        <small style='color:gray;'>{livro['categoria']} | Publicado em: {livro['data']}</small>
+                        <p style='margin-top:10px;'>{livro['subtitulo']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    with st.expander(f"📖 LER: {livro['titulo']}"):
+                        st.markdown(livro['conteudo'])
+                        st.divider()
+                        st.caption("Dica: Você pode copiar o texto acima para seus estudos pessoais.")
+    
 
 elif "Esboços" in app_mode:
     st.title("✍️ Esboços Pastoral")

@@ -268,8 +268,8 @@ elif "Estudos" in choice:
     st.title("✍️ Notas e Estudos Privados")
     st.text_area("Meus Rascunhos", height=300)
 
-elif choice == "💬 Central Ministerial":
-    st.title("💬 SOS Pastoral")
+elif choice == "💬 Aconselhamento Pastoral ":
+    st.title("💬 SOS Aconselhamento")
     txt_s = st.text_area("Enviar mensagem para o Gabinete do Pastor:")
     if st.button("Enviar SOS"):
         mlist = _read_json(PATH_MSGS, default=[])

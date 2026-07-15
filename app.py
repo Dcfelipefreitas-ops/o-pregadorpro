@@ -88,85 +88,7 @@ def push_notificacao_pastoral(mensagem, origem):
 # ==============================================================================
 # 04. PROTOCOLO DE AUTENTICAÇÃO (PADRÃO NASA)
 # ==============================================================================
-import hashlib
-
-def hashlib_sha256(value):
-    """Criptografia de nível industrial."""
-    return hashlib.sha256(value.encode()).hexdigest()
-
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-
-if not st.session_state["logged_in"]:
-    st.markdown("""
-        <div style='text-align: center; padding-top: 50px;'>
-            <h1 style='color: #D4AF37; letter-spacing: 2px;'>PORTAL DE ACESSO</h1>
-            <p style='color: #666; font-family: "JetBrains Mono";'>GABINETE DE ACONSELHAMENTO PASTORAL | V 3.1</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Centralização do formulário
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    
-    with col_c:
-        aba_login, aba_registro = st.tabs(["🔒 ACESSAR TERMINAL", "🆔 NOVO OPERADOR"])
-        
-        # --- ABA DE LOGIN ---
-        with aba_login:
-            with st.form("login_nasa"):
-                user_input = st.text_input("CODINOME (Usuário)").upper().strip()
-                pass_input = st.text_input("ASSINATURA DIGITAL (Senha)", type="password")
-                col_btn1, col_btn2 = st.columns(2)
-                
-                entrar = col_btn1.form_submit_button("🚀 INICIAR SESSÃO")
-                convidado = col_btn2.form_submit_button("👤 ENTRAR COMO CONVIDADO")
-
-                if entrar:
-                    # Carrega banco de usuários real
-                    usuarios = _read_json_safe(os.path.join(SYSTEM_ROOT, "db", "users_db.json"), default={})
-                    senha_hash = hashlib_sha256(pass_input)
-                    
-                    if user_input in usuarios and usuarios[user_input] == senha_hash:
-                        st.session_state["current_user"] = user_input
-                        st.session_state["logged_in"] = True
-                        st.success("Acesso autorizado. Carregando interface...")
-                        st.rerun()
-                    else:
-                        st.error("Assinatura Inválida. Verifique suas credenciais.")
-
-                if convidado:
-                    st.session_state["current_user"] = "CONVIDADO"
-                    st.session_state["logged_in"] = True
-                    st.warning("Acessando em modo de observação limitado.")
-                    st.rerun()
-
-        # --- ABA DE REGISTRO (NOVO USUÁRIO) ---
-        with aba_registro:
-            st.info("Solicite o registro de uma nova chave de acesso ao sistema.")
-            with st.form("registro_nasa"):
-                novo_user = st.text_input("DEFINIR CODINOME").upper().strip()
-                nova_senha = st.text_input("DEFINIR ASSINATURA", type="password")
-                confirmar_senha = st.text_input("CONFIRMAR ASSINATURA", type="password")
-                
-                if st.form_submit_button("✅ SOLICITAR REGISTRO"):
-                    if not novo_user or not nova_senha:
-                        st.error("Todos os campos de criptografia são obrigatórios.")
-                    elif nova_senha != confirmar_senha:
-                        st.error("As assinaturas não coincidem.")
-                    else:
-                        usuarios_db_path = os.path.join(SYSTEM_ROOT, "db", "users_db.json")
-                        usuarios = _read_json_safe(usuarios_db_path, default={})
-                        
-                        if novo_user in usuarios:
-                            st.warning("Este codinome já está registrado no banco de dados.")
-                        else:
-                            usuarios[novo_user] = hashlib_sha256(nova_senha)
-                            _write_json_atomic(usuarios_db_path, usuarios)
-                            st.success(f"Operador {novo_user} registrado com sucesso! Vá para a aba Login.")
-    
-    st.markdown("<p style='text-align: center; color: #333; margin-top: 50px;'>PROTOCOL OMEGA INTEGRITY VERIFIED</p>", unsafe_allow_html=True)
-    st.stop()
-    # --- ABA DE REGISTRO (MODIFICADA PARA IDENTIFICAR ADMIN) ---
+# --- ABA DE REGISTRO (MODIFICADA PARA IDENTIFICAR ADMIN) ---
         with aba_registro:
             st.info("⚠️ Nota: O primeiro usuário registrado como 'ADMIN' terá controle total.")
             with st.form("registro_nasa"):
@@ -201,7 +123,37 @@ with st.sidebar:
 # ==============================================================================
 # 06. ROTEAMENTO DAS ESTAÇÕES DE TRABALHO
 # ==============================================================================
+# --- ROTA EXCLUSIVA: COMMAND CENTER (ADMIN) ---
+if "user_role" in st.session_state and st.session_state["user_role"] == "ADMIN":
+    with st.sidebar:
+        st.divider()
+        if st.checkbox("📡 ABRIR COMMAND CENTER"):
+            app_mode = "🛡️ PAINEL DO ADMINISTRADOR"
 
+if app_mode == "🛡️ PAINEL DO ADMINISTRADOR":
+    st.title("🛰️ Command Center | Gestão de Missão")
+    
+    col_t1, col_t2 = st.columns(2)
+    
+    with col_t1:
+        st.subheader("👥 Tripulação Ativa (Usuários)")
+        usuarios = _read_json_safe(os.path.join(SYSTEM_ROOT, "db", "users_db.json"), default={})
+        for u, dados in usuarios.items():
+            status = "🟢" if dados['role'] == "ADMIN" else "🔵"
+            st.write(f"{status} **{u}** | Função: {dados['role']} | Desde: {dados['created_at']}")
+
+    with col_t2:
+        st.subheader("📥 Mensagens Recebidas (Aconselhamento)")
+        msgs_path = os.path.join(SYSTEM_ROOT, "db", "comunicacao.json")
+        mensagens = _read_json_safe(msgs_path, default=[])
+        
+        if not mensagens:
+            st.info("Nenhuma nova solicitação de aconselhamento.")
+        for m in reversed(mensagens):
+            with st.chat_message("user"):
+                st.write(f"**De: {m['remetente']}**")
+                st.write(m['texto'])
+                st.caption(f"Recebida em: {m['data']}")
 # --- ESTAÇÃO 1: DASHBOARD ---
 if "Dashboard" in app_mode:
     st.title("📊 Painel de Monitoramento SoulMetrics")
@@ -259,7 +211,24 @@ elif "Mensagens" in app_mode:
             push_notificacao_pastoral(msg_alerta, st.session_state['current_user'])
             st.balloons()
             st.success("Sincronização enviada para a fila de disparo externa.")
-
+if st.session_state.get("user_role") == "MEMBRO":
+    with st.sidebar.expander("🆘 SOS PASTORAL"):
+        st.write("Sua mensagem será enviada diretamente ao painel secreto do Pastor.")
+        sos_txt = st.text_area("Descreva seu pedido de ajuda/oração", key="sos")
+        if st.button("Enviar Pedido Urgente"):
+            if sos_txt:
+                msgs_path = os.path.join(SYSTEM_ROOT, "db", "comunicacao.json")
+                todas = _read_json_safe(msgs_path, default=[])
+                todas.append({
+                    "remetente": st.session_state["current_user"],
+                    "texto": sos_txt,
+                    "data": datetime.now().strftime("%d/%m %H:%M")
+                })
+                _write_json_atomic(msgs_path, todas)
+                
+                # ENVIO PARA O SEU CELULAR (Simulado no Log NASA)
+                logging.warning(f"URGENTE: Nova mensagem pastoral de {st.session_state['current_user']}")
+                st.success("Mensagem enviada com sucesso!")
 # --- ESTAÇÃO 4: REDE MINISTERIAL (AUDIO) ---
 elif "Rede Ministerial" in app_mode:
     st.title("🤝 Rede Ministerial & Áudios")

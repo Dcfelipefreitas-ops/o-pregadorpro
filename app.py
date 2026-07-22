@@ -3,7 +3,6 @@
 # pip install streamlit-quill
 from streamlit_quill import st_quill 
 
-elif choice == "📖 Gabinete de Hermenêutica":
     # CSS para simular janelas de software (The Word)
     st.markdown("""
     <style>

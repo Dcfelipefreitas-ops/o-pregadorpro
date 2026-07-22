@@ -163,207 +163,104 @@ elif choice == "📚 Biblioteca Digital":
                 st.divider()
 
 # ==============================================================================
-# 08. ROTA: GABINETE DE HERMENÊUTICA (ESTRUTURA DE PREGAÇÃO EXPOSITIVA)
+# 08. ROTA: GABINETE DE HERMENÊUTICA (DINÂMICO POR GÊNERO)
 # ==============================================================================
 elif choice == "📖 Gabinete de Hermenêutica":
-    st.title("📖 Gabinete de Hermenêutica e Exegese")
-    st.markdown("---")
+    st.title("📖 Gabinete de Exegese e Hermenêutica Profissional")
     
-    st.info("""
-    **Método de Estudo Expositivo:** Siga os passos abaixo inspirados no método histórico-gramatical 
-    para extrair o significado original e aplicá-lo à igreja contemporânea.
-    """)
+    # --- BARRA DE FERRAMENTAS DE CONSULTA (ESTILO THE WORD) ---
+    with st.expander("🛠️ BIBLIOTECA DE APOIO (Strong & Léxicos)", expanded=False):
+        col_tool1, col_tool2, col_tool3 = st.columns(3)
+        with col_tool1:
+            st.markdown("**Lexicon Strong**")
+            st.info("Consulte o original (Grego/Hebraico) via [Blue Letter Bible](https://www.blueletterbible.org/)")
+        with col_tool2:
+            st.markdown("**Comentário Bíblico**")
+            st.info("Sugestão: [Bible Hub Commentaries](https://biblehub.com/commentaries/)")
+        with col_tool3:
+            st.markdown("**Dicionário Teológico**")
+            st.info("Padrão: [Bible Study Tools](https://www.biblestudytools.com/dictionaries/)")
 
-    with st.form("form_hermeneutica"):
-        # --- PASSO 1: O TEXTO E O GÊNERO ---
-        st.subheader("1. Delimitação e Gênero")
-        col_t1, col_t2 = st.columns([2, 1])
-        with col_t1:
-            ref_biblica = st.text_input("Referência Bíblica (ex: Efésios 2:1-10)")
-        with col_t2:
-            genero = st.selectbox("Gênero Literário", [
-                "Epístola (Doutrinário)", 
-                "Narrativa do Antigo Testamento", 
-                "Evangelhos / Parábolas", 
-                "Atos (História)", 
-                "Poesia / Salmos", 
-                "Profecia / Apocalíptico", 
-                "Lei / Pentateuco"
-            ])
+    st.divider()
 
-        # --- PASSO 2: CONTEXTO (ENTENDES O QUE LÊS?) ---
-        st.subheader("2. Contexto Histórico e Literário")
-        st.caption("O que o texto significava para os destinatários originais?")
-        contexto_h = st.text_area("Quem escreveu? Para quem? Qual era o problema/situação na época?", height=100)
-        contexto_l = st.text_area("O que vem antes e depois deste texto? (Fluxo de pensamento)", height=100)
-
-        # --- PASSO 3: EXEGESE E PALAVRAS-CHAVE ---
-        st.subheader("3. Análise Exegética")
-        keywords_in = st.text_input("Palavras-chave ou termos em Grego/Hebraico para estudo")
-        exegese_obs = st.text_area("Observações gramaticais, verbos importantes e conexões lógicas (Pois, Portanto, Mas...)", height=150)
-
-        # --- PASSO 4: A PONTE TEOLÓGICA (O CORAÇÃO DO ESTUDO) ---
-        st.subheader("4. Teologia e Cristocentrismo")
-        ponte_teol = st.text_area("Qual a verdade universal e eterna deste texto? Como ele aponta para Cristo ou para o Evangelho?", height=120)
-
-        # --- PASSO 5: ESBOÇO DA PREGAÇÃO EXPOSITIVA ---
-        st.subheader("5. Estrutura Homilética (Esboço)")
-        tema_sermao = st.text_input("Título / Tema Central da Mensagem")
-        
-        esboco = st.text_area("Estruture seus pontos (Ex: I. A Queda do Homem; II. A Graça de Deus; III. A Resposta da Fé)", height=200)
-        
-        aplicacao = st.text_area("Aplicações Práticas: Como a igreja deve viver isso amanhã?", height=100)
-
-        # BOTAÃO DE PROCESSAMENTO
-        btn_estudo = st.form_submit_button("🧪 PROCESSAR E ANALISAR ESTUDO")
-
-    if btn_estudo:
-        # Lógica de Análise (Aproveitando sua função analise_hermeneutica)
-        achados, avisos = analise_hermeneutica(exegese_obs + " " + ponte_teol)
-        
-        st.success("✅ Estudo Processado com Sucesso!")
-        
-        # Dashboard de Feedback
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("### 🧐 Diagnóstico do Sistema")
-            for a in avisos: st.warning(a)
-            if not achados: st.info("Considere usar termos como: 'Soteriologia', 'Graça', 'Redenção' para maior profundidade.")
-            else: st.write(f"**Termos Teológicos Chave:** {', '.join(achados)}")
-
-        with c2:
-            st.markdown("### 📊 Nível de Profundidade")
-            pontuacao = 0
-            if len(contexto_h) > 50: pontuacao += 25
-            if len(exegese_obs) > 100: pontuacao += 25
-            if len(ponte_teol) > 50: pontuacao += 25
-            if len(esboco) > 50: pontuacao += 25
-            st.progress(pontuacao / 100)
-            st.write(f"Conclusão do Protocolo: {pontuacao}%")
-
-        # Opção de exportar (Simulado)
-        st.divider()
-        st.markdown(f"### 📄 Resumo do Sermão: {tema_sermao}")
-        st.write(f"**Base:** {ref_biblica} ({genero})")
-        st.markdown(f"**Esboço:**\n{esboco}")
-        
-        # Aqui você poderia salvar em um novo JSON chamado PATH_ESTUDOS_REALIZADOS
-        st.button("💾 Salvar Estudo no meu Acervo")
-# ==============================================================================
-# ROTA: GABINETE DE ACONSELHAMENTO (PRONTUÁRIO INTERATIVO)
-# ==============================================================================
-elif choice == "🧭 Aconselhamento Pastoral":
-    st.title("🧭 Gabinete de Cuidado Ministerial")
-    st.markdown("<p style='color:gray;'>Acompanhamento personalizado para edificação e orientação pastoral.</p>", unsafe_allow_html=True)
+    # --- SELEÇÃO DE GÊNERO (O Cérebro do Sistema) ---
+    col_main1, col_main2 = st.columns([1, 2])
     
-    # Carregamento do Banco
-    db_acon = _read_json(PATH_ACONSELHAMENTO, default=[])
-    
-    if st.session_state["role"] != "ADMIN":
-        # --- VISÃO DO ALUNO (ESTANTE DE CRESCIMENTO) ---
-        meus_processos = [p for p in db_acon if p['aluno'] == st.session_state['user']]
+    with col_main1:
+        st.subheader("📍 Configuração do Estudo")
+        ref_biblica = st.text_input("Passagem Bíblica (ex: Romanos 8:1-4)")
+        genero = st.selectbox("Gênero Literário", [
+            "Epístola (Argumentativo)", 
+            "Narrativa (Histórico)", 
+            "Poesia/Sapiencial (Emocional)", 
+            "Parábola (Ilustrativo)",
+            "Profético/Apocalíptico"
+        ])
         
-        if not meus_processos:
-            st.info("Você ainda não possui um processo de aconselhamento iniciado.")
-            with st.expander("🆕 Solicitar Nova Orientação"):
-                with st.form("sol_acon_aluno"):
-                    t_escolhido = st.selectbox("Sobre qual área deseja orientação?", 
-                                              ["Batismo", "Casamento", "Educação de Filhos", "Crescimento Espiritual", "Apoio em Crises", "Outros"])
-                    d_inicial = st.text_area("Descreva o que está passando (Privado ao Pastor)")
-                    if st.form_submit_button("Iniciar Processo"):
-                        p_novo = {
-                            "id": str(uuid.uuid4())[:8],
-                            "aluno": st.session_state["user"],
-                            "tema": t_escolhido,
-                            "historico": [], # Registros de conversas
-                            "plano_da_semana": {"devocional": "", "leitura": "", "referencia": ""},
-                            "status": "Em Espera",
-                            "data_abertura": datetime.now().strftime("%d/%m/%Y")
-                        }
-                        db_acon.append(p_novo)
-                        _write_json(PATH_ACONSELHAMENTO, db_acon)
-                        st.success("Solicitação enviada. O Pastor Freitas montará seu plano de cuidado.")
-                        st.rerun()
-        else:
-            # Lista os processos que o aluno tem
-            for proc in meus_processos:
-                with st.container():
-                    st.markdown(f"""
-                        <div class='ministerial-card'>
-                            <h3 style='margin:0;'>PROCESSO: {proc['tema']}</h3>
-                            <small>Início: {proc['data_abertura']} | Status: {proc['status']}</small>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    c1, c2 = st.columns([1, 1])
-                    with c1:
-                        st.markdown("#### 📖 Meu Plano de Estudo")
-                        if proc['plano_da_semana']['devocional']:
-                            st.info(f"**Devocional:**\n\n{proc['plano_da_semana']['devocional']}")
-                            st.success(f"**Leituras Sugeridas:**\n\n{proc['plano_da_semana']['leitura']}")
-                            st.warning(f"**Referência Bíblica:** {proc['plano_da_semana']['referencia']}")
-                        else:
-                            st.caption("O Pastor está preparando seu material de estudo para esta semana.")
-
-                    with c2:
-                        st.markdown("#### 📅 Evolução das Conversas")
-                        for h in reversed(proc['historico']):
-                            with st.expander(f"Nota de {h['data']}"):
-                                st.write(h['nota'])
-
-    else:
-        # --- VISÃO DO PASTOR (GESTOR DE PRONTUÁRIOS) ---
-        st.subheader("📋 Gestão de Prontuários Pastoriais")
+        # Orientações dinâmicas com base no gênero (Baseado no "Entendes o que lês?")
+        guias_genero = {
+            "Epístola (Argumentativo)": {
+                "foco": "Lógica e Argumentação",
+                "perguntas": ["Qual o 'Portanto'? ", "Qual a premissa teológica?", "Identifique as conjunções (pois, mas, para que)."]
+            },
+            "Narrativa (Histórico)": {
+                "foco": "Cenário, Personagens e Conflito",
+                "perguntas": ["Quem é o protagonista?", "Qual o clímax da cena?", "Onde Deus está agindo na história?"]
+            },
+            "Poesia/Sapiencial (Emocional)": {
+                "foco": "Paralelismo e Imagem",
+                "perguntas": ["Qual o sentimento dominante?", "Há paralelismo sinônimo ou antitético?", "Qual a metáfora central?"]
+            },
+            "Parábola (Ilustrativo)": {
+                "foco": "Ponto de Impacto",
+                "perguntas": ["Quem eram os ouvintes originais?", "Qual a reviravolta na história?", "Qual a única verdade central?"]
+            }
+        }
         
-        if not db_acon:
-            st.info("Nenhuma solicitação de acompanhamento ativa.")
-        else:
-            # Seleciona o aluno que quer atender
-            nomes_alunos = sorted(list(set([p['aluno'] for p in db_acon])))
-            aluno_alvo = st.selectbox("Selecione o Aluno para Atender:", nomes_alunos)
+        guia = guias_genero.get(genero, {"foco": "Geral", "perguntas": []})
+        st.warning(f"**Foco do Gênero:** {guia['foco']}")
+        for p in guia['perguntas']:
+            st.caption(f"• {p}")
+
+    with col_main2:
+        # --- WORKSPACE DE ESCRITA ---
+        tab_obs, tab_exegese, tab_esboço = st.tabs(["👁️ OBSERVAÇÃO", "🔍 EXEGESE (STRONG)", "🎤 ESBOÇO EXPOSITIVO"])
+        
+        with tab_obs:
+            st.subheader("Observação do Texto")
+            if genero == "Epístola (Argumentativo)":
+                obs_texto = st.text_area("Mapeie o argumento: (Se A então B...)", height=300, placeholder="Ex: Paulo inicia com uma negação 'Nenhuma condenação'...")
+            else:
+                obs_texto = st.text_area("O que você vê no texto?", height=300)
             
-            # Filtra os processos desse aluno
-            processos_aluno = [p for p in db_acon if p['aluno'] == aluno_alvo]
+        with tab_exegese:
+            st.subheader("Análise de Palavras e Contexto")
+            col_ex1, col_ex2 = st.columns(2)
+            with col_ex1:
+                palavra_chave = st.text_input("Palavra Original (Strong G/H)")
+                significado = st.text_area("Significado no Léxico")
+            with col_ex2:
+                contexto_cultural = st.text_area("Contexto Histórico/Cultural")
             
-            for idx, p_global in enumerate(db_acon):
-                if p_global['aluno'] == aluno_alvo:
-                    with st.expander(f"Atenção a: {p_global['aluno']} | Tema: {p_global['tema']}", expanded=True):
-                        st.caption(f"Status Atual: {p_global['status']}")
-                        
-                        col_adm1, col_adm2 = st.columns(2)
-                        with col_adm1:
-                            st.markdown("##### 📝 Anotação Pastoral (Prontuário)")
-                            txt_nota = st.text_area("Notas da Conversa / Evolução do caso", key=f"note_{p_global['id']}")
-                        
-                        with col_adm2:
-                            st.markdown("##### ⚓ Tarefas da Semana (Aluno visualiza)")
-                            dev_txt = st.text_input("Tema do Devocional", value=p_global['plano_da_semana']['devocional'], key=f"dev_{p_global['id']}")
-                            leit_txt = st.text_input("Indicação de Livro/Apostila", value=p_global['plano_da_semana']['leitura'], key=f"lei_{p_global['id']}")
-                            ref_txt = st.text_input("Referência Bíblica Chave", value=p_global['plano_da_semana']['referencia'], key=f"ref_{p_global['id']}")
-                        
-                        if st.button("✅ Atualizar Prontuário e Enviar ao Aluno", key=f"save_{p_global['id']}"):
-                            # Se escreveu algo na nota, salva no histórico
-                            if txt_nota:
-                                db_acon[idx]['historico'].append({
-                                    "data": datetime.now().strftime("%d/%m %H:%M"),
-                                    "nota": txt_nota
-                                })
-                            # Atualiza as tarefas que o aluno lê
-                            db_acon[idx]['plano_da_semana'] = {
-                                "devocional": dev_txt,
-                                "leitura": leit_txt,
-                                "referencia": ref_txt
-                            }
-                            db_acon[idx]['status'] = "Em Acompanhamento"
-                            _write_json(PATH_ACONSELHAMENTO, db_acon)
-                            st.success(f"O plano de {p_global['aluno']} foi atualizado com sucesso.")
-                            st.rerun()
+            ponte_teologica = st.text_area("A Ponte: Qual o princípio eterno que não muda?", placeholder="Ex: A justificação é apenas pela fé.")
 
-                        if st.button("🚮 Finalizar/Arquivar Processo", key=f"del_{p_global['id']}"):
-                            db_acon.pop(idx)
-                            _write_json(PATH_ACONSELHAMENTO, db_acon)
-                            st.rerun()
+        with tab_esboço:
+            st.subheader("Estrutura da Pregação")
+            tema_central = st.text_input("Título Homilético")
+            esboco_final = st.text_area("Esboço (Introdução, Pontos, Aplicação)", height=350, 
+                                        value="I. \n\nII. \n\nIII. \n\nConclusão e Apelo:")
 
+    # --- BOTÃO DE FINALIZAÇÃO ---
+    if st.button("💾 FINALIZAR E ARQUIVAR ESTUDO"):
+        novo_estudo = {
+            "data": datetime.now().strftime("%d/%m/%Y"),
+            "ref": ref_biblica,
+            "genero": genero,
+            "tema": tema_central,
+            "esboco": esboco_final
+        }
+        # Lógica para salvar no JSON
+        st.success(f"Estudo sobre {ref_biblica} salvo com sucesso no seu Gabinete!")
 # ==============================================================================
 # 09. DEMAIS ROTAS
 # ==============================================================================

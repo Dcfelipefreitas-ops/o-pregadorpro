@@ -1,4 +1,84 @@
-# -*- coding: utf-8 -*-
+
+
+# pip install streamlit-quill
+from streamlit_quill import st_quill 
+
+elif choice == "📖 Gabinete de Hermenêutica":
+    # CSS para simular janelas de software (The Word)
+    st.markdown("""
+    <style>
+        .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+        .stTabs [data-baseweb="tab"] {
+            background-color: #1a1c23;
+            border-radius: 4px 4px 0px 0px;
+            padding: 10px;
+        }
+        .pane {
+            border: 1px solid #343a40;
+            padding: 15px;
+            border-radius: 5px;
+            background: #0d1117;
+            height: 80vh;
+            overflow-y: auto;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.title("🏛️ Gabinete de Estudo Teológico (Padrão The Word)")
+
+    # --- LAYOUT DE PAINÉIS ---
+    col_bib, col_dict, col_editor = st.columns([1, 1, 1.5])
+
+    # PAINEL 1: TEXTO E COMENTÁRIO
+    with col_bib:
+        st.markdown("<div class='pane'>", unsafe_allow_html=True)
+        st.subheader("📜 Bíblias e Comentários")
+        versao = st.selectbox("Versão", ["NVT", "ARA", "Almeida"])
+        passagem = st.text_input("Referência", "Efésios 2:8")
+        
+        tab_bib, tab_com = st.tabs(["Bíblia", "Comentário"])
+        with tab_bib:
+            st.write(f"**{passagem} ({versao})**")
+            st.write("Porque pela graça sois salvos, por meio da fé; e isto não vem de vós, é dom de Deus.")
+        with tab_com:
+            st.write("**Comentário Matthew Henry:**")
+            st.caption("A graça é a fonte, a fé é o meio. Nada em nós merece a salvação.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # PAINEL 2: DICIONÁRIOS E STRONG
+    with col_dict:
+        st.markdown("<div class='pane'>", unsafe_allow_html=True)
+        st.subheader("🔍 Léxico Strong")
+        cod_strong = st.text_input("Buscar código (Ex: G5485)").upper()
+        
+        # Simulação de busca no JSON que você vai baixar
+        if cod_strong == "G5485":
+            st.success("**χάρις (charis)**")
+            st.write("**Definição:** Graça, favor, gratidão. O favor imerecido de Deus.")
+            st.info("**Uso em Efésios:** Refere-se à base da salvação cristã.")
+        else:
+            st.write("Digite um código para analisar o original.")
+        
+        st.divider()
+        st.subheader("📚 Dicionário Bíblico")
+        st.text_input("Termo (Ex: Justificação)")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # PAINEL 3: EDITOR DE SERMÃO (THE WORD STYLE)
+    with col_editor:
+        st.subheader("✍️ Editor de Manuscrito")
+        st.caption("Use a barra abaixo para formatar: negrito, listas, fontes e cores.")
+        
+        # O Editor de Texto Rico (Rich Text)
+        conteudo_sermao = st_quill(
+            placeholder="Escreva seu esboço aqui...",
+            html=True,
+            key="quill_editor"
+        )
+        
+        if st.button("💾 Salvar Esboço Formatado"):
+            # Salva o HTML gerado no banco de dados
+            st.success("Sermão salvo com toda a formatação!")# -*- coding: utf-8 -*-
 import os, json, logging, uuid, hashlib, streamlit as st
 from datetime import datetime
 

@@ -221,18 +221,67 @@ if choice == "MODO_ADMIN":
 # 07. ROTA: BIBLIOTECA DIGITAL
 # ==============================================================================
 elif choice == "📚 Biblioteca Digital":
-    st.title("📚 Biblioteca Digital")
-    acervo = _read_json(PATH_LIVROS, default=[])
-    if not acervo: st.info("Nada publicado ainda.")
-    else:
-        for b in acervo:
-            with st.container():
-                st.markdown(f"<div class='ministerial-card'><h3>{b['titulo']}</h3><small>{b['data']}</small></div>", unsafe_allow_html=True)
-                if "PC" in b['tipo'] and b['path'] and os.path.exists(b['path']):
-                    with open(b['path'], "rb") as f:
-                        st.download_button(f"📥 Baixar: {b['nome']}", f, file_name=b['nome'], key=b['id'])
-                else:
-                    with st.expander("📖 Ler on-line"): st.markdown(b['texto'])
+    st.markdown("<h1 style='text-align:center;'>📚 Biblioteca Digital</h1>", unsafe_allow_html=True)
+    
+    # Criamos duas abas: O que você subiu e sugestões externas
+    tab_local, tab_global = st.tabs(["📂 Meus Arquivos", "🌐 Livraria Cristã (Domínio Público)"])
+
+    with tab_local:
+        acervo = _read_json(PATH_LIVROS, default=[])
+        if not acervo:
+            st.info("Seu acervo pessoal está vazio. Vá em 'SECRETARIA' para subir seus arquivos PDF ou DOCX.")
+        else:
+            # Busca simples no acervo local
+            busca = st.text_input("🔍 Pesquisar em meus livros:", placeholder="Título ou autor...")
+            for b in acervo:
+                if busca.lower() in b['titulo'].lower():
+                    with st.container():
+                        st.markdown(f"""
+                            <div class='ministerial-card'>
+                                <h3 style='margin:0;'>{b['titulo']}</h3>
+                                <small>Postado em: {b['data']}</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        if "PC" in b['tipo'] and b['path'] and os.path.exists(b['path']):
+                            with open(b['path'], "rb") as f:
+                                st.download_button(f"📥 Baixar Arquivo", f, file_name=b['nome'], key=f"dl_{b['id']}")
+                        else:
+                            with st.expander("📖 Ler On-line"):
+                                st.markdown(b['texto'])
+
+    with tab_global:
+        st.markdown("### 🏛️ Clássicos de Domínio Público")
+        st.caption("Acesso direto a obras fundamentais da teologia (Links externos seguros)")
+        
+        # Lista Curada de Grandes Obras Gratuitas (Exemplos Reais)
+        biblioteca_externa = [
+            {"titulo": "O Peregrino (John Bunyan)", "link": "https://www.monergismo.com/textos/literatura/o-peregrino_bunyan.pdf"},
+            {"titulo": "Institutas da Religião Cristã (João Calvino)", "link": "https://www.monergismo.com/textos/livros/institutas_calvino.pdf"},
+            {"titulo": "Confissões (Santo Agostinho)", "link": "https://www.monergismo.com/textos/agostinho/confissoes_agostinho.pdf"},
+            {"titulo": "Sermões de C.H. Spurgeon", "link": "https://www.projetospurgeon.com.br/"},
+            {"titulo": "Dicionário Bíblico Smith", "link": "https://www.biblestudytools.com/dictionaries/smiths-bible-dictionary/"}
+        ]
+
+        # Exibição em formato Apple Relevo
+        cols_glob = st.columns(2)
+        for i, livro in enumerate(biblioteca_externa):
+            target_col = cols_glob[i % 2]
+            with target_col:
+                st.markdown(f"""
+                    <div class='ministerial-card'>
+                        <h4 style='color:#D4AF37; margin:0;'>{livro['titulo']}</h4>
+                        <p style='font-size:0.8rem; color:gray;'>Fonte: Repositórios Oficiais</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                st.link_button(f"🔗 Abrir Obra Completa", livro['link'])
+
+        st.divider()
+        st.subheader("🔍 Portais Recomendados")
+        st.markdown("""
+        *   **[Monergismo](https://www.monergismo.com/):** Maior acervo de artigos e livros reformados em português.
+        *   **[Projeto Spurgeon](https://www.projetospurgeon.com.br/):** Centenas de sermões expositivos grátis.
+        *   **[CCEL](https://ccel.org/):** Biblioteca Ethereal de Clássicos Cristãos (Internacional).
+        """)
 
 # ==============================================================================
 # 08. ROTA: GABINETE DE HERMENÊUTICA

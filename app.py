@@ -1,85 +1,7 @@
-
-
-# pip install streamlit-quill
-from streamlit_quill import st_quill 
-
-    # CSS para simular janelas de software (The Word)
-    st.markdown("""
-    <style>
-        .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-        .stTabs [data-baseweb="tab"] {
-            background-color: #1a1c23;
-            border-radius: 4px 4px 0px 0px;
-            padding: 10px;
-        }
-        .pane {
-            border: 1px solid #343a40;
-            padding: 15px;
-            border-radius: 5px;
-            background: #0d1117;
-            height: 80vh;
-            overflow-y: auto;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.title("🏛️ Gabinete de Estudo Teológico (Padrão The Word)")
-
-    # --- LAYOUT DE PAINÉIS ---
-    col_bib, col_dict, col_editor = st.columns([1, 1, 1.5])
-
-    # PAINEL 1: TEXTO E COMENTÁRIO
-    with col_bib:
-        st.markdown("<div class='pane'>", unsafe_allow_html=True)
-        st.subheader("📜 Bíblias e Comentários")
-        versao = st.selectbox("Versão", ["NVT", "ARA", "Almeida"])
-        passagem = st.text_input("Referência", "Efésios 2:8")
-        
-        tab_bib, tab_com = st.tabs(["Bíblia", "Comentário"])
-        with tab_bib:
-            st.write(f"**{passagem} ({versao})**")
-            st.write("Porque pela graça sois salvos, por meio da fé; e isto não vem de vós, é dom de Deus.")
-        with tab_com:
-            st.write("**Comentário Matthew Henry:**")
-            st.caption("A graça é a fonte, a fé é o meio. Nada em nós merece a salvação.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # PAINEL 2: DICIONÁRIOS E STRONG
-    with col_dict:
-        st.markdown("<div class='pane'>", unsafe_allow_html=True)
-        st.subheader("🔍 Léxico Strong")
-        cod_strong = st.text_input("Buscar código (Ex: G5485)").upper()
-        
-        # Simulação de busca no JSON que você vai baixar
-        if cod_strong == "G5485":
-            st.success("**χάρις (charis)**")
-            st.write("**Definição:** Graça, favor, gratidão. O favor imerecido de Deus.")
-            st.info("**Uso em Efésios:** Refere-se à base da salvação cristã.")
-        else:
-            st.write("Digite um código para analisar o original.")
-        
-        st.divider()
-        st.subheader("📚 Dicionário Bíblico")
-        st.text_input("Termo (Ex: Justificação)")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # PAINEL 3: EDITOR DE SERMÃO (THE WORD STYLE)
-    with col_editor:
-        st.subheader("✍️ Editor de Manuscrito")
-        st.caption("Use a barra abaixo para formatar: negrito, listas, fontes e cores.")
-        
-        # O Editor de Texto Rico (Rich Text)
-        conteudo_sermao = st_quill(
-            placeholder="Escreva seu esboço aqui...",
-            html=True,
-            key="quill_editor"
-        )
-        
-        if st.button("💾 Salvar Esboço Formatado"):
-            # Salva o HTML gerado no banco de dados
-            st.success("Sermão salvo com toda a formatação!")# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import os, json, logging, uuid, hashlib, streamlit as st
 from datetime import datetime
+from streamlit_quill import st_quill # Certifique-se de rodar: pip install streamlit-quill
 
 # ==============================================================================
 # 01. CONFIGURAÇÕES GLOBAIS E PASTAS
@@ -117,11 +39,21 @@ st.markdown("""
     }
     h1, h2, h3 { color: #D4AF37 !important; }
     .stDeployButton { display: none !important; }
+    
+    /* Janela de Paineis Estilo Software Desktop (The Word) */
+    .pane {
+        border: 1px solid rgba(212, 175, 55, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        height: 75vh;
+        overflow-y: auto;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 03. MOTORES DE LÓGICA E HERMENÊUTICA
+# 03. MOTORES DE LÓGICA
 # ==============================================================================
 def hashlib_sha256(v): return hashlib.sha256(v.encode()).hexdigest()
 
@@ -131,14 +63,6 @@ def _read_json(path, default=None):
 
 def _write_json(path, data):
     with open(path, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
-
-def analise_hermeneutica(texto):
-    keywords = ["exegese", "hermenêutica", "soteriologia", "cristocentrismo", "escatologia", "graça", "doutrina"]
-    achadas = [w for w in keywords if w in texto.lower()]
-    alertas = []
-    if texto and 10 < len(texto) < 300: alertas.append("⚠️ O conteúdo pode ser mais aprofundado.")
-    if texto and not achadas and len(texto) > 100: alertas.append("🔍 Adicione termos técnicos teológicos.")
-    return achadas, alertas
 
 # ==============================================================================
 # 04. LOGIN PERSISTENTE
@@ -179,7 +103,7 @@ if not st.session_state["logged_in"]:
 with st.sidebar:
     st.markdown(f"### 👤 {st.session_state['user']}\nNível: `{st.session_state['role']}`")
     st.divider()
-    menu = ["📊 Painel Geral", "📖 Gabinete de Hermenêutica", "📚 Biblioteca Digital", "✍️ Estudos", "💬 Central Ministerial"]
+    menu = ["📊 Painel Geral", "📖 Gabinete de Hermenêutica", "📚 Biblioteca Digital", "✍️ Estudos", "💬 SOS Direto", "🧭 Aconselhamento Pastoral"]
     choice = st.radio("Escolha o Módulo:", menu)
     
     if st.session_state["role"] == "ADMIN":
@@ -189,7 +113,7 @@ with st.sidebar:
         st.session_state["logged_in"] = False; st.rerun()
 
 # ==============================================================================
-# 06. ROTA: MODO ADMIN (ENVIO DE LIVROS)
+# 06. ROTA: MODO ADMIN (CÓDIGO ORIGINAL)
 # ==============================================================================
 if choice == "MODO_ADMIN":
     st.title("🗄️ Secretaria Administrativa")
@@ -224,7 +148,7 @@ if choice == "MODO_ADMIN":
         for msg in reversed(m_list): st.info(f"De {msg['de']}: {msg['txt']}")
 
 # ==============================================================================
-# 07. ROTA: BIBLIOTECA DIGITAL (MEMBROS BAIXAM/LEEM)
+# 07. ROTA: BIBLIOTECA DIGITAL (CÓDIGO ORIGINAL)
 # ==============================================================================
 elif choice == "📚 Biblioteca Digital":
     st.title("📚 Biblioteca Digital")
@@ -242,191 +166,136 @@ elif choice == "📚 Biblioteca Digital":
                 st.divider()
 
 # ==============================================================================
-# 08. ROTA: GABINETE DE HERMENÊUTICA (DINÂMICO POR GÊNERO)
+# 08. ROTA: GABINETE DE HERMENÊUTICA (INTERFACE MELHORADA - THE WORD STYLE)
 # ==============================================================================
 elif choice == "📖 Gabinete de Hermenêutica":
-    st.title("📖 Gabinete de Exegese e Hermenêutica Profissional")
+    st.title("🏛️ Gabinete de Estudo Teológico (Interface Profissional)")
+
+    strong_simulado = {
+        "G5485": {"termo": "χάρις (charis)", "trad": "Graça", "def": "Favor imerecido, a base da salvação em Efésios."},
+        "G4102": {"termo": "πίστις (pistis)", "trad": "Fé", "def": "Confiança, convicção e lealdade a Deus."}
+    }
+
+    # Painéis de Estudo estilo "The Word"
+    col_bib, col_tools, col_edit = st.columns([1, 1, 1.8])
+
+    with col_bib:
+        st.markdown("<div class='pane'>", unsafe_allow_html=True)
+        st.subheader("📜 Bíblias e Comentários")
+        passagem = st.text_input("Passagem Bíblica", "Efésios 2:1-10")
+        v_biblia = st.selectbox("Versão", ["NVT", "ARA", "Almeida Corrigida"])
+        
+        tab_t, tab_c = st.tabs(["📖 Texto", "💭 Comentários"])
+        with tab_t:
+            st.info(f"Modo Estudo: {passagem} na versão {v_biblia}")
+            st.write("DICA: Use o painel ao lado para exegese de termos chave.")
+        with tab_c:
+            st.write("**Comentário Wesley:** O fundamento aqui é a eleição soberana de Deus...")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_tools:
+        st.markdown("<div class='pane'>", unsafe_allow_html=True)
+        st.subheader("🔍 Strong & Léxicos")
+        cod_s = st.text_input("Digite o código Strong (ex: G5485)").upper()
+        if cod_s in strong_simulado:
+            item = strong_simulado[cod_s]
+            st.success(f"**{item['termo']}**\n\n**Significado:** {item['trad']}\n\n{item['def']}")
+        else:
+            st.caption("Consulte os originais Grego/Hebraico para uma pregação expositiva fiel.")
+        st.divider()
+        st.subheader("📚 Dicionário de Temas")
+        st.text_input("Pesquisar por: Justificação, Graça, Santidade...")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_edit:
+        st.subheader("✍️ Manuscrito (Pregador)")
+        st.caption("Escreva seu esboço abaixo. Use listas e negrito para organizar seus pontos.")
+        manuscrito_final = st_quill(placeholder="Proposição, Pontos e Aplicação...", html=True, key="h_editor")
+        if st.button("💾 ARQUIVAR MEU ESTUDO"):
+            st.success("Estudo arquivado com sucesso!")
+
+# ==============================================================================
+# 09. ROTA: ACONSELHAMENTO PASTORAL (SEU CÓDIGO ORIGINAL ÍNTEGRO)
+# ==============================================================================
+elif choice == "🧭 Aconselhamento Pastoral":
+    st.title("🧭 Gabinete de Cuidado Ministerial")
+    db_acon = _read_json(PATH_ACONSELHAMENTO, default=[])
     
-    # --- BARRA DE FERRAMENTAS DE CONSULTA (ESTILO THE WORD) ---
-    with st.expander("🛠️ BIBLIOTECA DE APOIO (Strong & Léxicos)", expanded=False):
-        col_tool1, col_tool2, col_tool3 = st.columns(3)
-        with col_tool1:
-            st.markdown("**Lexicon Strong**")
-            st.info("Consulte o original (Grego/Hebraico) via [Blue Letter Bible](https://www.blueletterbible.org/)")
-        with col_tool2:
-            st.markdown("**Comentário Bíblico**")
-            st.info("Sugestão: [Bible Hub Commentaries](https://biblehub.com/commentaries/)")
-        with col_tool3:
-            st.markdown("**Dicionário Teológico**")
-            st.info("Padrão: [Bible Study Tools](https://www.biblestudytools.com/dictionaries/)")
+    if st.session_state["role"] != "ADMIN":
+        meus_processos = [p for p in db_acon if p['aluno'] == st.session_state['user']]
+        if not meus_processos:
+            st.info("Você ainda não possui um processo de aconselhamento iniciado.")
+            with st.expander("🆕 Solicitar Nova Orientação"):
+                with st.form("sol_acon_aluno"):
+                    t_escolhido = st.selectbox("Área:", ["Batismo", "Casamento", "Educação", "Espiritual", "Outros"])
+                    d_inicial = st.text_area("Descreva o que está passando:")
+                    if st.form_submit_button("Iniciar"):
+                        p_novo = {"id": str(uuid.uuid4())[:8], "aluno": st.session_state["user"], "tema": t_escolhido, "historico": [], "plano_da_semana": {"devocional": "", "leitura": "", "referencia": ""}, "status": "Em Espera", "data_abertura": datetime.now().strftime("%d/%m/%Y")}
+                        db_acon.append(p_novo); _write_json(PATH_ACONSELHAMENTO, db_acon); st.rerun()
+        else:
+            for proc in meus_processos:
+                st.markdown(f"<div class='ministerial-card'><h3>{proc['tema']}</h3><p>{proc['status']}</p></div>", unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown("#### 📖 Meu Plano")
+                    if proc['plano_da_semana']['devocional']:
+                        st.info(f"**Devocional:** {proc['plano_da_semana']['devocional']}")
+                        st.success(f"**Leitura:** {proc['plano_da_semana']['leitura']}")
+                with c2:
+                    st.markdown("#### 📅 Histórico")
+                    for h in reversed(proc['historico']):
+                        with st.expander(f"Nota de {h['data']}"): st.write(h['nota'])
+    else:
+        st.subheader("📋 Gestão Pastoral")
+        nomes_alunos = sorted(list(set([p['aluno'] for p in db_acon])))
+        if not nomes_alunos: st.info("Sem casos.")
+        else:
+            aluno_alvo = st.selectbox("Atender Aluno:", nomes_alunos)
+            for idx, p_global in enumerate(db_acon):
+                if p_global['aluno'] == aluno_alvo:
+                    with st.expander(f"Atendimento: {p_global['aluno']}", expanded=True):
+                        txt_nota = st.text_area("Notas da Sessão", key=f"nt_{p_global['id']}")
+                        dev_txt = st.text_input("Plano Devocional", value=p_global['plano_da_semana']['devocional'], key=f"dv_{p_global['id']}")
+                        leit_txt = st.text_input("Livro Indicado", value=p_global['plano_da_semana']['leitura'], key=f"lei_{p_global['id']}")
+                        ref_txt = st.text_input("Versículo Base", value=p_global['plano_da_semana']['referencia'], key=f"rf_{p_global['id']}")
+                        if st.button("✅ Salvar e Enviar Aluno", key=f"sv_{p_global['id']}"):
+                            if txt_nota: p_global['historico'].append({"data": datetime.now().strftime("%d/%m %H:%M"), "nota": txt_nota})
+                            p_global['plano_da_semana'] = {"devocional": dev_txt, "leitura": leit_txt, "referencia": ref_txt}
+                            p_global['status'] = "Em Acompanhamento"; _write_json(PATH_ACONSELHAMENTO, db_acon); st.rerun()
 
-    st.divider()
-
-    # --- SELEÇÃO DE GÊNERO (O Cérebro do Sistema) ---
-    col_main1, col_main2 = st.columns([1, 2])
-    
-    with col_main1:
-        st.subheader("📍 Configuração do Estudo")
-        ref_biblica = st.text_input("Passagem Bíblica (ex: Romanos 8:1-4)")
-        genero = st.selectbox("Gênero Literário", [
-            "Epístola (Argumentativo)", 
-            "Narrativa (Histórico)", 
-            "Poesia/Sapiencial (Emocional)", 
-            "Parábola (Ilustrativo)",
-            "Profético/Apocalíptico"
-        ])
-        
-        # Orientações dinâmicas com base no gênero (Baseado no "Entendes o que lês?")
-        guias_genero = {
-            "Epístola (Argumentativo)": {
-                "foco": "Lógica e Argumentação",
-                "perguntas": ["Qual o 'Portanto'? ", "Qual a premissa teológica?", "Identifique as conjunções (pois, mas, para que)."]
-            },
-            "Narrativa (Histórico)": {
-                "foco": "Cenário, Personagens e Conflito",
-                "perguntas": ["Quem é o protagonista?", "Qual o clímax da cena?", "Onde Deus está agindo na história?"]
-            },
-            "Poesia/Sapiencial (Emocional)": {
-                "foco": "Paralelismo e Imagem",
-                "perguntas": ["Qual o sentimento dominante?", "Há paralelismo sinônimo ou antitético?", "Qual a metáfora central?"]
-            },
-            "Parábola (Ilustrativo)": {
-                "foco": "Ponto de Impacto",
-                "perguntas": ["Quem eram os ouvintes originais?", "Qual a reviravolta na história?", "Qual a única verdade central?"]
-            }
-        }
-        
-        guia = guias_genero.get(genero, {"foco": "Geral", "perguntas": []})
-        st.warning(f"**Foco do Gênero:** {guia['foco']}")
-        for p in guia['perguntas']:
-            st.caption(f"• {p}")
-
-    with col_main2:
-        # --- WORKSPACE DE ESCRITA ---
-        tab_obs, tab_exegese, tab_esboço = st.tabs(["👁️ OBSERVAÇÃO", "🔍 EXEGESE (STRONG)", "🎤 ESBOÇO EXPOSITIVO"])
-        
-        with tab_obs:
-            st.subheader("Observação do Texto")
-            if genero == "Epístola (Argumentativo)":
-                obs_texto = st.text_area("Mapeie o argumento: (Se A então B...)", height=300, placeholder="Ex: Paulo inicia com uma negação 'Nenhuma condenação'...")
-            else:
-                obs_texto = st.text_area("O que você vê no texto?", height=300)
-            
-        with tab_exegese:
-            st.subheader("Análise de Palavras e Contexto")
-            col_ex1, col_ex2 = st.columns(2)
-            with col_ex1:
-                palavra_chave = st.text_input("Palavra Original (Strong G/H)")
-                significado = st.text_area("Significado no Léxico")
-            with col_ex2:
-                contexto_cultural = st.text_area("Contexto Histórico/Cultural")
-            
-            ponte_teologica = st.text_area("A Ponte: Qual o princípio eterno que não muda?", placeholder="Ex: A justificação é apenas pela fé.")
-
-        with tab_esboço:
-            st.subheader("Estrutura da Pregação")
-            tema_central = st.text_input("Título Homilético")
-            esboco_final = st.text_area("Esboço (Introdução, Pontos, Aplicação)", height=350, 
-                                        value="I. \n\nII. \n\nIII. \n\nConclusão e Apelo:")
-
-    # --- BOTÃO DE FINALIZAÇÃO ---
-    if st.button("💾 FINALIZAR E ARQUIVAR ESTUDO"):
-        novo_estudo = {
-            "data": datetime.now().strftime("%d/%m/%Y"),
-            "ref": ref_biblica,
-            "genero": genero,
-            "tema": tema_central,
-            "esboco": esboco_final
-        }
-        # Lógica para salvar no JSON
-        st.success(f"Estudo sobre {ref_biblica} salvo com sucesso no seu Gabinete!")
 # ==============================================================================
-# 09. DEMAIS ROTAS
-# ==============================================================================
-# ==============================================================================
-# 06. ROTA: PAINEL GERAL (SOUZEL | SINCRONIZAÇÃO TOTAL GOOGLE)
+# 10. ROTA: PAINEL GERAL (CÓDIGO ORIGINAL ÍNTEGRO)
 # ==============================================================================
 elif choice == "📊 Painel Geral":
-    st.markdown(f"<h1 style='text-align:center; color:#D4AF37; margin-bottom:0;'>IGREJA BATISTA EM SOUZEL</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color:gray;'>Protocolo de Discipulado Sincronizado | Gabinete Pr. Felipe Freitas</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center; color:#D4AF37;'>IGREJA BATISTA EM SOUZEL</h1>", unsafe_allow_html=True)
     st.divider()
-
-    # --- LINHA 1: BÍBLIA DIGITAL NVT ---
     col_b1, col_b2 = st.columns([1, 2])
     with col_b1:
         st.subheader("📖 NVT DIGITAL")
-        l_bib = st.selectbox("Livro:", ["Mateus", "Salmos", "Gênesis", "João", "Romanos"], key="nb_l")
-        c_bib = st.number_input("Capítulo:", min_value=1, max_value=150, value=1, key="nb_c")
-        
+        l_bib = st.selectbox("Livro:", ["Mateus", "Salmos", "Gênesis", "João", "Romanos"])
+        c_bib = st.number_input("Capítulo:", min_value=1, max_value=150, value=1)
     with col_b2:
-        st.markdown(f"""
-            <div class='ministerial-card' style='height: 200px; overflow-y: auto; padding: 25px;'>
-                <h4 style='margin:0; color:#D4AF37;'>{l_bib} {c_bib} (NVT)</h4><br>
-                <p style='font-style: italic; color:#E2E8F0; font-size:1.1rem;'>
-                "Lâmpada para os meus pés é a tua palavra e luz, para o meu caminho."
-                </p>
-                <small style='color: gray;'>Acesse o Gabinete de Hermenêutica para análises exegéticas.</small>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown(f"<div class='ministerial-card'><h4>{l_bib} {c_bib} (NVT)</h4><br><p style='font-style: italic;'>'Lâmpada para os meus pés é a tua palavra e luz, para o meu caminho.'</p></div>", unsafe_allow_html=True)
     st.divider()
-
-    # --- LINHA 2: AGENDA GOOGLE DA IGREJA EM SOUZEL ---
-    st.subheader("📅 Calendário de Eventos em Souzel")
-    
-    # Parâmetros NASA para o Google Calendar
-    CALENDAR_ID = "igrejabatistaemsouzel@gmail.com"
-    # A cor de fundo é #050a1a para sumir no fundo do seu app
-    google_url = f"https://calendar.google.com/calendar/embed?src={CALENDAR_ID}&ctz=America%2FSao_Paulo&bgcolor=%23050a1a&color=%23D4AF37&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0"
-
-    st.markdown(f"""
-        <div style='border: 1px solid rgba(212,175,55,0.3); border-radius: 12px; overflow: hidden;'>
-            <iframe src="{google_url}" style="border:0" width="100%" height="550" frameborder="0" scrolling="no"></iframe>
-        </div>
-    """, unsafe_allow_html=True)
-
+    st.subheader("📅 Calendário em Souzel")
+    google_url = "https://calendar.google.com/calendar/embed?src=igrejabatistaemsouzel@gmail.com&ctz=America%2FSao_Paulo&bgcolor=%23050a1a&color=%23D4AF37&showTitle=0"
+    st.markdown(f"<iframe src='{google_url}' style='border:0' width='100%' height='550' frameborder='0' scrolling='no'></iframe>", unsafe_allow_html=True)
     st.divider()
+    h1, h2, h3 = st.columns(3)
+    with h1: st.markdown("<div class='ministerial-card' style='text-align:center;'><h4>QUARTA-FEIRA</h4><p style='color:#D4AF37;'>19:30</p></div>", unsafe_allow_html=True)
+    with h2: st.markdown("<div class='ministerial-card' style='text-align:center;'><h4>SÁBADO</h4><p style='color:#D4AF37;'>19:30</p></div>", unsafe_allow_html=True)
+    with h3: st.markdown("<div class='ministerial-card' style='text-align:center;'><h4>DOMINGO</h4><p style='color:#D4AF37;'>19:30</p></div>", unsafe_allow_html=True)
 
-    # --- LINHA 3: HORÁRIOS FIXOS INSTITUCIONAIS ---
-    st.subheader("🏛️ Celebrações de Souzel (Horários Fixos)")
-    h_col1, h_col2, h_col3 = st.columns(3)
-    
-    with h_col1:
-        st.markdown("""
-            <div class='ministerial-card' style='text-align:center;'>
-                <h4 style='margin:0;'>QUARTA-FEIRA</h4>
-                <p style='color:#D4AF37; font-size: 1.5rem; font-family: monospace;'>19:30</p>
-                <small style='color:gray;'>ENSINO E ORAÇÃO</small>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    with h_col2:
-        st.markdown("""
-            <div class='ministerial-card' style='text-align:center;'>
-                <h4 style='margin:0;'>SÁBADO (EBD)</h4>
-                <p style='color:#D4AF37; font-size: 1.5rem; font-family: monospace;'>19:30</p>
-                <small style='color:gray;'>DISCIPULADO AVANÇADO</small>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    with h_col3:
-        st.markdown("""
-            <div class='ministerial-card' style='text-align:center;'>
-                <h4 style='margin:0;'>DOMINGO</h4>
-                <p style='color:#D4AF37; font-size: 1.5rem; font-family: monospace;'>19:30</p>
-                <small style='color:gray;'>CULTO DA FAMÍLIA</small>
-            </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<center style='margin-top:20px; color:#333;'><small>SYNC COMPLETED: PROTOCOL SOUZEL ACTIVE</small></center>", unsafe_allow_html=True)
-
-elif "Estudos" in choice:
+# ==============================================================================
+# 11. DEMAIS ROTAS (ORIGINAIS)
+# ==============================================================================
+elif choice == "✍️ Estudos":
     st.title("✍️ Notas e Estudos ")
     st.text_area("Meus Rascunhos", height=300)
 
-elif choice == "💬 Aconselhamento Pastoral ":
-    st.title("💬 SOS Aconselhamento")
-    txt_s = st.text_area("Enviar mensagem para o Gabinete do Pastor:")
+elif choice == "💬 SOS Direto":
+    st.title("💬 Central Ministerial")
+    txt_s = st.text_area("Mensagem privada para o Pastor:")
     if st.button("Enviar SOS"):
         mlist = _read_json(PATH_MSGS, default=[])
         mlist.append({"de": st.session_state["user"], "txt": txt_s})

@@ -77,6 +77,8 @@ def analise_hermeneutica(texto):
 # 04. LOGIN PERSISTENTE
 # ==============================================================================
 if "logged_in" not in st.session_state: st.session_state["logged_in"] = False
+if "current_page" not in st.session_state: 
+    st.session_state["current_page"] = "MENU"
 
 if not st.session_state["logged_in"]:
     st.markdown(f"<h1 style='text-align:center;'>{APP_TITLE}</h1>", unsafe_allow_html=True)
@@ -279,8 +281,15 @@ elif choice == "🧭 Aconselhamento Pastoral":
 # ==============================================================================
 # MÓDULO: PAINEL GERAL (RESTAURAÇÃO COMPLETA - TELA CHEIA)
 # ==============================================================================
-elif st.session_state["current_page"] == "PAINEL":
-    # Botão para retornar ao menu principal
+    
+
+elif st.session_state.get("current_page") == "PAINEL" or choice == "📊 Painel Geral":
+    
+    if st.button("⬅️ VOLTAR AO MENU"):
+        st.session_state["current_page"] = "MENU"
+        st.rerun()
+
+    st.markdown("<h1 style='text-align:center; color:#D4AF37;'>IGREJA BATISTA EM SOUZEL</h1>", unsafe_allow_html=True)
     if st.button("⬅️ VOLTAR AO MENU"):
         st.session_state["current_page"] = "MENU"
         st.rerun()

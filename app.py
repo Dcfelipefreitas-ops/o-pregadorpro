@@ -22,35 +22,99 @@ PATH_ACONSELHAMENTO = os.path.join(DB_DIR, "prontuarios_aconselhamento.json")
 # ==============================================================================
 # 02. ESTÉTICA CELESTIAL E ESTILOS
 # ==============================================================================
-st.set_page_config(page_title=APP_TITLE, page_icon="✝️", layout="wide")
-
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    .main { background-color: #050a1a; color: #ffffff; }
-    .ministerial-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-left: 5px solid #D4AF37;
-        padding: 20px;
-        border-radius: 4px;
-        margin-bottom: 20px;
-        border: 1px solid rgba(212, 175, 55, 0.1);
-    }
-    h1, h2, h3 { color: #D4AF37 !important; }
-    .stDeployButton { display: none !important; }
+    /* Importação de fontes modernas */
+    @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;600&family=Inter:wght@300;400;700&display=swap');
     
-    .pane {
-        border: 1px solid rgba(212, 175, 55, 0.2);
-        padding: 15px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.03);
-        height: 75vh;
-        overflow-y: auto;
+    html, body, [class*="css"] { 
+        font-family: 'SF Pro Display', 'Inter', sans-serif; 
+        background-color: #000000; 
     }
+
+    /* Fundo em degradê profundo estilo Apple Dark */
+    .stApp {
+        background: radial-gradient(circle at top right, #1a1a2e, #000000);
+    }
+
+    /* Card Ministerial - Efeito Vidro (Glassmorphism) */
+    .ministerial-card {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 22px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .ministerial-card:hover {
+        transform: scale(1.02);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(212, 175, 55, 0.4);
+        box-shadow: 0 15px 40px rgba(212, 175, 55, 0.1);
+    }
+
+    /* Títulos em Destaque Nobre */
+    h1, h2, h3 { 
+        color: #D4AF37 !important; 
+        font-weight: 700 !important;
+        letter-spacing: -0.02em !important;
+    }
+
+    /* Painel de Trabalho (Gabinete) em Relevo Profundo */
+    .pane {
+        background: linear-gradient(145deg, #0f0f15, #050508);
+        border: 1px solid rgba(212, 175, 55, 0.15);
+        border-radius: 28px;
+        padding: 20px;
+        height: 78vh;
+        overflow-y: auto;
+        box-shadow: inset 4px 4px 10px rgba(0,0,0,0.8), 
+                    inset -2px -2px 10px rgba(255,255,255,0.02),
+                    0 10px 30px rgba(0,0,0,0.6);
+    }
+
+    /* Customização da Barra de Rolagem do Painel */
+    .pane::-webkit-scrollbar { width: 6px; }
+    .pane::-webkit-scrollbar-thumb { background: #D4AF37; border-radius: 10px; }
+
+    /* Botões estilo Neumorfismo (Relevo Apple) */
+    div.stButton > button {
+        background: #121212;
+        color: #D4AF37;
+        border: 1px solid rgba(212, 175, 55, 0.2);
+        border-radius: 14px;
+        padding: 12px 20px;
+        font-weight: 600;
+        box-shadow: 6px 6px 12px #000000, 
+                   -2px -2px 8px rgba(255,255,255,0.05);
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    div.stButton > button:hover {
+        color: #ffffff;
+        border-color: #D4AF37;
+        box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+        transform: translateY(-2px);
+    }
+
+    /* Estilo para Widgets de Entrada (Inputs) */
+    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea {
+        background: rgba(255,255,255,0.04) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-radius: 12px !important;
+        color: #ffffff !important;
+    }
+
+    /* Esconder Elementos desnecessários do Streamlit */
+    .stDeployButton, #MainMenu, footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
-
 # ==============================================================================
 # 03. MOTORES DE LÓGICA E AUXILIARES
 # ==============================================================================

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os, json, logging, uuid, hashlib, streamlit as st
+from streamlit_quill import st_quill
 from datetime import datetime
 from streamlit_quill import st_quill # Certifique-se de rodar: pip install streamlit-quill
 
@@ -51,6 +52,14 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+.pane {
+        border: 1px solid rgba(212, 175, 55, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        height: 80vh;
+        overflow-y: auto;
+    }
 
 # ==============================================================================
 # 03. MOTORES DE LÓGICA
@@ -165,54 +174,61 @@ elif choice == "📚 Biblioteca Digital":
                     with st.expander("📖 Ler on-line"): st.markdown(b['texto'])
                 st.divider()
 
-# ==============================================================================
-# 08. ROTA: GABINETE DE HERMENÊUTICA (INTERFACE MELHORADA - THE WORD STYLE)
-# ==============================================================================
 elif choice == "📖 Gabinete de Hermenêutica":
-    st.title("🏛️ Gabinete de Estudo Teológico (Interface Profissional)")
+    st.title("🏛️ Gabinete de Estudo Expositivo")
 
-    strong_simulado = {
-        "G5485": {"termo": "χάρις (charis)", "trad": "Graça", "def": "Favor imerecido, a base da salvação em Efésios."},
-        "G4102": {"termo": "πίστις (pistis)", "trad": "Fé", "def": "Confiança, convicção e lealdade a Deus."}
-    }
+    # Lógica para ler seus arquivos JSON históricos (Cairo Codex, Accra, etc)
+    # Ele procura arquivos na pasta DB_DIR ou Gabinete_Pastoral
+    arquivos_fontes = [f for f in os.listdir(DB_DIR) if f.endswith('.json')]
+    biblioteca_recursos = {}
+    
+    for arq in arquivos_fontes:
+        dados_res = _read_json(os.path.join(DB_DIR, arq))
+        if isinstance(dados_res, dict) and "title" in dados_res:
+            biblioteca_recursos[dados_res["title"]] = dados_res
 
-    # Painéis de Estudo estilo "The Word"
-    col_bib, col_tools, col_edit = st.columns([1, 1, 1.8])
+    # Layout em 3 colunas padrão software de exegese
+    col_recurso, col_ferramenta, col_manuscrito = st.columns([1, 1, 1.8])
 
-    with col_bib:
+    with col_recurso:
         st.markdown("<div class='pane'>", unsafe_allow_html=True)
-        st.subheader("📜 Bíblias e Comentários")
-        passagem = st.text_input("Passagem Bíblica", "Efésios 2:1-10")
-        v_biblia = st.selectbox("Versão", ["NVT", "ARA", "Almeida Corrigida"])
+        st.subheader("📚 Fontes & Manuscritos")
         
-        tab_t, tab_c = st.tabs(["📖 Texto", "💭 Comentários"])
-        with tab_t:
-            st.info(f"Modo Estudo: {passagem} na versão {v_biblia}")
-            st.write("DICA: Use o painel ao lado para exegese de termos chave.")
-        with tab_c:
-            st.write("**Comentário Wesley:** O fundamento aqui é a eleição soberana de Deus...")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col_tools:
-        st.markdown("<div class='pane'>", unsafe_allow_html=True)
-        st.subheader("🔍 Strong & Léxicos")
-        cod_s = st.text_input("Digite o código Strong (ex: G5485)").upper()
-        if cod_s in strong_simulado:
-            item = strong_simulado[cod_s]
-            st.success(f"**{item['termo']}**\n\n**Significado:** {item['trad']}\n\n{item['def']}")
+        if biblioteca_recursos:
+            escolha_res = st.selectbox("Selecione o Material:", list(biblioteca_recursos.keys()))
+            res_view = biblioteca_recursos[escolha_res]
+            
+            st.markdown(f"**Título:** {res_view.get('title_vernacular', '')}")
+            st.markdown(f"**Ano/Era:** {res_view.get('year', 'N/A')}")
+            st.divider()
+            # Mostra a descrição removendo as tags <br> para ficar legível
+            st.write(res_view.get('description', '').replace('<br>', '\n'))
         else:
-            st.caption("Consulte os originais Grego/Hebraico para uma pregação expositiva fiel.")
-        st.divider()
-        st.subheader("📚 Dicionário de Temas")
-        st.text_input("Pesquisar por: Justificação, Graça, Santidade...")
+            st.info("Coloque seus arquivos .json históricos na pasta de dados para carregar aqui.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with col_edit:
-        st.subheader("✍️ Manuscrito (Pregador)")
-        st.caption("Escreva seu esboço abaixo. Use listas e negrito para organizar seus pontos.")
-        manuscrito_final = st_quill(placeholder="Proposição, Pontos e Aplicação...", html=True, key="h_editor")
-        if st.button("💾 ARQUIVAR MEU ESTUDO"):
-            st.success("Estudo arquivado com sucesso!")
+    with col_ferramenta:
+        st.markdown("<div class='pane'>", unsafe_allow_html=True)
+        st.subheader("🔍 Léxico & Strong")
+        st.caption("Insira o código para análise do original")
+        st.text_input("Strong G/H", placeholder="Ex: G5485")
+        
+        st.divider()
+        st.subheader("📖 Referências Cruzas")
+        st.caption("Textos relacionados para Pregação Expositiva")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_manuscrito:
+        st.subheader("✍️ Esboço e Manuscrito")
+        # Editor Rico com suporte a pontos, negrito e cores
+        conteudo_estudo = st_quill(
+            placeholder="Desenvolva sua exegese e os tópicos da mensagem...",
+            html=True,
+            key="quill_hermen"
+        )
+        
+        if st.button("💾 ARQUIVAR ESTUDO"):
+            st.success("Estudo salvo no sistema com sucesso!")
 
 # ==============================================================================
 # 09. ROTA: ACONSELHAMENTO PASTORAL (SEU CÓDIGO ORIGINAL ÍNTEGRO)

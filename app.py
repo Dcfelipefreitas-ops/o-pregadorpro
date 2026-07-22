@@ -163,19 +163,92 @@ elif choice == "📚 Biblioteca Digital":
                 st.divider()
 
 # ==============================================================================
-# 08. ROTA: GABINETE DE HERMENÊUTICA (NOVO)
+# 08. ROTA: GABINETE DE HERMENÊUTICA (ESTRUTURA DE PREGAÇÃO EXPOSITIVA)
 # ==============================================================================
 elif choice == "📖 Gabinete de Hermenêutica":
-    st.title("📖 Gabinete de Hermenêutica")
-    tema_h = st.text_input("Tema Central do Estudo")
-    texto_h = st.text_area("Escreva seu Manuscrito", height=450)
-    if texto_h:
-        achados, avisos = analise_hermeneutica(texto_h)
-        with st.expander("🧐 Análise Teológica do Sistema", expanded=True):
+    st.title("📖 Gabinete de Hermenêutica e Exegese")
+    st.markdown("---")
+    
+    st.info("""
+    **Método de Estudo Expositivo:** Siga os passos abaixo inspirados no método histórico-gramatical 
+    para extrair o significado original e aplicá-lo à igreja contemporânea.
+    """)
+
+    with st.form("form_hermeneutica"):
+        # --- PASSO 1: O TEXTO E O GÊNERO ---
+        st.subheader("1. Delimitação e Gênero")
+        col_t1, col_t2 = st.columns([2, 1])
+        with col_t1:
+            ref_biblica = st.text_input("Referência Bíblica (ex: Efésios 2:1-10)")
+        with col_t2:
+            genero = st.selectbox("Gênero Literário", [
+                "Epístola (Doutrinário)", 
+                "Narrativa do Antigo Testamento", 
+                "Evangelhos / Parábolas", 
+                "Atos (História)", 
+                "Poesia / Salmos", 
+                "Profecia / Apocalíptico", 
+                "Lei / Pentateuco"
+            ])
+
+        # --- PASSO 2: CONTEXTO (ENTENDES O QUE LÊS?) ---
+        st.subheader("2. Contexto Histórico e Literário")
+        st.caption("O que o texto significava para os destinatários originais?")
+        contexto_h = st.text_area("Quem escreveu? Para quem? Qual era o problema/situação na época?", height=100)
+        contexto_l = st.text_area("O que vem antes e depois deste texto? (Fluxo de pensamento)", height=100)
+
+        # --- PASSO 3: EXEGESE E PALAVRAS-CHAVE ---
+        st.subheader("3. Análise Exegética")
+        keywords_in = st.text_input("Palavras-chave ou termos em Grego/Hebraico para estudo")
+        exegese_obs = st.text_area("Observações gramaticais, verbos importantes e conexões lógicas (Pois, Portanto, Mas...)", height=150)
+
+        # --- PASSO 4: A PONTE TEOLÓGICA (O CORAÇÃO DO ESTUDO) ---
+        st.subheader("4. Teologia e Cristocentrismo")
+        ponte_teol = st.text_area("Qual a verdade universal e eterna deste texto? Como ele aponta para Cristo ou para o Evangelho?", height=120)
+
+        # --- PASSO 5: ESBOÇO DA PREGAÇÃO EXPOSITIVA ---
+        st.subheader("5. Estrutura Homilética (Esboço)")
+        tema_sermao = st.text_input("Título / Tema Central da Mensagem")
+        
+        esboco = st.text_area("Estruture seus pontos (Ex: I. A Queda do Homem; II. A Graça de Deus; III. A Resposta da Fé)", height=200)
+        
+        aplicacao = st.text_area("Aplicações Práticas: Como a igreja deve viver isso amanhã?", height=100)
+
+        # BOTAÃO DE PROCESSAMENTO
+        btn_estudo = st.form_submit_button("🧪 PROCESSAR E ANALISAR ESTUDO")
+
+    if btn_estudo:
+        # Lógica de Análise (Aproveitando sua função analise_hermeneutica)
+        achados, avisos = analise_hermeneutica(exegese_obs + " " + ponte_teol)
+        
+        st.success("✅ Estudo Processado com Sucesso!")
+        
+        # Dashboard de Feedback
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("### 🧐 Diagnóstico do Sistema")
             for a in avisos: st.warning(a)
-            st.write(f"**Termos Identificados:** {', '.join(achados) if achados else 'Aguardando termos técnicos...'}")
-            st.progress(min(len(achados)*20, 100))
-    st.button("💾 Sincronizar Estudo")
+            if not achados: st.info("Considere usar termos como: 'Soteriologia', 'Graça', 'Redenção' para maior profundidade.")
+            else: st.write(f"**Termos Teológicos Chave:** {', '.join(achados)}")
+
+        with c2:
+            st.markdown("### 📊 Nível de Profundidade")
+            pontuacao = 0
+            if len(contexto_h) > 50: pontuacao += 25
+            if len(exegese_obs) > 100: pontuacao += 25
+            if len(ponte_teol) > 50: pontuacao += 25
+            if len(esboco) > 50: pontuacao += 25
+            st.progress(pontuacao / 100)
+            st.write(f"Conclusão do Protocolo: {pontuacao}%")
+
+        # Opção de exportar (Simulado)
+        st.divider()
+        st.markdown(f"### 📄 Resumo do Sermão: {tema_sermao}")
+        st.write(f"**Base:** {ref_biblica} ({genero})")
+        st.markdown(f"**Esboço:**\n{esboco}")
+        
+        # Aqui você poderia salvar em um novo JSON chamado PATH_ESTUDOS_REALIZADOS
+        st.button("💾 Salvar Estudo no meu Acervo")
 # ==============================================================================
 # ROTA: GABINETE DE ACONSELHAMENTO (PRONTUÁRIO INTERATIVO)
 # ==============================================================================
